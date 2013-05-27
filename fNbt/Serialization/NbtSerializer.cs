@@ -172,7 +172,12 @@ namespace fNbt.Serialization
                 else if (list.ListType == NbtTagType.ByteArray)
                     type = typeof(byte[]);
                 else if (list.ListType == NbtTagType.Compound)
-                    type = typeof(object);
+                {
+                    if (Type.IsArray)
+                        type = Type.GetElementType();
+                    else
+                        type = typeof(object);
+                }
                 else if (list.ListType == NbtTagType.Double)
                     type = typeof(double);
                 else if (list.ListType == NbtTagType.Float)
