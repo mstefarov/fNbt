@@ -8,6 +8,6 @@ namespace fNbt.Serialization
     public interface INbtSerializable
     {
         NbtTag Serialize();
-        void Deserialize(NbtCompound value);
+        void Deserialize(NbtTag value);
     }
 }
