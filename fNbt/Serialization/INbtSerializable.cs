@@ -7,7 +7,7 @@ namespace fNbt.Serialization
 {
     public interface INbtSerializable
     {
-        NbtCompound Serialize();
+        NbtTag Serialize();
         void Deserialize(NbtCompound value);
     }
 }

@@ -27,11 +27,7 @@ namespace fNbt.Serialization
         public NbtTag Serialize(object value, string tagName)
         {
             if (value is INbtSerializable)
-            {
-                var compound = ((INbtSerializable)value).Serialize();
-                compound.Name = tagName;
-                return compound;
-            }
+                return ((INbtSerializable)value).Serialize();
             else if (value is NbtTag)
                 return (NbtTag)value;
             else if (value is byte)
