@@ -19,15 +19,15 @@ namespace fNbt.Serialization
             Type = type;
         }
 
-        public NbtTag Serialize(object value)
+        public NbtTag Serialize(object value, bool skipInterfaceCheck = false)
         {
-            return Serialize(value, "");
+            return Serialize(value, "", skipInterfaceCheck);
         }
 
-        public NbtTag Serialize(object value, string tagName)
+        public NbtTag Serialize(object value, string tagName, bool skipInterfaceCheck = false)
         {
-            if (value is INbtSerializable)
-                return ((INbtSerializable)value).Serialize();
+            if (!skipInterfaceCheck && value is INbtSerializable)
+                return ((INbtSerializable)value).Serialize(tagName);
             else if (value is NbtTag)
                 return (NbtTag)value;
             else if (value is byte)
