@@ -139,8 +139,14 @@ namespace fNbt.Serialization
             }
         }
         
-        public object Deserialize(NbtTag value)
+        public object Deserialize(NbtTag value, bool skipInterfaceCheck = false)
         {
+            if (!skipInterfaceCheck && typeof(INbtSerializable).IsAssignableFrom(Type))
+            {
+                var instance = (INbtSerializable)Activator.CreateInstance(Type);
+                instance.Deserialize(value);
+                return instance;
+            }
             if (value is NbtByte)
                 return ((NbtByte)value).Value;
             else if (value is NbtByteArray)
@@ -217,7 +223,7 @@ namespace fNbt.Serialization
                     if (typeof(INbtSerializable).IsAssignableFrom(property.PropertyType))
                     {
                         data = Activator.CreateInstance(property.PropertyType);
-                        ((INbtSerializable)data).Deserialize(node as NbtCompound);
+                        ((INbtSerializable)data).Deserialize(node);
                     }
                     else
                         data = new NbtSerializer(property.PropertyType).Deserialize(node);
