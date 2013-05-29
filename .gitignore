@@ -1,6 +1,6 @@
 _ReSharper.LibNbt
 fNbt/obj
 fNbt.Test/obj
-bin/*
+bin/
 *.user
 *.suo
