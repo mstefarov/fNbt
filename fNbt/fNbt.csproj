@@ -40,9 +40,6 @@
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <DocumentationFile>..\bin\Release\fNbt.xml</DocumentationFile>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
-    <DebugSymbols>false</DebugSymbols>
-    <DefineConstants>
-    </DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
     <RootNamespace>fNbt</RootNamespace>
