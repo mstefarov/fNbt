@@ -21,7 +21,7 @@ namespace fNbt {
         public NbtTagType ListType {
             get { return listType; }
             set {
-                if (value < NbtTagType.Byte || (value > NbtTagType.IntArray && value != NbtTagType.Unknown)) {
+                if (value < NbtTagType.End || (value > NbtTagType.IntArray && value != NbtTagType.Unknown)) {
                     throw new ArgumentOutOfRangeException("value");
                 }
                 if (tags.Count > 0) {
