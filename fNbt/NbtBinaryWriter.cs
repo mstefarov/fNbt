@@ -6,7 +6,7 @@ using JetBrains.Annotations;
 namespace fNbt {
     /// <summary> BinaryWriter wrapper that writes NBT primitives to a stream,
     /// while taking care of endianness and string encoding, and counting bytes written. </summary>
-    internal sealed unsafe class NbtBinaryWriter {
+    internal sealed class NbtBinaryWriter {
         // Write at most 512 MiB at a time.
         // This works around an overflow in BufferedStream.Write(byte[]) that happens on 1 GiB+ writes.
         public const int MaxWriteChunk = 512*1024*1024;
@@ -116,7 +116,9 @@ namespace fNbt {
 
 
         public void Write(float value) {
-            ulong tmpValue = *(uint*)&value;
+            var bits = default(FloatAndUIntUnion);
+            bits.FloatValue = value;
+            ulong tmpValue = bits.UInt32Bits;
             unchecked {
                 if (swapNeeded) {
                     buffer[0] = (byte)(tmpValue >> 24);
@@ -135,7 +137,9 @@ namespace fNbt {
 
 
         public void Write(double value) {
-            ulong tmpValue = *(ulong*)&value;
+            var bits = default(DoubleAndULongUnion);
+            bits.DoubleValue = value;
+            ulong tmpValue = bits.UInt64Bits;
             unchecked {
                 if (swapNeeded) {
                     buffer[0] = (byte)(tmpValue >> 56);
@@ -178,19 +182,14 @@ namespace fNbt {
             } else {
                 // Aggressively try to not allocate memory in this loop for runtime performance reasons.
                 // Use an Encoder to write out the string correctly (handling surrogates crossing buffer
-                // boundaries properly).  
+                // boundaries properly).
+                char[] chars = value.ToCharArray();
                 int charStart = 0;
                 int numLeft = value.Length;
                 while (numLeft > 0) {
                     // Figure out how many chars to process this round.
                     int charCount = (numLeft > MaxBufferedStringLength) ? MaxBufferedStringLength : numLeft;
-                    int byteLen;
-                    fixed (char* pChars = value) {
-                        fixed (byte* pBytes = buffer) {
-                            byteLen = encoder.GetBytes(pChars + charStart, charCount, pBytes, BufferSize,
-                                                       charCount == numLeft);
-                        }
-                    }
+                    int byteLen = encoder.GetBytes(chars, charStart, charCount, buffer, 0, charCount == numLeft);
                     stream.Write(buffer, 0, byteLen);
                     charStart += charCount;
                     numLeft -= charCount;
