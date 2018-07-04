@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>MiNET.fnbt</id>
+    <version>$version$</version>
+    <title>MiNET.fnbt</title>
+	  <authors>$author$</authors>
+	  <owners>$author$</owners>
+    <licenseUrl>https://github.com/NiclasOlofsson/fNbt/blob/master/docs/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/NiclasOlofsson/fNbt</projectUrl>
+    <iconUrl><![CDATA[https://secure.gravatar.com/avatar/2ba5d72bdad85108d14512c4d27ea550?s=128&r=g&d=retro]]></iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>MiNET fnbt version with support for MCPE 0.16+ varint and string.</description>
+    <releaseNotes>MiNET fnbt version with support for MCPE 0.16+ varint and string.</releaseNotes>
+    <copyright>2010-2011 Erik Davidson; 2012-2015 Matvei Stefarov; 2016 Niclas Olofsson</copyright>
+    <tags>MiNET fnbt nbt MCPE varint and string.</tags>
+  </metadata>
+</package>

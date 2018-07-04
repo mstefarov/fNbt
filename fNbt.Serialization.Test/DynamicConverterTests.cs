@@ -13,7 +13,8 @@ namespace fNbt.Serialization.Test {
         public void PrimitiveTest() {
             NbtTag intTag = NbtConvert.MakeTag("derp", 1);
             Assert.IsInstanceOf<NbtInt>(intTag);
-            Assert.Equals(intTag.IntValue, 1);
+
+			Assert.AreEqual(intTag.IntValue, 1);
         }
     }
 }
