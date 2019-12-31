@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using JetBrains.Annotations;
 
 namespace fNbt {
@@ -19,7 +20,6 @@ namespace fNbt {
         public string FileName { get; private set; }
 
 		public bool UseVarInt { get; set; }
-		public bool AllowNonCompoundRootTag { get; set; }
 
         /// <summary> Gets the compression method used for most recent loading/saving of this file.
         /// Defaults to AutoDetect. </summary>
@@ -39,6 +39,21 @@ namespace fNbt {
 
         [NotNull]
         NbtCompound rootTag;
+
+        /// <summary> ALTERNATIVE Root tag of this file. Must be a named Tag. Defaults to an empty-named tag. </summary>
+        /// <exception cref="ArgumentException"> If given tag is unnamed. </exception>
+        [NotNull]
+        public NbtTag AlternativeRootTag
+        {
+            get { return rootTag; }
+            set
+            {
+                if (value == null) throw new ArgumentNullException("value");
+                if (value.Name == null) throw new ArgumentException("Root tag must be named.");
+                alternativeRootTag = value;
+            }
+        }
+        NbtTag alternativeRootTag;
 
         /// <summary> Whether new NbtFiles should default to big-endian encoding (default: true). </summary>
         public static bool BigEndianByDefault { get; set; }
@@ -342,23 +357,42 @@ namespace fNbt {
         }
 
 
-        void LoadFromStreamInternal([NotNull] Stream stream, [CanBeNull] TagSelector tagSelector) {
-            // Make sure the first byte in this file is the tag for a TAG_Compound
-            int firstByte = stream.ReadByte();
-            if (firstByte < 0) {
-                throw new EndOfStreamException();
-            }
-            if (!AllowNonCompoundRootTag && firstByte != (int)NbtTagType.Compound) {
-                throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
-            }
+        public bool AllowAlternativeRootTag { get; set; } = false;
+
+        private void LoadFromStreamInternal([NotNull] Stream stream, [CanBeNull] TagSelector tagSelector) {
             var reader = new NbtBinaryReader(stream, BigEndian) {
                 Selector = tagSelector,
-				UseVarInt = UseVarInt
+                UseVarInt = UseVarInt
             };
 
-            var rootCompound = new NbtCompound(reader.ReadString());
-            rootCompound.ReadTag(reader);
-            RootTag = rootCompound;
+            if (AllowAlternativeRootTag) {
+                var rootCompound = new NbtCompound("fakeroot");
+                rootCompound.ReadTag(reader);
+                NbtTag nbtTag = rootCompound.Tags.First();
+                if(nbtTag is NbtCompound) {
+                    RootTag = (NbtCompound)nbtTag;
+                } else {
+                    RootTag = rootCompound;
+                    AlternativeRootTag = nbtTag;
+                }
+            }
+            else {
+                // Make sure the first byte in this file is the tag for a TAG_Compound
+                int firstByte = stream.ReadByte();
+                if (firstByte < 0)
+                {
+                    throw new EndOfStreamException();
+                }
+                if (firstByte != (int)NbtTagType.Compound)
+                {
+                    throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
+                }
+
+                var rootCompound = new NbtCompound(reader.ReadString());
+                rootCompound.ReadTag(reader);
+                RootTag = rootCompound;
+            }
+
         }
 
         #endregion

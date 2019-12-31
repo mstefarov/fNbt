@@ -305,6 +305,9 @@ namespace fNbt {
                     // ReSharper disable AssignNullToNotNullAttribute
                     // newTag.Name is never null
                     tags.Add(newTag.Name, newTag);
+                    if ("fakeroot".Equals(name) && Parent == null) {
+                        return true;
+                    }
                     // ReSharper restore AssignNullToNotNullAttribute
                 }
             }
