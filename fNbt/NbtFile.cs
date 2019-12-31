@@ -19,6 +19,7 @@ namespace fNbt {
         public string FileName { get; private set; }
 
 		public bool UseVarInt { get; set; }
+		public bool AllowNonCompoundRootTag { get; set; }
 
         /// <summary> Gets the compression method used for most recent loading/saving of this file.
         /// Defaults to AutoDetect. </summary>
@@ -347,7 +348,7 @@ namespace fNbt {
             if (firstByte < 0) {
                 throw new EndOfStreamException();
             }
-            if (firstByte != (int)NbtTagType.Compound) {
+            if (!AllowNonCompoundRootTag && firstByte != (int)NbtTagType.Compound) {
                 throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
             }
             var reader = new NbtBinaryReader(stream, BigEndian) {
