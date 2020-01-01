@@ -134,7 +134,7 @@ namespace fNbt.Test {
             // See TestFiles/test.nbt.txt to see the expected format
             Assert.IsInstanceOf<NbtCompound>(file.RootTag);
 
-            NbtCompound root = file.RootTag;
+            NbtCompound root = (NbtCompound)file.RootTag;
             Assert.AreEqual("hello world", root.Name);
             Assert.AreEqual(1, root.Count);
 
@@ -150,7 +150,7 @@ namespace fNbt.Test {
             // See TestFiles/bigtest.nbt.txt to see the expected format
             Assert.IsInstanceOf<NbtCompound>(file.RootTag);
 
-            NbtCompound root = file.RootTag;
+            NbtCompound root = (NbtCompound)file.RootTag;
             Assert.AreEqual("Level", root.Name);
             Assert.AreEqual(12, root.Count);
 
@@ -314,7 +314,7 @@ namespace fNbt.Test {
         public static void AssertValueTest(NbtFile file) {
             Assert.IsInstanceOf<NbtCompound>(file.RootTag);
 
-            NbtCompound root = file.RootTag;
+            NbtCompound root = (NbtCompound)file.RootTag;
             Assert.AreEqual("root", root.Name);
             Assert.AreEqual(9, root.Count);
 

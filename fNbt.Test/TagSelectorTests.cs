@@ -9,25 +9,29 @@ namespace fNbt.Test {
             loadedFile.LoadFromFile("TestFiles/bigtest.nbt",
                                     NbtCompression.None,
                                     tag => tag.Name != "nested compound test");
-            Assert.IsFalse(loadedFile.RootTag.Contains("nested compound test"));
-            Assert.IsTrue(loadedFile.RootTag.Contains("listTest (long)"));
+            NbtCompound rootTag = (NbtCompound)loadedFile.RootTag;
+            Assert.IsFalse(rootTag.Contains("nested compound test"));
+            Assert.IsTrue(rootTag.Contains("listTest (long)"));
 
             loadedFile.LoadFromFile("TestFiles/bigtest.nbt",
                                     NbtCompression.None,
                                     tag => tag.TagType != NbtTagType.Float || tag.Parent.Name != "Level");
-            Assert.IsFalse(loadedFile.RootTag.Contains("floatTest"));
-            Assert.AreEqual(0.75f, loadedFile.RootTag["nested compound test"]["ham"]["value"].FloatValue);
+            rootTag = (NbtCompound)loadedFile.RootTag;
+            Assert.IsFalse(rootTag.Contains("floatTest"));
+            Assert.AreEqual(0.75f, rootTag["nested compound test"]["ham"]["value"].FloatValue);
 
             loadedFile.LoadFromFile("TestFiles/bigtest.nbt",
                                     NbtCompression.None,
                                     tag => tag.Name != "listTest (long)");
-            Assert.IsFalse(loadedFile.RootTag.Contains("listTest (long)"));
-            Assert.IsTrue(loadedFile.RootTag.Contains("byteTest"));
+            rootTag = (NbtCompound)loadedFile.RootTag;
+            Assert.IsFalse(rootTag.Contains("listTest (long)"));
+            Assert.IsTrue(rootTag.Contains("byteTest"));
 
             loadedFile.LoadFromFile("TestFiles/bigtest.nbt",
                                     NbtCompression.None,
                                     tag => false);
-            Assert.AreEqual(0, loadedFile.RootTag.Count);
+            rootTag = (NbtCompound)loadedFile.RootTag;
+            Assert.AreEqual(0, rootTag.Count);
         }
 
 
@@ -38,7 +42,8 @@ namespace fNbt.Test {
                 byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
                 file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
                                     tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(0, file.RootTag.Count);
+                NbtCompound rootTag = (NbtCompound)file.RootTag;
+                Assert.AreEqual(0, rootTag.Count);
             }
             {
                 // Check list-compound interaction
@@ -55,7 +60,8 @@ namespace fNbt.Test {
                 byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
                 file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
                                     tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(1, file.RootTag.Count);
+                NbtCompound rootTag = (NbtCompound)file.RootTag;
+                Assert.AreEqual(1, rootTag.Count);
             }
         }
 
@@ -70,7 +76,8 @@ namespace fNbt.Test {
             var file = new NbtFile(root);
             byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
             file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None, tag => false);
-            Assert.AreEqual(0, file.RootTag.Count);
+            NbtCompound rootTag = (NbtCompound)file.RootTag;
+            Assert.AreEqual(0, rootTag.Count);
         }
     }
 }
