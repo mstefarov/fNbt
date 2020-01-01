@@ -45,7 +45,7 @@ namespace fNbt {
         [NotNull]
         public NbtTag AlternativeRootTag
         {
-            get { return rootTag; }
+            get { return alternativeRootTag; }
             set
             {
                 if (value == null) throw new ArgumentNullException("value");
