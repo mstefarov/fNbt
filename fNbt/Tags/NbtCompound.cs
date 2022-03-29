@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using fNbt.Tags;
 using JetBrains.Annotations;
@@ -504,7 +505,17 @@ namespace fNbt {
         #region Implementation of ICollection
 
         void ICollection.CopyTo(Array array, int index) {
-            CopyTo((NbtTag[])array, index);
+            if (array is NbtTag[] nbtTags) {
+                CopyTo(nbtTags, index);
+
+                return;
+            }
+
+            var values = tags.Values.ToArray();
+            for (int i = 0; i < tags.Count; i++) {
+                array.SetValue(values[index + i], i);
+            }
+            //throw new ArgumentException("Array does not contain NbtTag's");
         }
 
 

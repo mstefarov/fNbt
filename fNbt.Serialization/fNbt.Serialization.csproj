@@ -1,77 +1,41 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
-  <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{95238D45-EC60-419F-90E1-7064EA738079}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>fNbt.Serialization</RootNamespace>
-    <AssemblyName>fNbt.Serialization</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Compiled\CodeEmitter.cs" />
-    <Compile Include="Compiled\DeserializeCodeEmitter.cs" />
-    <Compile Include="DynamicConverter.cs" />
-    <Compile Include="INbtSerializable.cs" />
-    <Compile Include="MissingPolicy.cs" />
-    <Compile Include="MissingPolicyAttribute.cs" />
-    <Compile Include="Compiled\NbtCompiler.cs" />
-    <Compile Include="NbtConvert.cs" />
-    <Compile Include="NbtIgnoreAttribute.cs" />
-    <Compile Include="NbtConverter.cs" />
-    <Compile Include="NullPolicy.cs" />
-    <Compile Include="NullPolicyAttribute.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SerializationUtil.cs" />
-    <Compile Include="Compiled\SerializeCodeEmitter.cs" />
-    <Compile Include="ConversionOptions.cs" />
-    <Compile Include="TagNameAttribute.cs" />
-    <Compile Include="TypeCategory.cs" />
-    <Compile Include="TypeMetadata.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\fNbt\fNbt.csproj">
-      <Project>{4488498d-976d-4da3-bf72-109531af0488}</Project>
-      <Name>fNbt</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net6.0; netcoreapp3.1; netstandard2.1</TargetFrameworks>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageId>MiNET.fNbt.Serialization</PackageId>
+		<Version>0.0.0</Version>
+		<Authors>kennyvv</Authors>
+		<Company>Kenny van Vulpen</Company>
+		<Description>fNbt Serialization</Description>
+		<Copyright>2010-2011 Erik Davidson; 2012-2015 Matvei Stefarov; 2016-2018 Niclas Olofsson; 2022 Kenny van Vulpen</Copyright>
+		<PackageLicenseUrl>https://github.com/NiclasOlofsson/fNbt/blob/master/docs/LICENSE</PackageLicenseUrl>
+		<PackageProjectUrl>https://github.com/NiclasOlofsson/fNbt</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/NiclasOlofsson/fNbt</RepositoryUrl>
+		<PackageIconUrl><![CDATA[https://secure.gravatar.com/avatar/2ba5d72bdad85108d14512c4d27ea550?s=128&r=g&d=retro]]></PackageIconUrl>
+		<PackageTags>MiNET fnbt nbt MCPE varint and string</PackageTags>
+		<FileVersion>1.0.0.0</FileVersion>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<LangVersion>latest</LangVersion>
+		<NoWarn>1701;1702;1701</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\fNbt\fNbt.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Properties" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+	</ItemGroup>
+
 </Project>

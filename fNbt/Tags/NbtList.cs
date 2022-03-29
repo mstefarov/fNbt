@@ -552,7 +552,16 @@ namespace fNbt {
 
 
         void ICollection.CopyTo(Array array, int index) {
-            CopyTo((NbtTag[])array, index);
+            if (array is NbtTag[] nbtTags) {
+                CopyTo(nbtTags, index);
+
+                return;
+            }
+
+            var values = tags.ToArray();
+            for (int i = 0; i < tags.Count; i++) {
+                array.SetValue(values[index + i], i);
+            }
         }
 
 

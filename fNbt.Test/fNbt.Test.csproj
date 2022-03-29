@@ -1,19 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netcoreapp2.1</TargetFramework>
+		<TargetFrameworks>net6.0; netcoreapp3.1; netstandard2.1</TargetFrameworks>
 
 		<IsPackable>false</IsPackable>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.8.0-preview-20180610-02" />
-		<PackageReference Include="NUnit" Version="3.10.1" />
-		<PackageReference Include="NUnit3TestAdapter" Version="3.10.0" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.2.0-preview-20220301-01" />
+		<PackageReference Include="NUnit" Version="3.13.3" />
+		<PackageReference Include="NUnit3TestAdapter" Version="4.2.1" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\fnbt\fnbt.csproj" />
+		<ProjectReference Include="..\fNbt\fNbt.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
