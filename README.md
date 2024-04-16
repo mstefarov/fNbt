@@ -1,10 +1,12 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/vcdkhya4u6h26qr2/branch/master?svg=true)](https://ci.appveyor.com/project/fragmer/fnbt/branch/master)
 
 [Named Binary Tag (NBT)](https://minecraft.gamepedia.com/NBT_format) is a structured binary file format used by Minecraft.
-fNbt is a small library, written in C# for .NET 3.5+. It provides functionality
+fNbt is a small library, written in C#. It provides functionality
 to create, load, traverse, modify, and save NBT files and streams.
+The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
+or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 0.6.4 (6 July 2018).
+Current released version is 1.0.0 (15 April 2024).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -27,19 +29,16 @@ applications that use fNbt; they are only used for testing.
 
 
 ## DOWNLOAD
-Latest version of fNbt requires .NET Framework 3.5+ (client or full profile).
+Latest version of fNbt targets [.NET Standard 2.0](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0),
+which means it can be used in .NET Framework 4.6.1+, .NET Core 2.0+, Mono 5.4+, and more.
 
 - **Package @ NuGet:**  https://www.nuget.org/packages/fNbt/
 
-- **Compiled binary:**  https://fcraft.net/fnbt/fNbt_v0.6.4.zip
+- **Compiled binary:**  https://fcraft.net/fnbt/fNbt_v1.0.0.zip
     <br><sup>SHA1: 600853530fd538e614b6cb4722ced81917e9615d</sup>
 
-- **Amalgamation** (single source file):
-    * Non-annotated: https://fcraft.net/fnbt/fNbt_v0.6.4.cs
-	    <br><sup>SHA1: 9298dbe00d080bcf5d32299415aaf856590ba3bf</sup>
-    * Annotated (using [JetBrains.Annotations](https://blog.jetbrains.com/dotnet/2018/05/03/what-are-jetbrains-annotations/)):
-	    https://fcraft.net/fnbt/fNbt_v0.6.4_Annotated.cs
-		<br><sup>SHA1: ae096d83b57bf59c708ad66168d45c1ea9b58175</sup>
+- **Amalgamation** (single source file): https://fcraft.net/fnbt/fNbt_v1.0.0.cs    
+    <br><sup>SHA1: 9298dbe00d080bcf5d32299415aaf856590ba3bf</sup>
 
 
 ## EXAMPLES
@@ -92,6 +91,18 @@ Latest version of fNbt requires .NET Framework 3.5+ (client or full profile).
     serverFile.SaveToFile( "server.nbt", NbtCompression.None );
 ```
 
+### Writing to stream directly using NbtWriter
+```
+using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
+    var writer = new NbtWriter(fileStream, "Server");
+    writer.WriteString("Name", "BestServerEver");
+    writer.WriteInt("Players", 15);
+    writer.WriteInt("MaxPlayers", 20);
+    writer.EndCompound();
+    writer.Finish();
+}
+```
+
 #### Constructing using collection initializer notation
 ```cs
     var compound = new NbtCompound("root"){
@@ -117,12 +128,11 @@ Latest version of fNbt requires .NET Framework 3.5+ (client or full profile).
 
 
 ## API REFERENCE
-Online reference can be found at http://www.fcraft.net/fnbt/v0.6.4/
+Online reference can be found at http://www.fcraft.net/fnbt/v1.0.0/
 
 
 ## LICENSING
-fNbt v0.5.0+ is licensed under 3-Clause BSD license;
-see [docs/LICENSE](docs/LICENSE).
+fNbt v0.5.0+ is licensed under 3-Clause BSD license; see [docs/LICENSE](docs/LICENSE).
 LibNbt2012 up to and including v0.4.1 kept LibNbt's original license (LGPLv3).
 
 
@@ -138,4 +148,4 @@ Note that this 0.5.x branch of fNbt is no longer supported or updated.
 
 - **Amalgamation** (single source file):
     - Non-annotated: https://fcraft.net/fnbt/fNbt_v0.5.1.cs
-    - Annotated: https://fcraft.net/fnbt/fNbt_v0.5.1_Annotated.cs
+    - With JetBrains annotations: https://fcraft.net/fnbt/fNbt_v0.5.1_Annotated.cs
