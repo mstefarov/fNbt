@@ -73,7 +73,7 @@ namespace GenSerializer {
          
         private string GetSerialization(IEnumerable<IPropertySymbol> propertySymbols) {
             StringBuilder sb = new("		public NbtTag SerializeToNbt(){\n");
-            sb.AppendLine("var helper=new fNbt.Serialization.NbtSerializationHelper();");
+            sb.AppendLine("\t\t\tvar helper=new fNbt.Serialization.NbtSerializationHelper();");
             sb.AppendLine("\t\t\tvar result = new fNbt.NbtCompound();");
             sb.AppendLine("\t\t\tfNbt.NbtTag obj;");
             foreach (IPropertySymbol item in propertySymbols) {
@@ -99,7 +99,7 @@ namespace GenSerializer {
         private string GetDeserialization(IEnumerable<IPropertySymbol> propertySymbols) {
             StringBuilder sb = new("		public void DeserializeFromNbt(NbtTag tag){\n");
             sb.AppendLine("\t\t\tif(tag is not NbtCompound nbtTag) throw new System.ArgumentException(\"tag was not a NbtCompound\");");
-            sb.AppendLine("var helper =new fNbt.Serialization.NbtDeserializationHelper();");
+            sb.AppendLine("\t\t\tvar helper =new fNbt.Serialization.NbtDeserializationHelper();");
             foreach (IPropertySymbol item in propertySymbols) {
                 string propertyName = GetNbtPropertyName(item);
                 

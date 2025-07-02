@@ -14,7 +14,7 @@ namespace fNbt.Serialization {
     /// <example>
     /// <code>
     ///      //The source generator will automatically serialize this type
-    ///      static internal NbtTag SerializeToNbt(this IEnumerable&lt;double&gt; obj) {
+    ///        internal NbtTag SerializeToNbt(this IEnumerable&lt;double&gt; obj) {
     ///         //TOD Serialize IEnumerable&lt;double&gt; then Return
     ///      }
     /// </code>
@@ -26,42 +26,42 @@ namespace fNbt.Serialization {
         /// Provide serialization/deserialization support for int32
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(int obj) {
+        public   NbtTag SerializeToNbt(int obj) {
             return new NbtInt(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for int64
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(long obj) {
+        public   NbtTag SerializeToNbt(long obj) {
             return new NbtLong(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for int16
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(short obj) {
+        public   NbtTag SerializeToNbt(short obj) {
             return new NbtShort(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for uint8
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(byte obj) {
+        public   NbtTag SerializeToNbt(byte obj) {
             return new NbtByte(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for float32
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(float obj) {
+        public   NbtTag SerializeToNbt(float obj) {
             return new NbtFloat(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for float64(double)
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(double obj) {
+        public   NbtTag SerializeToNbt(double obj) {
             return new NbtDouble(obj);
         }
         #endregion
@@ -71,21 +71,21 @@ namespace fNbt.Serialization {
         /// Provide serialization/deserialization support for string
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(string obj) {
+        public   NbtTag SerializeToNbt(string obj) {
             return new NbtString(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for IEnumerable&lt;int(int32)&gt;> to NbtIntArray
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(IEnumerable<int> obj) {
+        public   NbtTag SerializeToNbt(IEnumerable<int> obj) {
             return new NbtIntArray(obj.ToArray());
         }
         /// <summary>
         /// Provide serialization/deserialization support for IEnumerable&lt;long(int64)&gt;> to NbtLongArray
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(IEnumerable<long> obj) {
+        public   NbtTag SerializeToNbt(IEnumerable<long> obj) {
             return new NbtLongArray(obj.ToArray());
         }
 
@@ -96,14 +96,14 @@ namespace fNbt.Serialization {
         /// Provide serialization/deserialization support for IEnumerable&lt;NbtTag&gt;> to NbtList
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt(IEnumerable<NbtTag> obj){
+        public   NbtTag SerializeToNbt(IEnumerable<NbtTag> obj){
             return new NbtList(obj);
         }
         /// <summary>
         /// Provide serialization/deserialization support for IEnumerable&lt;INbtSerializableType&gt;> to NbtList of NbtCompound(or other,but most of the time are NbtCompound)
         /// </summary>
         /// <returns></returns>
-        public static NbtTag SerializeToNbt<TSerialization>(IEnumerable<TSerialization> obj) where TSerialization: INbtSerializableType{
+        public   NbtTag SerializeToNbt<TSerialization>(IEnumerable<TSerialization> obj) where TSerialization: INbtSerializableType{
             return new NbtList(obj.Select(t=>t.SerializeToNbt()));
         }
         
@@ -121,7 +121,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for int32
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out int refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out int refValue) {
             if (obj is not NbtInt) {
                 throw new ArgumentException("value of NbtTag is not Int32");
             }
@@ -130,7 +130,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for int64
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out long refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out long refValue) {
             if (obj is not NbtLong) {
                 throw new ArgumentException("value of NbtTag is not Int64");
             }
@@ -139,7 +139,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for int16
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out short refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out short refValue) {
             if (obj is not NbtShort) {
                 throw new ArgumentException("value of NbtTag is not Int16");
             }
@@ -148,7 +148,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for uint8(byte)
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out byte refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out byte refValue) {
             if (obj is not NbtByte) {
                 throw new ArgumentException("value of NbtTag is not UInt8");
             }
@@ -157,7 +157,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for uint8(byte)
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out float refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out float refValue) {
             if (obj is not NbtFloat) {
                 throw new ArgumentException("value of NbtTag is not float32");
             }
@@ -166,7 +166,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for float64(double)
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out double refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out double refValue) {
             if (obj is not NbtFloat) {
                 throw new ArgumentException("value of NbtTag is not double(float64)");
             }
@@ -178,7 +178,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for string
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out string refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out string refValue) {
             if (obj is not NbtString) {
                 throw new ArgumentException("value of NbtTag is not String");
             }
@@ -187,21 +187,21 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for IEnumerable&lt;int(int32)&gt;> from NbtIntArray
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out IEnumerable<int> refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out IEnumerable<int> refValue) {
             if (obj is not NbtIntArray) {
                 throw new ArgumentException("value of NbtTag is not NbtIntArray");
             }
             refValue = obj.IntArrayValue;
         }
         /// None
-        public static void DeserializeFromNbt(NbtTag obj,out int[] refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out int[] refValue) {
             if (obj is not NbtIntArray) {
                 throw new ArgumentException("value of NbtTag is not NbtIntArray");
             }
             refValue = obj.IntArrayValue;
         }
         /// None
-        public static void DeserializeFromNbt(NbtTag obj,out List<int> refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out List<int> refValue) {
             if (obj is not NbtIntArray) {
                 throw new ArgumentException("value of NbtTag is not NbtIntArray");
             }
@@ -210,21 +210,21 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for IEnumerable&lt;int(int32)&gt;> from NbtIntArray
         /// </summary>
-        public static void DeserializeFromNbt(NbtTag obj,out IEnumerable<long> refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out IEnumerable<long> refValue) {
             if (obj is not NbtLongArray) {
                 throw new ArgumentException("value of NbtTag is not NbtLongArray");
             }
             refValue = obj.LongArrayValue;
         }
         /// None
-        public static void DeserializeFromNbt(NbtTag obj,out List<long> refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out List<long> refValue) {
             if (obj is not NbtLongArray) {
                 throw new ArgumentException("value of NbtTag is not NbtLongArray");
             }
             refValue = obj.LongArrayValue.ToList();
         }
         /// None
-        public static void DeserializeFromNbt(NbtTag obj,out long[] refValue) {
+        public   void DeserializeFromNbt(NbtTag obj,out long[] refValue) {
             if (obj is not NbtLongArray) {
                 throw new ArgumentException("value of NbtTag is not NbtLongArray");
             }
@@ -236,7 +236,7 @@ namespace fNbt.Serialization {
         /// <summary>
         /// Provide serialization/deserialization support for List of INbtDeserializable
         /// </summary>
-        public static void DeserializeFromNbt<T>(NbtTag obj,out IEnumerable<T> refValue)where T: INbtDeserializableType,new(){
+        public   void DeserializeFromNbt<T>(NbtTag obj,out IEnumerable<T> refValue)where T: INbtDeserializableType,new(){
             if (obj is not NbtList list) {
                 throw new ArgumentException("value of NbtTag is not List");
             }
