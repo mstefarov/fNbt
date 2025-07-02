@@ -1,0 +1,11 @@
+﻿{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "GenSerializer": {
+      "commandName": "DebugRoslynComponent",
+      
+        "targetProject": "../fNbt.Test/fNbt.Test.csproj"
+      
+    }
+  }
+}

@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenSerializer", "GenSerializer\GenSerializer.csproj", "{3F73B7FB-445F-40BB-95D7-D8D0036F780D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{8DD93C35-682E-4C62-9012-EF15C80FFFEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8DD93C35-682E-4C62-9012-EF15C80FFFEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8DD93C35-682E-4C62-9012-EF15C80FFFEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F73B7FB-445F-40BB-95D7-D8D0036F780D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F73B7FB-445F-40BB-95D7-D8D0036F780D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F73B7FB-445F-40BB-95D7-D8D0036F780D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F73B7FB-445F-40BB-95D7-D8D0036F780D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
