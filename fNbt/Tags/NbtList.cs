@@ -481,35 +481,35 @@ namespace fNbt {
 
         #region Implementation of IList and ICollection
 
-        void IList.Remove(object value) {
-            Remove((NbtTag)value);
+        void IList.Remove(object? value) {
+            Remove((NbtTag)value!);
         }
 
 
-        object IList.this[int tagIndex] {
+        object? IList.this[int tagIndex] {
             get { return tags[tagIndex]; }
-            set { this[tagIndex] = (NbtTag)value; }
+            set { this[tagIndex] = (NbtTag)value!; }
         }
 
 
-        int IList.Add(object value) {
-            Add((NbtTag)value);
+        int IList.Add(object? value) {
+            Add((NbtTag)value!);
             return (tags.Count - 1);
         }
 
 
-        bool IList.Contains(object value) {
-            return tags.Contains((NbtTag)value);
+        bool IList.Contains(object? value) {
+            return tags.Contains((NbtTag)value!);
         }
 
 
-        int IList.IndexOf(object value) {
-            return tags.IndexOf((NbtTag)value);
+        int IList.IndexOf(object? value) {
+            return tags.IndexOf((NbtTag)value!);
         }
 
 
-        void IList.Insert(int index, object value) {
-            Insert(index, (NbtTag)value);
+        void IList.Insert(int index, object? value) {
+            Insert(index, (NbtTag)value!);
         }
 
 
