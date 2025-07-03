@@ -6,7 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{83C41F58-F6F7-46F2-85C3-CDD69E7FBEE6}"
 	ProjectSection(SolutionItems) = preProject
 		docs\Changelog.md = docs\Changelog.md
-		docs\LICENSE = docs\LICENSE
+		docs\LICENSE.txt = docs\LICENSE.txt
 		README.md = README.md
 	EndProjectSection
 EndProject

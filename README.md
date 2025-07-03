@@ -6,13 +6,10 @@ to create, load, traverse, modify, and save NBT files and streams.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 1.0.0 (15 April 2024).
+Current released version is 1.0.0 (3 July 2025).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
-
-Note that fNbt.Test.dll and nunit.framework.dll do NOT need to be bundled with
-applications that use fNbt; they are only used for testing.
 
 
 ## FEATURES
@@ -34,11 +31,7 @@ which means it can be used in .NET Framework 4.6.1+, .NET Core 2.0+, Mono 5.4+, 
 
 - **Package @ NuGet:**  https://www.nuget.org/packages/fNbt/
 
-- **Compiled binary:**  https://fcraft.net/fnbt/fNbt_v1.0.0.zip
-    <br><sup>SHA1: 600853530fd538e614b6cb4722ced81917e9615d</sup>
-
-- **Amalgamation** (single source file): https://fcraft.net/fnbt/fNbt_v1.0.0.cs    
-    <br><sup>SHA1: 9298dbe00d080bcf5d32299415aaf856590ba3bf</sup>
+- **Compiled binaries and single-source-file amalgamations:**  https://github.com/mstefarov/fNbt/releases
 
 
 ## EXAMPLES
@@ -132,20 +125,9 @@ Online reference can be found at http://www.fcraft.net/fnbt/v1.0.0/
 
 
 ## LICENSING
-fNbt v0.5.0+ is licensed under 3-Clause BSD license; see [docs/LICENSE](docs/LICENSE).
+fNbt v0.5.0+ is licensed under 3-Clause BSD license; see [docs/LICENSE.txt](docs/LICENSE.txt).
 LibNbt2012 up to and including v0.4.1 kept LibNbt's original license (LGPLv3).
 
 
 ## VERSION HISTORY
 See [docs/Changelog.md](docs/Changelog.md)
-
-
-## OLD VERSIONS
-If you need .NET 2.0 support, stick to using fNbt version 0.5.1.
-Note that this 0.5.x branch of fNbt is no longer supported or updated.
-
-- **Compiled binary:**  https://fcraft.net/fnbt/fNbt_v0.5.1.zip
-
-- **Amalgamation** (single source file):
-    - Non-annotated: https://fcraft.net/fnbt/fNbt_v0.5.1.cs
-    - With JetBrains annotations: https://fcraft.net/fnbt/fNbt_v0.5.1_Annotated.cs
