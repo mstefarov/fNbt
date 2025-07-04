@@ -81,6 +81,7 @@ namespace fNbt {
 
 
         #region Shortcuts
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
 
         /// <summary> Gets or sets the tag with the specified name. May return <c>null</c>. </summary>
         /// <returns> The tag with the specified key. Null if tag with the given name was not found. </returns>
@@ -287,7 +288,7 @@ namespace fNbt {
                 }
             }
         }
-
+#pragma warning restore CA1065 // Do not raise exceptions in unexpected locations
         #endregion
 
 

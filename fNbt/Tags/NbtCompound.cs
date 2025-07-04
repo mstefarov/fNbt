@@ -95,7 +95,7 @@ namespace fNbt {
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public T? Get<T>(string tagName) where T : NbtTag {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag result;
+            NbtTag? result;
             if (tags.TryGetValue(tagName, out result)) {
                 return (T)result;
             }
@@ -110,7 +110,7 @@ namespace fNbt {
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public NbtTag? Get(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag result;
+            NbtTag? result;
             if (tags.TryGetValue(tagName, out result)) {
                 return result;
             }
@@ -128,7 +128,7 @@ namespace fNbt {
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public bool TryGet<T>(string tagName, out T? result) where T : NbtTag {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag tempResult;
+            NbtTag? tempResult;
             if (tags.TryGetValue(tagName, out tempResult)) {
                 result = (T)tempResult;
                 return true;
@@ -147,7 +147,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool TryGet(string tagName, out NbtTag? result) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag tempResult;
+            NbtTag? tempResult;
             if (tags.TryGetValue(tagName, out tempResult)) {
                 result = tempResult;
                 return true;
@@ -188,7 +188,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool Remove(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag tag;
+            NbtTag? tag;
             if (!tags.TryGetValue(tagName, out tag)) {
                 return false;
             }
@@ -467,7 +467,7 @@ namespace fNbt {
         public bool Remove(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             if (tag.Name == null) throw new ArgumentException("Trying to remove an unnamed tag.");
-            NbtTag maybeItem;
+            NbtTag? maybeItem;
             if (tags.TryGetValue(tag.Name, out maybeItem)) {
                 if (maybeItem == tag && tags.Remove(tag.Name)) {
                     tag.Parent = null;

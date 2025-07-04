@@ -9,6 +9,7 @@ namespace fNbt {
     }
 }
 
+#if !NETCOREAPP
 // Copied from https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/System/Diagnostics/CodeAnalysis/NullableAttributes.cs
 // and changed from public to internal.
 namespace System.Diagnostics.CodeAnalysis
@@ -28,3 +29,4 @@ namespace System.Diagnostics.CodeAnalysis
         public bool ParameterValue { get; }
     }
 }
+#endif
