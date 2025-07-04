@@ -6,6 +6,7 @@
     <LangVersion>10</LangVersion>
     <Nullable>enable</Nullable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisMode>Minimum</AnalysisMode>
     
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -39,7 +40,7 @@
     <None Include="..\README.md" Pack="true" PackagePath="\docs\" />
     <None Include="..\docs\LICENSE.txt" Pack="true" PackagePath="\docs\" />
     <None Include="..\docs\Changelog.md" Pack="true" PackagePath="\docs\" />
-    <None Include="icon.png" Pack="true" PackagePath=""/>
+    <None Include="icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <Target Name="SetPackageReleaseNotes" BeforeTargets="GenerateNuspec">
