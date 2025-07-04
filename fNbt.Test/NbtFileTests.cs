@@ -149,8 +149,9 @@ namespace fNbt.Test {
 
 
         void ReloadFileInternal(String fileName, NbtCompression compression, bool bigEndian, bool buffered) {
-            var loadedFile = new NbtFile(Path.Combine(TestFiles.DirName, fileName));
-            loadedFile.Flavor = new NbtFlavor(bigEndian); // Change after loading
+            var loadedFile = new NbtFile(Path.Combine(TestFiles.DirName, fileName)) {
+                BigEndian = bigEndian
+            };
             if (!buffered) {
                 loadedFile.BufferSize = 0;
             }

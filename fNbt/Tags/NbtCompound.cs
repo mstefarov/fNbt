@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
 namespace fNbt {
     /// <summary> A tag containing a set of other named tags. Order is not guaranteed. </summary>
-    public sealed class NbtCompound : NbtTagCollection {
+    public sealed class NbtCompound : NbtTag, ICollection<NbtTag>, ICollection {
         /// <summary> Type of this tag (Compound). </summary>
         public override NbtTagType TagType {
             get { return NbtTagType.Compound; }
@@ -388,7 +389,12 @@ namespace fNbt {
 
         /// <summary> Returns an enumerator that iterates through all tags in this NbtCompound. </summary>
         /// <returns> An IEnumerator&gt;NbtTag&lt; that can be used to iterate through the collection. </returns>
-        public override IEnumerator<NbtTag> GetEnumerator() {
+        public IEnumerator<NbtTag> GetEnumerator() {
+            return tags.Values.GetEnumerator();
+        }
+
+
+        IEnumerator IEnumerable.GetEnumerator() {
             return tags.Values.GetEnumerator();
         }
 
@@ -402,7 +408,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If the given tag is unnamed;
         /// or if a tag with the given name already exists in this NbtCompound. </exception>
-        public override void Add(NbtTag newTag) {
+        public void Add(NbtTag newTag) {
             if (newTag == null) {
                 throw new ArgumentNullException(nameof(newTag));
             } else if (newTag == this) {
@@ -418,7 +424,7 @@ namespace fNbt {
 
 
         /// <summary> Removes all tags from this NbtCompound. </summary>
-        public override void Clear() {
+        public void Clear() {
             foreach (NbtTag tag in tags.Values) {
                 tag.Parent = null;
             }
@@ -431,7 +437,7 @@ namespace fNbt {
         /// <returns> true if tag is found; otherwise, false. </returns>
         /// <param name="tag"> The object to locate in this NbtCompound. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
-        public override bool Contains(NbtTag tag) {
+        public bool Contains(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             return tags.ContainsValue(tag);
         }
@@ -446,7 +452,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> Given array is multidimensional; arrayIndex is equal to or greater than the length of array;
         /// the number of tags in this NbtCompound is greater than the available space from arrayIndex to the end of the destination array;
         /// or type NbtTag cannot be cast automatically to the type of the destination array. </exception>
-        public override void CopyTo(NbtTag[] array, int arrayIndex) {
+        public void CopyTo(NbtTag[] array, int arrayIndex) {
             tags.Values.CopyTo(array, arrayIndex);
         }
 
@@ -458,7 +464,7 @@ namespace fNbt {
         /// <param name="tag"> The tag to remove from the NbtCompound. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If the given tag is unnamed </exception>
-        public override bool Remove(NbtTag tag) {
+        public bool Remove(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             if (tag.Name == null) throw new ArgumentException("Trying to remove an unnamed tag.");
             NbtTag maybeItem;
@@ -474,17 +480,33 @@ namespace fNbt {
 
         /// <summary> Gets the number of tags contained in the NbtCompound. </summary>
         /// <returns> The number of tags contained in the NbtCompound. </returns>
-        public override int Count {
+        public int Count {
             get { return tags.Count; }
+        }
+
+        bool ICollection<NbtTag>.IsReadOnly {
+            get { return false; }
         }
 
         #endregion
 
 
-        /// <inheritdoc/>
-        public override object SyncRoot {
+        #region Implementation of ICollection
+
+        void ICollection.CopyTo(Array array, int index) {
+            CopyTo((NbtTag[])array, index);
+        }
+
+
+        object ICollection.SyncRoot {
             get { return (tags as ICollection).SyncRoot; }
         }
+
+        bool ICollection.IsSynchronized {
+            get { return false; }
+        }
+
+        #endregion
 
 
         /// <inheritdoc />
