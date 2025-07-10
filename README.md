@@ -1,4 +1,4 @@
-[![Build status](https://ci.appveyor.com/api/projects/status/vcdkhya4u6h26qr2/branch/master?svg=true)](https://ci.appveyor.com/project/fragmer/fnbt/branch/master)
+![Build Status](https://github.com/mstefarov/fNbt/actions/workflows/dotnet.yml/badge.svg)
 
 [Named Binary Tag (NBT)](https://minecraft.gamepedia.com/NBT_format) is a structured binary file format used by Minecraft.
 fNbt is a small library, written in C#. It provides functionality
