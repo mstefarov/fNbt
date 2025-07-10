@@ -1,14 +1,9 @@
-_ReSharper.LibNbt
-fNbt/obj
-fNbt.Test/obj
-fNbt.Serialization/obj
-fNbt.Serialization.Test/obj
 bin/
+obj/
 packages/
 *.user
 *.suo
 .vs
-.idea/.idea.fNbt/.idea/workspace.xml
 
 fNbt.sln.DotSettings
 *.xml

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "fNbt.Benchmarks": {
+      "commandName": "Project",
+      "commandLineArgs": "--runtimes net48 net8.0"
+    }
+  }
+}
