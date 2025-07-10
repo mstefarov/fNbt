@@ -1,16 +1,14 @@
-﻿using NUnit.Framework;
-
-namespace fNbt.Test {
-    [TestFixture]
-    internal class ComparerTests {
+﻿namespace fNbt.Test {
+    [TestClass]
+    public class ComparerTests {
         private readonly NbtComparer comparer = NbtComparer.Instance;
 
-        [Test]
+        [TestMethod]
         public void InstanceIsSingleton() {
-            Assert.That(NbtComparer.Instance, Is.SameAs(NbtComparer.Instance));
+            Assert.AreSame(NbtComparer.Instance, NbtComparer.Instance);
         }
 
-        [Test]
+        [TestMethod]
         public void BasicTagsEqualAndHashCode() {
             var a = new NbtInt("foo", 123);
             var b = new NbtInt("foo", 123);
@@ -24,7 +22,7 @@ namespace fNbt.Test {
             Assert.IsFalse(comparer.Equals(a, d), "Different names => not equal");
         }
 
-        [Test]
+        [TestMethod]
         public void StringCaseSensitivity() {
             var lower = new NbtString("same", "test");
             var upper = new NbtString("same", "TEST");
@@ -36,7 +34,7 @@ namespace fNbt.Test {
             Assert.IsFalse(comparer.Equals(nameLower, nameUpper), "Tag name comparison is case-sensitive");
         }
 
-        [Test]
+        [TestMethod]
         public void StringUnicode() {
             // make sure unicode strings that are loosely comparable (in some locales) but not identical (ordinal) are not equal.
             var uVal1 = new NbtString("same", "\u00E9"); // e with accent (precomposed)
@@ -49,7 +47,7 @@ namespace fNbt.Test {
             Assert.IsFalse(comparer.Equals(uName1, uName2), "Tag names with different codepoints should not match");
         }
 
-        [Test]
+        [TestMethod]
         public void FloatAndDoubleNaN() {
             var f1 = new NbtFloat("f", float.NaN);
             var f2 = new NbtFloat("f", float.NaN);
@@ -62,7 +60,7 @@ namespace fNbt.Test {
             Assert.AreEqual(comparer.GetHashCode(d1), comparer.GetHashCode(d2), "Hash codes for NaN doubles must match");
         }
 
-        [Test]
+        [TestMethod]
         public void ArrayTagEquality() {
             var b1 = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
             var b2 = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
@@ -79,7 +77,7 @@ namespace fNbt.Test {
             Assert.IsTrue(comparer.Equals(l1, l2), "Same long arrays should be equal");
         }
 
-        [Test]
+        [TestMethod]
         public void ListTagsOrderMatters() {
             var list1 = new NbtList("l") { new NbtInt(1), new NbtInt(2), new NbtInt(3) };
             var list2 = new NbtList("l") { new NbtInt(1), new NbtInt(2), new NbtInt(3) };
@@ -89,7 +87,7 @@ namespace fNbt.Test {
             Assert.IsFalse(comparer.Equals(list1, list3), "Different order => not equal");
         }
 
-        [Test]
+        [TestMethod]
         public void CompoundTagsIgnoresOrder() {
             var compA = new NbtCompound("c")
             {
@@ -106,7 +104,7 @@ namespace fNbt.Test {
             Assert.AreEqual(comparer.GetHashCode(compA), comparer.GetHashCode(compB), "HashCode only considers count for compounds");
         }
 
-        [Test]
+        [TestMethod]
         public void ListTestEquals() {
             // Stress-test: compare lists with every single tag type
             var x = TestFiles.MakeListTest();
@@ -115,7 +113,7 @@ namespace fNbt.Test {
             Assert.AreEqual(comparer.GetHashCode(x), comparer.GetHashCode(y), "And their hash codes should match");
         }
 
-        [Test]
+        [TestMethod]
         public void NullNameNotEqualEmptyName() {
             var nullName = new NbtInt(null, 42);
             var emptyName = new NbtInt("", 42);

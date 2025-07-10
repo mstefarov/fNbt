@@ -1,9 +1,7 @@
-﻿using NUnit.Framework;
-
-namespace fNbt.Test {
-    [TestFixture]
+﻿namespace fNbt.Test {
+    [TestClass]
     public sealed class TagSelectorTests {
-        [Test]
+        [TestMethod]
         public void SkippingTagsOnFileLoad() {
             var loadedFile = new NbtFile();
             loadedFile.LoadFromFile(TestFiles.Big,
@@ -31,7 +29,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void SkippingLists() {
             {
                 var file = new NbtFile(TestFiles.MakeListTest());
@@ -60,7 +58,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void SkippingValuesInCompoundTest() {
             NbtCompound root = TestFiles.MakeValueTest();
             NbtCompound nestedComp = TestFiles.MakeValueTest();

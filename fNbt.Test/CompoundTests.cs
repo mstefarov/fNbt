@@ -2,12 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 
 namespace fNbt.Test {
-    [TestFixture]
+    [TestClass]
     public sealed class CompoundTests {
-        [Test]
+        [TestMethod]
         public void InitializingCompoundFromCollectionTest() {
             NbtTag[] allNamed = {
                 new NbtShort("allNamed1", 1),
@@ -37,8 +36,7 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentNullException>(() => new NbtCompound("nullTest", null));
 
             // proper initialization
-            NbtCompound allNamedTest = null;
-            Assert.DoesNotThrow(() => allNamedTest = new NbtCompound("allNamedTest", allNamed));
+            NbtCompound allNamedTest = new NbtCompound("allNamedTest", allNamed);
             CollectionAssert.AreEquivalent(allNamed, allNamedTest);
 
             // some tags are unnamed, should throw
@@ -52,7 +50,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void GettersAndSetters() {
             // construct a document for us to test.
             var nestedChild = new NbtCompound("NestedChild");
@@ -133,7 +131,7 @@ namespace fNbt.Test {
             // Using setter incorrectly
             object dummyObject;
             Assert.Throws<ArgumentNullException>(() => parent["Child"] = null);
-            Assert.NotNull(parent["Child"]);
+            Assert.IsNotNull(parent["Child"]);
             Assert.Throws<ArgumentException>(() => parent["Child"] = new NbtByte("NotChild"));
             Assert.Throws<InvalidOperationException>(() => dummyObject = parent[0]);
             Assert.Throws<InvalidOperationException>(() => parent[0] = new NbtByte("NewerChild"));
@@ -147,7 +145,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void Renaming() {
             var tagToRename = new NbtInt("DifferentName", 1);
             var compound = new NbtCompound {
@@ -170,7 +168,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void AddingAndRemoving() {
             var foo = new NbtInt("Foo");
             var test = new NbtCompound {
@@ -236,7 +234,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void UtilityMethods() {
             NbtTag[] testThings = {
                 new NbtShort("Name1", 1),
@@ -253,7 +251,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void InterfaceImplementations() {
             NbtTag[] tagList = {
                 new NbtByte("First", 1), new NbtShort("Second", 2), new NbtInt("Third", 3),
@@ -266,14 +264,14 @@ namespace fNbt.Test {
             // test .Names and .Tags collections
             CollectionAssert.AreEquivalent(new[] {
                 "First", "Second", "Third", "Fourth"
-            }, comp.Names);
-            CollectionAssert.AreEquivalent(tagList, comp.Tags);
+            }, comp.Names.ToList());
+            CollectionAssert.AreEquivalent(tagList, comp.Tags.ToList());
 
             // test ICollection and ICollection<NbtTag> boilerplate properties
             ICollection<NbtTag> iGenCollection = comp;
             Assert.IsFalse(iGenCollection.IsReadOnly);
             ICollection iCollection = comp;
-            Assert.NotNull(iCollection.SyncRoot);
+            Assert.IsNotNull(iCollection.SyncRoot);
             Assert.IsFalse(iCollection.IsSynchronized);
 
             // test CopyTo()

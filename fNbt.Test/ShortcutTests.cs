@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Globalization;
-using NUnit.Framework;
 
 namespace fNbt.Test {
-    [TestFixture]
+    [TestClass]
     public class ShortcutTests {
-        [Test]
+        [TestMethod]
         public void NbtByteTest() {
             object dummy;
             NbtTag test = new NbtByte(250);
@@ -23,7 +22,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtByteArrayTest() {
             object dummy;
             byte[] bytes = { 1, 2, 3, 4, 5 };
@@ -42,7 +41,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtCompoundTest() {
             object dummy;
             NbtTag test = new NbtCompound("Derp");
@@ -60,7 +59,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtDoubleTest() {
             object dummy;
             NbtTag test = new NbtDouble(0.4931287132182315);
@@ -78,7 +77,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtFloatTest() {
             object dummy;
             NbtTag test = new NbtFloat(0.49823147f);
@@ -96,7 +95,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtIntTest() {
             object dummy;
             NbtTag test = new NbtInt(2147483647);
@@ -114,7 +113,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtIntArrayTest() {
             object dummy;
             int[] ints = { 1111, 2222, 3333, 4444, 5555 };
@@ -133,7 +132,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtListTest() {
             object dummy;
             NbtTag test = new NbtList("Derp");
@@ -151,7 +150,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtLongTest() {
             object dummy;
             NbtTag test = new NbtLong(9223372036854775807);
@@ -169,7 +168,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtShortTest() {
             object dummy;
             NbtTag test = new NbtShort(32767);
@@ -187,7 +186,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtStringTest() {
             object dummy;
             NbtTag test = new NbtString("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!");
@@ -205,7 +204,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtLongArrayTest() {
             object dummy;
             long[] longs = { 1111, 2222, 3333, 4444, 5555 };

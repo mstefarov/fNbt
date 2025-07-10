@@ -2,12 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using NUnit.Framework;
 
 namespace fNbt.Test {
-    [TestFixture]
+    [TestClass]
     public sealed class ListTests {
-        [Test]
+        [TestMethod]
         public void InterfaceImplementation() {
             // prepare our test lists
             var referenceList = new List<NbtTag> {
@@ -24,7 +23,7 @@ namespace fNbt.Test {
 
             // check IList<NbtTag> implementation
             IList<NbtTag> iGenericList = originalList;
-            CollectionAssert.AreEqual(referenceList, iGenericList);
+            ListAssert.AreEqual(referenceList, iGenericList, NbtComparer.Instance);
             Assert.IsFalse(iGenericList.IsReadOnly);
 
             // check IList.Add
@@ -60,7 +59,7 @@ namespace fNbt.Test {
             Assert.IsFalse(iList.IsFixedSize);
             Assert.IsFalse(iList.IsReadOnly);
             Assert.IsFalse(iList.IsSynchronized);
-            Assert.NotNull(iList.SyncRoot);
+            Assert.IsNotNull(iList.SyncRoot);
 
             // check IList.CopyTo
             var exportTest = new NbtInt[iList.Count];
@@ -76,11 +75,11 @@ namespace fNbt.Test {
             // check IList.Clear
             iList.Clear();
             Assert.AreEqual(0, iList.Count);
-            Assert.Less(iList.IndexOf(testTag), 0);
+            Assert.AreEqual(-1, iList.IndexOf(testTag));
         }
 
 
-        [Test]
+        [TestMethod]
         public void IndexerTest() {
             NbtByte ourTag = new NbtByte(1);
             var secondList = new NbtList {
@@ -116,7 +115,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void InitializingListFromCollection() {
             // auto-detecting list type
             var test1 = new NbtList("Test1", new NbtTag[] {
@@ -129,15 +128,15 @@ namespace fNbt.Test {
             // check pre-conditions
             Assert.Throws<ArgumentNullException>(() => new NbtList((NbtTag[])null));
             Assert.Throws<ArgumentNullException>(() => new NbtList(null, null));
-            Assert.DoesNotThrow(() => new NbtList((string)null, NbtTagType.Unknown));
+            _ = new NbtList((string)null, NbtTagType.Unknown); // does not throw, but creates an empty list
             Assert.Throws<ArgumentNullException>(() => new NbtList((NbtTag[])null, NbtTagType.Unknown));
 
             // correct explicitly-given list type
-            Assert.DoesNotThrow(() => new NbtList("Test2", new NbtTag[] {
+            _ = new NbtList("Test2", new NbtTag[] {
                 new NbtInt(1),
                 new NbtInt(2),
                 new NbtInt(3)
-            }, NbtTagType.Int));
+            }, NbtTagType.Int);
 
             // wrong explicitly-given list type
             Assert.Throws<ArgumentException>(() => new NbtList("Test3", new NbtTag[] {
@@ -154,16 +153,16 @@ namespace fNbt.Test {
             }));
 
             // using AddRange
-            Assert.DoesNotThrow(() => new NbtList().AddRange(new NbtTag[] {
+            new NbtList().AddRange(new NbtTag[] {
                 new NbtInt(1),
                 new NbtInt(2),
                 new NbtInt(3)
-            }));
+            });
             Assert.Throws<ArgumentNullException>(() => new NbtList().AddRange(null));
         }
 
 
-        [Test]
+        [TestMethod]
         public void ManipulatingList() {
             var sameTags = new NbtTag[] {
                 new NbtInt(0),
@@ -226,7 +225,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void ChangingListTagType() {
             var list = new NbtList();
 
@@ -239,11 +238,11 @@ namespace fNbt.Test {
             Assert.AreEqual(NbtTagType.Unknown, list.ListType);
 
             // changing the type of an empty list to "End" is allowed, see https://github.com/fragmer/fNbt/issues/12
-            Assert.DoesNotThrow(() => list.ListType = NbtTagType.End);
+            list.ListType = NbtTagType.End;
             Assert.AreEqual(list.ListType, NbtTagType.End);
 
             // changing the type of an empty list back to "Unknown" is allowed too!
-            Assert.DoesNotThrow(() => list.ListType = NbtTagType.Unknown);
+            list.ListType = NbtTagType.Unknown;
             Assert.AreEqual(list.ListType, NbtTagType.Unknown);
 
             // adding the first element should set the tag type
@@ -251,18 +250,18 @@ namespace fNbt.Test {
             Assert.AreEqual(list.ListType, NbtTagType.Int);
 
             // setting correct type for a non-empty list
-            Assert.DoesNotThrow(() => list.ListType = NbtTagType.Int);
+            list.ListType = NbtTagType.Int;
 
             // changing list type to an incorrect type
             Assert.Throws<ArgumentException>(() => list.ListType = NbtTagType.Short);
 
             // after the list is cleared, we should once again be allowed to change its TagType
             list.Clear();
-            Assert.DoesNotThrow(() => list.ListType = NbtTagType.Short);
+            list.ListType = NbtTagType.Short;
         }
 
 
-        [Test]
+        [TestMethod]
         public void SerializingWithoutListType() {
             var root = new NbtCompound("root") {
                 new NbtList("list")
@@ -276,7 +275,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void Serializing1() {
             // check the basics of saving/loading
             const NbtTagType expectedListType = NbtTagType.Int;
@@ -299,8 +298,8 @@ namespace fNbt.Test {
             Assert.AreEqual(bytesRead, data.Length);
 
             // check contents of loaded file
-            Assert.NotNull(readFile.RootTag);
-            Assert.IsInstanceOf<NbtList>(readFile.RootTag["Entities"]);
+            Assert.IsNotNull(readFile.RootTag);
+            Assert.IsInstanceOfType<NbtList>(readFile.RootTag["Entities"]);
             var readList = (NbtList)readFile.RootTag["Entities"];
             Assert.AreEqual(writtenList.ListType, readList.ListType);
             Assert.AreEqual(readList.Count, writtenList.Count);
@@ -316,7 +315,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void Serializing2() {
             // check saving/loading lists of all possible value types
             var testFile = new NbtFile(TestFiles.MakeListTest());
@@ -326,7 +325,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void SerializingEmpty() {
             // check saving/loading lists of all possible value types
             var testFile = new NbtFile(new NbtCompound("root") {
@@ -351,7 +350,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NestedListAndCompoundTest() {
             byte[] data;
             {
@@ -390,7 +389,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void FirstInsertTest() {
             NbtList list = new NbtList();
             Assert.AreEqual(NbtTagType.Unknown, list.ListType);

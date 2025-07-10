@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using NUnit.Framework;
 
 namespace fNbt.Test {
-    [TestFixture]
-    internal class NbtWriterTest {
-        [Test]
+    [TestClass]
+    public class NbtWriterTest {
+        [TestMethod]
         public void ValueTest() {
             // write one named tag for every value type, and read it back
             using (var ms = new MemoryStream()) {
@@ -40,7 +39,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void HugeNbtWriterTest() {
             // Tests writing byte arrays that exceed the max NbtBinaryWriter chunk size
             using (BufferedStream bs = new BufferedStream(Stream.Null)) {
@@ -52,7 +51,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void ByteArrayFromStream() {
             var data = new byte[64 * 1024];
             for (int i = 0; i < data.Length; i++) {
@@ -114,7 +113,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void CompoundListTest() {
             // test writing various combinations of compound tags and list tags
             const string testString = "Come on and slam, and welcome to the jam.";
@@ -184,7 +183,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void ListTest() {
             // write short (1-element) lists of every possible kind
             using (var ms = new MemoryStream()) {
@@ -255,12 +254,12 @@ namespace fNbt.Test {
 
                 ms.Position = 0;
                 var reader = new NbtReader(ms);
-                Assert.DoesNotThrow(() => reader.ReadAsTag());
+                reader.ReadAsTag();
             }
         }
 
 
-        [Test]
+        [TestMethod]
         public void WriteTagTest() {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
@@ -281,7 +280,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void ErrorTest() {
             byte[] dummyByteArray = { 1, 2, 3, 4, 5 };
             int[] dummyIntArray = { 1, 2, 3, 4, 5 };
@@ -444,7 +443,7 @@ namespace fNbt.Test {
 
 
         // Ensure that Unicode strings of arbitrary size and content are written/read properly
-        [Test]
+        [TestMethod]
         public void ComplexStringsTest() {
             // Use a fixed seed for repeatability of this test
             Random rand = new Random(0);
@@ -479,12 +478,12 @@ namespace fNbt.Test {
                         .Select(tag => tag.StringValue);
 
                 // Make sure that all read/written strings match exactly
-                CollectionAssert.AreEqual(writtenStrings, readStrings);
+                CollectionAssert.AreEqual(writtenStrings, readStrings.ToList());
             }
         }
 
 
-        [Test]
+        [TestMethod]
         public void MissingNameTest() {
             using (var ms = new MemoryStream()) {
                 NbtWriter writer = new NbtWriter(ms, "test");

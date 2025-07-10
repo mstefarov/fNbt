@@ -1,10 +1,9 @@
 ﻿using System;
-using NUnit.Framework;
 
 namespace fNbt.Test {
-    [TestFixture]
+    [TestClass]
     public class MiscTests {
-        [Test]
+        [TestMethod]
         public void CopyConstructorTest() {
             NbtByte byteTag = new NbtByte("byteTag", 1);
             NbtByte byteTagClone = (NbtByte)byteTag.Clone();
@@ -98,7 +97,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void ByteArrayIndexerTest() {
             // test getting/settings values of byte array tag via indexer
             var byteArray = new NbtByteArray("Test");
@@ -114,7 +113,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void IntArrayIndexerTest() {
             // test getting/settings values of int array tag via indexer
             var intArray = new NbtIntArray("Test");
@@ -130,7 +129,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void LongArrayIndexerTest() {
             var longArray = new NbtLongArray("Test");
             CollectionAssert.AreEqual(new long[0], longArray.Value);
@@ -147,7 +146,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void DefaultValueTest() {
             // test default values of all value tags
             Assert.AreEqual(0, new NbtByte("test").Value);
@@ -163,7 +162,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NullValueTest() {
             Assert.Throws<ArgumentNullException>(() => new NbtByteArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtIntArray().Value = null);
@@ -172,14 +171,14 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void NbtTagNameTest() {
             Assert.AreEqual("TAG_End", NbtTag.GetCanonicalTagName(NbtTagType.End));
             Assert.IsNull(NbtTag.GetCanonicalTagName((NbtTagType)255));
         }
 
 
-        [Test]
+        [TestMethod]
         public void PathTest() {
             // test NbtTag.Path property
             var testComp = new NbtCompound {
@@ -205,7 +204,7 @@ namespace fNbt.Test {
         }
 
 
-        [Test]
+        [TestMethod]
         public void BadParamsTest() {
             Assert.Throws<ArgumentNullException>(() => new NbtByteArray((byte[])null));
             Assert.Throws<ArgumentNullException>(() => new NbtIntArray((int[])null));

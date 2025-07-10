@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <IsTestProject>true</IsTestProject>
@@ -13,6 +13,12 @@
     <Optimize>false</Optimize>
     <OutputPath>..\bin\Release\</OutputPath>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="3.9.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
   <ItemGroup>
     <None Update="TestFiles\bigtest.nbt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -35,9 +41,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\fNbt\fNbt.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="NUnit" Version="3.14.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
   </ItemGroup>
 </Project>
