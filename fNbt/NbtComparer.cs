@@ -14,7 +14,7 @@ namespace fNbt {
         private NbtComparer() { }
 
         /// <inheritdoc/>
-        public bool Equals(NbtTag x, NbtTag y) {
+        public bool Equals(NbtTag? x, NbtTag? y) {
             if (ReferenceEquals(x, y)) return true;
             if (x is null || y is null) return false;
             if (x.TagType != y.TagType) return false;

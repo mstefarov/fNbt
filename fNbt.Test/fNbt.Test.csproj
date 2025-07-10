@@ -4,14 +4,8 @@
     <OutputType>Library</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <IsTestProject>true</IsTestProject>
-    <LangVersion>10</LangVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <OutputPath>..\bin\Debug\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <Optimize>false</Optimize>
-    <OutputPath>..\bin\Release\</OutputPath>
+    <LangVersion>12</LangVersion>
+    <OutputPath>..\bin\$(Configuration)\Tests\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MSTest" Version="3.9.3" />
