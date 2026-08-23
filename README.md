@@ -1,3 +1,5 @@
+# fNbt
+
 ![Build Status](https://github.com/mstefarov/fNbt/actions/workflows/dotnet.yml/badge.svg)
 
 [Named Binary Tag (NBT)](https://minecraft.gamepedia.com/NBT_format) is a structured binary file format used by Minecraft.
@@ -17,10 +19,10 @@ now completely rewritten by Matvei Stefarov (fragmer).
 - Easily create, traverse, and modify NBT documents.
 - Simple indexer-based syntax for accessing compound, list, and nested tags.
 - Shortcut properties to access tags' values without unnecessary type casts.
-- Compound tags implement `ICollection<T>` and List tags implement `IList<T>`, for easy traversal and LINQ integration.
+- Compound tags implement `ICollection<NbtTag>` and List tags implement `IList<NbtTag>`, for easy traversal and LINQ integration.
 - Good performance and low memory overhead.
 - Built-in pretty-printing of individual tags or whole files.
-- Every class and method are fully documented, annotated, and unit-tested.
+- Every class and method is fully documented, annotated, and unit-tested.
 - Can work with both big-endian and little-endian NBT data and systems.
 - Optional high-performance reader/writer for working with streams directly.
 
@@ -44,23 +46,25 @@ which means it can be used in .NET Framework 4.6.1+, .NET Core 2.0+, Mono 5.4+, 
 
 #### Accessing tags (long/strongly-typed style)
 ```cs
-    int intVal = myCompoundTag.Get<NbtInt>("intTagsName").Value;
+    int intVal = myCompoundTag.Get<NbtInt>("intTagsName")!.Value;
     string listItem = myStringList.Get<NbtString>(0).Value;
-    byte nestedVal = myCompTag.Get<NbtCompound>("nestedTag")
-                              .Get<NbtByte>("someByteTag")
+    byte nestedVal = myCompTag.Get<NbtCompound>("nestedTag")!
+                              .Get<NbtByte>("someByteTag")!
                               .Value;
 ```
 
 #### Accessing tags (shortcut style)
 ```cs
-    int intVal = myCompoundTag["intTagsName"].IntValue;
+    int intVal = myCompoundTag["intTagsName"]!.IntValue;
     string listItem = myStringList[0].StringValue;
-    byte nestedVal = myCompTag["nestedTag"]["someByteTag"].ByteValue;
+    byte nestedVal = myCompTag["nestedTag"]!["someByteTag"]!.ByteValue;
 ```
+Looking a tag up by name returns `null` when it is missing, hence the `!` above. `TryGet` is the checked
+alternative, and casts at the same time.
 
 #### Iterating over all tags in a compound/list
 ```cs
-    foreach( NbtTag tag in myCompoundTag.Values ){
+    foreach( NbtTag tag in myCompoundTag.Tags ){
         Console.WriteLine( tag.Name + " = " + tag.TagType );
     }
     foreach( string tagName in myCompoundTag.Names ){
@@ -85,7 +89,7 @@ which means it can be used in .NET Framework 4.6.1+, .NET Core 2.0+, Mono 5.4+, 
 ```
 
 ### Writing to stream directly using NbtWriter
-```
+```cs
 using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
     var writer = new NbtWriter(fileStream, "Server");
     writer.WriteString("Name", "BestServerEver");
@@ -125,9 +129,9 @@ Online reference can be found at http://www.fcraft.net/fnbt/v1.0.0/
 
 
 ## LICENSING
-fNbt v0.5.0+ is licensed under 3-Clause BSD license; see [docs/LICENSE.txt](docs/LICENSE.txt).
+fNbt v0.5.0+ is licensed under 3-Clause BSD license; see [docs/LICENSE.txt](https://github.com/mstefarov/fNbt/blob/master/docs/LICENSE.txt).
 LibNbt2012 up to and including v0.4.1 kept LibNbt's original license (LGPLv3).
 
 
 ## VERSION HISTORY
-See [docs/Changelog.md](docs/Changelog.md)
+See [docs/Changelog.md](https://github.com/mstefarov/fNbt/blob/master/docs/Changelog.md)

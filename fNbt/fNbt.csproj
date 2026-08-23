@@ -7,6 +7,9 @@
     <Nullable>enable</Nullable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisMode>Minimum</AnalysisMode>
+    <!-- Ships fNbt.xml in the package, so consumers get IntelliSense. Also turns on CS1591,
+         which fails the "every public member is documented" rule loudly instead of silently. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
