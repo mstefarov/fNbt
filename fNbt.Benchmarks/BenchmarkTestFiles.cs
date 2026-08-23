@@ -8,7 +8,7 @@ namespace fNbt.Benchmarks {
     public static class BenchmarkTestFiles {
         public static readonly string DirName = Path.Combine(AppContext.BaseDirectory, "TestFiles");
         public static readonly string BigTestFile = Path.Combine(DirName, "bigtest.nbt");
-        private static NbtFile bigFile;
+        private static NbtFile bigFile = null!;
 
         // --- Pre-allocated names and values for benchmarks ---
         private const int ComplexCompoundTagCount = 1000;

@@ -13,15 +13,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.15.2" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- FNbtNuGetVersion swaps the local build for a released package; see the baseline option in Program.cs. -->
+  <ItemGroup Condition="'$(FNbtNuGetVersion)' == ''">
     <ProjectReference Include="..\fNbt\fNbt.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(FNbtNuGetVersion)' != ''">
+    <PackageReference Include="fNbt" Version="$(FNbtNuGetVersion)" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != ''">
+    <DefineConstants>$(DefineConstants);FNBT_BASELINE</DefineConstants>
+  </PropertyGroup>
   
   <ItemGroup>
     <None Update="TestFiles\bigtest.nbt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="TestFiles\cw-template.cw">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

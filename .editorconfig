@@ -204,6 +204,7 @@ end_of_line = crlf
 # Analyzer severity
 
 dotnet_diagnostic.CA1510.severity = none
+dotnet_diagnostic.CA1512.severity = none
 
 # Dotnet style
 

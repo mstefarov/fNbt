@@ -11,3 +11,4 @@ fNbt.sln.DotSettings
 *.DotSettings
 docs/_site
 docs/api
+BenchmarkDotNet.Artifacts/

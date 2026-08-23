@@ -30,18 +30,17 @@ class Program {
                 jobList[jobList.IndexOf(job)] = job.WithBaseline(false).Freeze(); // HACK: remove baseline flag from original job
                 initialConfig.AddJob(job
                     .WithId($"{job.Id}-NuGet")
-                    .WithNuGet("fNbt", version)
+                    .WithMsBuildArguments($"/p:FNbtNuGetVersion={version}")
                     .WithBaseline(isFirst));
                 isFirst = false;
             }
         }
 
-        var finalConfig = ManualConfig.Union(initialConfig, parsedConfig);
-
-        // Run benchmarks
+        // Args go to the switcher rather than into a config: given an empty array it ignores --filter
+        // and drops into interactive selection.
         BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
-            .Run(Array.Empty<string>(), finalConfig);
+            .Run(benchmarkArgs, initialConfig);
     }
 }
 
