@@ -13,16 +13,19 @@ namespace fNbt {
             get { return NbtTagType.Compound; }
         }
 
-        readonly Dictionary<string, NbtTag> tags = new Dictionary<string, NbtTag>();
+        readonly Dictionary<string, NbtTag> tags;
 
 
         /// <summary> Creates an empty unnamed NbtByte tag. </summary>
-        public NbtCompound() { }
+        public NbtCompound() {
+            tags = new Dictionary<string, NbtTag>();
+        }
 
 
         /// <summary> Creates an empty NbtByte tag with the given name. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtCompound(string? tagName) {
+            tags = new Dictionary<string, NbtTag>();
             name = tagName;
         }
 
@@ -42,6 +45,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If some of the given tags were not named, or two tags with the same name were given. </exception>
         public NbtCompound(string? tagName, IEnumerable<NbtTag> tags) {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
+            this.tags = new Dictionary<string, NbtTag>((tags as ICollection<NbtTag>)?.Count ?? 0);
             name = tagName;
             foreach (NbtTag tag in tags) {
                 Add(tag);
@@ -54,6 +58,8 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtCompound(NbtCompound other) {
             if (other == null) throw new ArgumentNullException(nameof(other));
+            // Sized up front: growing a dictionary re-allocates its entry and bucket arrays each time.
+            tags = new Dictionary<string, NbtTag>(other.tags.Count);
             name = other.name;
             foreach (NbtTag tag in other.tags.Values) {
                 Add((NbtTag)tag.Clone());
@@ -291,12 +297,11 @@ namespace fNbt {
                         throw new NbtFormatException("Unsupported tag type found in NBT_Compound: " + nextTag);
                 }
                 newTag.Parent = this;
-                newTag.Name = readStream.ReadString();
+                // Assigned to the field: the tag has no name yet, so the property's rename path is dead weight.
+                string tagName = readStream.ReadString();
+                newTag.name = tagName;
                 if (newTag.ReadTag(readStream)) {
-                    // ReSharper disable AssignNullToNotNullAttribute
-                    // newTag.Name is never null
-                    tags.Add(newTag.Name, newTag);
-                    // ReSharper restore AssignNullToNotNullAttribute
+                    tags.Add(tagName, newTag);
                 }
             }
         }

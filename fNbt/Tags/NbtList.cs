@@ -14,6 +14,10 @@ namespace fNbt {
 
         readonly List<NbtTag> tags = new List<NbtTag>();
 
+        // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
+        // of a corrupt length. Longer lists just grow as before.
+        const int MaxPresizedCapacity = 16;
+
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
         /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is a recognized tag type. </exception>
@@ -128,6 +132,9 @@ namespace fNbt {
             ListType = givenListType;
 
             if (tags == null) return;
+            if (tags is ICollection<NbtTag> collection) {
+                this.tags.Capacity = collection.Count;
+            }
             foreach (NbtTag tag in tags) {
                 Add(tag);
             }
@@ -141,6 +148,7 @@ namespace fNbt {
             if (other == null) throw new ArgumentNullException(nameof(other));
             name = other.name;
             listType = other.listType;
+            tags.Capacity = other.tags.Count;
             foreach (NbtTag tag in other.tags) {
                 tags.Add((NbtTag)tag.Clone());
             }
@@ -231,6 +239,8 @@ namespace fNbt {
             if (length < 0) {
                 throw new NbtFormatException("Negative list size given.");
             }
+
+            tags.Capacity = Math.Min(length, MaxPresizedCapacity);
 
             for (int i = 0; i < length; i++) {
                 NbtTag newTag = ListType switch {
