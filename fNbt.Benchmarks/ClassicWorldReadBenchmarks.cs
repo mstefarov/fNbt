@@ -5,7 +5,9 @@ namespace fNbt.Benchmarks;
 
 // Reading ClassicWorld maps. Mostly block data, so these measure bulk throughput and GZip cost
 // rather than per-tag overhead.
+// See ClassicWorldWriteBenchmarks for why these are memory-randomized.
 [MemoryDiagnoser]
+[MemoryRandomization]
 public class ClassicWorldReadBenchmarks {
     [Params(CwSize.Small, CwSize.Medium)]
     public CwSize Size;

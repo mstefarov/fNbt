@@ -1,17 +1,9 @@
-﻿using System.IO;
+using System.IO;
 
 namespace fNbt {
     // Class used to count bytes read-from/written-to non-seekable streams.
     internal sealed class ByteCountingStream : Stream {
         readonly Stream baseStream;
-
-        // These are necessary to avoid counting bytes twice if ReadByte/WriteByte call Read/Write internally.
-        bool readingOneByte;
-        bool writingOneByte;
-
-        // These are necessary to avoid counting bytes twice if Read/Write call ReadByte/WriteByte internally.
-        bool readingManyBytes;
-        bool writingManyBytes;
 
 
         public ByteCountingStream(Stream stream) {
@@ -36,54 +28,36 @@ namespace fNbt {
 
 
         public override int Read(byte[] buffer, int offset, int count) {
-            readingManyBytes = true;
             int bytesActuallyRead = baseStream.Read(buffer, offset, count);
-            readingManyBytes = false;
-            if (!readingOneByte) BytesRead += bytesActuallyRead;
+            BytesRead += bytesActuallyRead;
             return bytesActuallyRead;
         }
 
 
         public override void Write(byte[] buffer, int offset, int count) {
-            writingManyBytes = true;
             baseStream.Write(buffer, offset, count);
-            writingManyBytes = false;
-            if (!writingOneByte) BytesWritten += count;
+            BytesWritten += count;
         }
 
 
+        // Straight to baseStream instead of base to avoid re-entering Read/Write.
         public override int ReadByte() {
-            readingOneByte = true;
-            int value = base.ReadByte();
-            readingOneByte = false;
-            if (value >= 0 && !readingManyBytes) BytesRead++;
+            int value = baseStream.ReadByte();
+            if (value >= 0) BytesRead++;
             return value;
         }
 
 
         public override void WriteByte(byte value) {
-            writingOneByte = true;
-            base.WriteByte(value);
-            writingOneByte = false;
-            if (!writingManyBytes) BytesWritten++;
+            baseStream.WriteByte(value);
+            BytesWritten++;
         }
 
 
-        public override bool CanRead {
-            get { return baseStream.CanRead; }
-        }
-
-        public override bool CanSeek {
-            get { return baseStream.CanSeek; }
-        }
-
-        public override bool CanWrite {
-            get { return baseStream.CanWrite; }
-        }
-
-        public override long Length {
-            get { return baseStream.Length; }
-        }
+        public override bool CanRead => baseStream.CanRead;
+        public override bool CanSeek => baseStream.CanSeek;
+        public override bool CanWrite => baseStream.CanWrite;
+        public override long Length => baseStream.Length;
 
         public override long Position {
             get { return baseStream.Position; }

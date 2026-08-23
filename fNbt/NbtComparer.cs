@@ -4,22 +4,31 @@ using System.Collections.Generic;
 namespace fNbt {
     /// <summary>
     ///   Compares NbtTag for equality by comparing their types, names, and values. Considers compound tags to be equal
-    ///   if they contain equal sets of tags. Considered list tags to be equal if their tags are equal and in the same order.
+    ///   if they contain equal sets of tags. Considers list tags to be equal if their tags are equal and in the same order.
     ///   Name comparisons are case-sensitive.
     /// </summary>
     public sealed class NbtComparer : IEqualityComparer<NbtTag> {
         /// <summary> Gets a singleton instance of the NbtComparer. </summary>
         public static NbtComparer Instance { get; } = new NbtComparer();
 
+        // Comparison recurses, and a few kilobytes of hostile input can nest thousands of levels deep.
+        // A StackOverflowException cannot be caught, so cap instead. Real NBT is nowhere near this deep.
+        private const int MaxDepth = 512;
+
         private NbtComparer() { }
 
         /// <inheritdoc/>
         public bool Equals(NbtTag? x, NbtTag? y) {
+            return Equals(x, y, 0);
+        }
+
+
+        private bool Equals(NbtTag? x, NbtTag? y, int depth) {
             if (ReferenceEquals(x, y)) return true;
             if (x is null || y is null) return false;
             if (x.TagType != y.TagType) return false;
             if (!String.Equals(x.Name, y.Name, StringComparison.Ordinal)) return false; // null names are permitted
-            return DeepEquals(x, y);
+            return DeepEquals(x, y, depth);
         }
 
         /// <inheritdoc/>
@@ -58,6 +67,20 @@ namespace fNbt {
                         hash = (hash * 23) ^ comp.Count.GetHashCode();
                         return hash;
 
+                    case NbtTagType.Double: {
+                        // All NaNs are Equals-equal so must hash alike, and .NET Framework's
+                        // Double.GetHashCode does not normalize NaN payloads the way .NET Core's does.
+                        double d = ((NbtDouble)tag).Value;
+                        if (Double.IsNaN(d)) d = Double.NaN;
+                        return (hash * 23) ^ d.GetHashCode();
+                    }
+
+                    case NbtTagType.Float: {
+                        float f = ((NbtFloat)tag).Value;
+                        if (Single.IsNaN(f)) f = Single.NaN;
+                        return (hash * 23) ^ f.GetHashCode();
+                    }
+
                     default:
                         // primitives and strings
                         var raw = GetRawValue(tag);
@@ -71,7 +94,11 @@ namespace fNbt {
         }
 
         // Compare detailed attributes of two given tags
-        private bool DeepEquals(NbtTag x, NbtTag y) {
+        private bool DeepEquals(NbtTag x, NbtTag y, int depth) {
+            if (depth >= MaxDepth) {
+                throw new ArgumentException("Tags are nested deeper than " + MaxDepth + " levels.", nameof(x));
+            }
+
             // Assume that tags have same type and are non-null
             switch (x.TagType) {
                 case NbtTagType.ByteArray: {
@@ -99,11 +126,16 @@ namespace fNbt {
                         return true;
                     }
                 case NbtTagType.Compound: {
-                        // Compounds are equal if their child-count and contents are equal
+                        // Child names are unique, so every child of x must have a same-named one in y.
+                        // Looking them up beats a HashSet: no reliance on hash quality, and it can carry depth.
                         var xc = (NbtCompound)x;
                         var yc = (NbtCompound)y;
                         if (xc.Count != yc.Count) return false;
-                        return new HashSet<NbtTag>(xc, this).SetEquals(yc);
+                        foreach (NbtTag xChild in xc) {
+                            NbtTag? yChild = yc.Get(xChild.Name!);
+                            if (yChild == null || !Equals(xChild, yChild, depth + 1)) return false;
+                        }
+                        return true;
                     }
                 case NbtTagType.List: {
                         // Lists are considered equal if their type, count, and contents are equal
@@ -111,7 +143,7 @@ namespace fNbt {
                         var yl = (NbtList)y;
                         if (xl.ListType != yl.ListType || xl.Count != yl.Count) return false;
                         for (int i = 0; i < xl.Count; i++)
-                            if (!Equals(xl[i], yl[i])) return false;
+                            if (!Equals(xl[i], yl[i], depth + 1)) return false;
                         return true;
                     }
                 default: {
@@ -136,7 +168,7 @@ namespace fNbt {
                 NbtTagType.Long => tag.LongValue,
                 NbtTagType.Short => tag.ShortValue,
                 NbtTagType.String => tag.StringValue,
-                _ => null, // End, Unknown, array, and compount tags
+                _ => null, // End, Unknown, array, and compound tags
             };
         }
     }

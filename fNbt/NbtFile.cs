@@ -262,6 +262,16 @@ namespace fNbt {
                     break;
 
                 case NbtCompression.ZLib:
+#if NET6_0_OR_GREATER
+                    // Built-in ZLibStream is faster and validates the checksum too
+                    using (var decStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Decompress, true)) {
+                        if (bufferSize > 0) {
+                            LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
+                        } else {
+                            LoadFromStreamInternal(decStream, selector);
+                        }
+                    }
+#else
                     if (stream.ReadByte() != 0x78) {
                         throw new InvalidDataException(WrongZLibHeaderMessage);
                     }
@@ -273,6 +283,7 @@ namespace fNbt {
                             LoadFromStreamInternal(decStream, selector);
                         }
                     }
+#endif
                     break;
 
                 default:
@@ -540,7 +551,7 @@ namespace fNbt {
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <param name="compression"> Format in which the given file is compressed. </param>
         /// <param name="bigEndian"> Whether the file uses big-endian (default) or little-endian encoding. </param>
-        /// <param name="bufferSize"> Buffer size to use for reading, in bytes. Default is 8192. </param>
+        /// <param name="bufferSize"> No longer used. </param>
         /// <returns> Name of the root tag in the given NBT file. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
@@ -557,9 +568,6 @@ namespace fNbt {
             if (!File.Exists(fileName)) {
                 throw new FileNotFoundException("Could not find the given NBT file.", fileName);
             }
-            if (bufferSize < 0) {
-                throw new ArgumentOutOfRangeException(nameof(bufferSize), bufferSize, "DefaultBufferSize cannot be negative.");
-            }
             using (FileStream readFileStream = File.OpenRead(fileName)) {
                 return ReadRootTagName(readFileStream, compression, bigEndian, bufferSize);
             }
@@ -570,7 +578,7 @@ namespace fNbt {
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading this stream. </param>
         /// <param name="bigEndian"> Whether the stream uses big-endian (default) or little-endian encoding. </param>
-        /// <param name="bufferSize"> Buffer size to use for reading, in bytes. Default is 8192. </param>
+        /// <param name="bufferSize"> No longer used. </param>
         /// <returns> Name of the root tag in the given stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
@@ -580,10 +588,8 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public static string ReadRootTagName(Stream stream, NbtCompression compression, bool bigEndian,
                                              int bufferSize) {
+            // bufferSize param is no longer used because it caused perf problems due to over-reading on netcore.
             if (stream == null) throw new ArgumentNullException(nameof(stream));
-            if (bufferSize < 0) {
-                throw new ArgumentOutOfRangeException(nameof(bufferSize), bufferSize, "DefaultBufferSize cannot be negative.");
-            }
             // detect compression, based on the first byte
             if (compression == NbtCompression.AutoDetect) {
                 compression = DetectCompression(stream);
@@ -591,12 +597,9 @@ namespace fNbt {
 
             switch (compression) {
                 case NbtCompression.GZip:
-                    using (var decStream = new GZipStream(stream, CompressionMode.Decompress, true)) {
-                        if (bufferSize > 0) {
-                            return GetRootNameInternal(new BufferedStream(decStream, bufferSize), bigEndian);
-                        } else {
-                            return GetRootNameInternal(decStream, bigEndian);
-                        }
+                    // Buffering the output would undo PeekStream by pulling a whole bufferSize at once.
+                    using (var decStream = new GZipStream(new PeekStream(stream), CompressionMode.Decompress, true)) {
+                        return GetRootNameInternal(decStream, bigEndian);
                     }
 
                 case NbtCompression.None:
@@ -607,12 +610,8 @@ namespace fNbt {
                         throw new InvalidDataException(WrongZLibHeaderMessage);
                     }
                     stream.ReadByte();
-                    using (var decStream = new DeflateStream(stream, CompressionMode.Decompress, true)) {
-                        if (bufferSize > 0) {
-                            return GetRootNameInternal(new BufferedStream(decStream, bufferSize), bigEndian);
-                        } else {
-                            return GetRootNameInternal(decStream, bigEndian);
-                        }
+                    using (var decStream = new DeflateStream(new PeekStream(stream), CompressionMode.Decompress, true)) {
+                        return GetRootNameInternal(decStream, bigEndian);
                     }
 
                 default:

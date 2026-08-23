@@ -232,18 +232,25 @@ namespace fNbt.Test {
 
 
         void ReadRootTagInternal(string fileName, NbtCompression compression) {
-            Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.ReadRootTagName(fileName, compression, true, -1));
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.ReadRootTagName(fileName, (NbtCompression)255, true, 0));
 
             Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName));
-            Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, true, 0));
+            // bufferSize is ignored now, so every value must give the same name, even a negative one.
+            foreach (int bufferSize in new[] { -1, 0, 1, 8, 8192 }) {
+                Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, true, bufferSize));
+            }
 
             byte[] fileBytes = File.ReadAllBytes(fileName);
             using (var ms = new MemoryStream(fileBytes)) {
                 using (var nss = new NonSeekableStream(ms)) {
-                    Assert.Throws<ArgumentOutOfRangeException>(
-                        () => NbtFile.ReadRootTagName(nss, compression, true, -1));
-                    NbtFile.ReadRootTagName(nss, compression, true, 0);
+                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(nss, compression, true, 0));
+                }
+            }
+
+            // Reading is chunked, so make sure a stream that hands back less than asked still works.
+            using (var ms = new MemoryStream(fileBytes)) {
+                using (var prs = new PartialReadStream(ms, 1)) {
+                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(prs, compression, true, 0));
                 }
             }
         }

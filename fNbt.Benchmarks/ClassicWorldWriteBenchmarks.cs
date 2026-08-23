@@ -2,7 +2,10 @@
 
 namespace fNbt.Benchmarks;
 
+// A Medium map moves about as much as L3 holds, so copy throughput swings between 1.5 and 16 GB/s on
+// where the buffers land. MemoryRandomization keeps one process's luck from looking like a result.
 [MemoryDiagnoser]
+[MemoryRandomization]
 public class ClassicWorldWriteBenchmarks {
     [Params(CwSize.Small, CwSize.Medium)]
     public CwSize Size;
