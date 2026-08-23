@@ -36,8 +36,9 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 
+// AssemblyVersion stays at 1.0.0.0 across 1.x, so Framework apps built against 1.0.0 bind without redirects.
 [assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 // Potentially speed up resource probes
 
