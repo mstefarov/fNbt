@@ -7,7 +7,7 @@ public class ClassicWorldWriteBenchmarks {
     [Params(CwSize.Small, CwSize.Medium)]
     public CwSize Size;
 
-    CwMap map = null!;
+    NbtCompound root = null!;
     NbtFile mapFile = null!;
 
     // Not Stream.Null: it discards writes without reading the source buffer, so the block arrays
@@ -16,8 +16,10 @@ public class ClassicWorldWriteBenchmarks {
 
     [GlobalSetup]
     public void GlobalSetup() {
-        map = ClassicWorldFiles.Load(Size);
-        mapFile = new NbtFile(map.Root);
+        // map stays local: holding it would keep a second copy of the payload on the LOH and add noise.
+        CwMap map = ClassicWorldFiles.Load(Size);
+        root = map.Root;
+        mapFile = new NbtFile(root);
         sink = new MemoryStream(map.RawBytes.Length + 1024);
     }
 
@@ -55,8 +57,6 @@ public class ClassicWorldWriteBenchmarks {
 
     [Benchmark(Description = "Write map via NbtWriter (uncompressed)")]
     public void WriteWithNbtWriter() {
-        NbtCompound root = map.Root;
-
         sink.Position = 0;
         var writer = new NbtWriter(sink, "ClassicWorld");
         writer.WriteByte("FormatVersion", 1);

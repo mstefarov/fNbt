@@ -61,8 +61,9 @@ public class ClassicWorldMetadataBenchmarks {
 
 
     // Worst case for the comparer, since identical trees cannot exit early.
-    // NbtComparer postdates v1.0.0, so it cannot build against a released baseline.
+    // NbtComparer postdates v1.0.0, so this cannot build against a released baseline.
 #if !FNBT_BASELINE
+    [BenchmarkCategory(Program.BaselineIncompatible)]
     [Benchmark(Description = "Compare two metadata trees")]
     public bool CompareMetadata() {
         return NbtComparer.Instance.Equals(metadataRoot, metadataClone);
