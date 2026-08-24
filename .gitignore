@@ -12,3 +12,4 @@ fNbt.sln.DotSettings
 docs/_site
 docs/api
 BenchmarkDotNet.Artifacts/
+release/

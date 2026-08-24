@@ -8,7 +8,7 @@ to create, load, traverse, modify, and save NBT files and streams.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 1.0.0 (3 July 2025).
+Current released version is 1.1.0 (23 August 2026).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -125,7 +125,7 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
 
 
 ## API REFERENCE
-Online reference can be found at http://www.fcraft.net/fnbt/v1.0.0/
+Online reference can be found at http://www.fcraft.net/fnbt/v1.1.0/
 
 
 ## LICENSING

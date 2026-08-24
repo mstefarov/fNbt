@@ -418,12 +418,13 @@ namespace fNbt {
         }
 
 
-        /// <summary> Saves this NBT file to a stream. Nothing is written to stream if RootTag is <c>null</c>. </summary>
+        /// <summary> Saves this NBT file to a new byte array. Returns an empty array if RootTag is <c>null</c>. </summary>
         /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
         /// <returns> Byte array containing the serialized NBT data. </returns>
         /// <exception cref="ArgumentException"> If AutoDetect was given as the <paramref name="compression"/> mode. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
         /// <exception cref="InvalidDataException"> If given stream does not support writing. </exception>
+        /// <exception cref="NotSupportedException"> If the serialized document does not fit in a single array. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements. </exception>

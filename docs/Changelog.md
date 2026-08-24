@@ -1,3 +1,15 @@
+## 1.1.0 (fNbt)
+- Add NbtComparer, for comparing tags and whole trees by structure and value.
+- Add a .NET 8 target alongside .NET Standard 2.0.
+- Performance improvements in ZLib compression (2.5x faster), SaveToBuffer
+    (up to 5x less memory allocation), and NbtCompound/NbtList creation
+    (up to 25% less memory allocation).
+- Fixed ReadRootTagName decompressing more of a file than it needs.
+    Its bufferSize parameter turned out to be useless and is now ignored.
+- When targeting .NET 8+, ZLib-compressed files now have their checksums
+    validated.
+- Fix missing Intellisense/XML documentation for the NuGet package.
+
 ## 1.0.0 (fNbt)
 - Library now targets .NET Standard 2.0 instead of .NET Framework, which
     allows fNbt to be used in more types of projects (e.g. .NET 8 or UWP).
