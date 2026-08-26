@@ -12,7 +12,6 @@ class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
 
     static void Main(string[] args) {
-        // Parse custom arguments
         var customArgs = new CustomArguments(args);
         var benchmarkArgs = customArgs.GetRemainingArgs();
 
@@ -20,21 +19,33 @@ class Program {
         var initialConfig = DefaultConfig.Instance
             .AddDiagnoser(MemoryDiagnoser.Default);
 
-        // Parse *all* BenchmarkDotNet options (runtimes, filters, diagnosers, etc.)
-        (bool isSuccess, IConfig parsedConfig, CommandLineOptions options) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
+        if (customArgs.BaselineSource != null && customArgs.BaselineVersion == null) {
+            logger.WriteLineError("// --baseline-source has no effect without --baseline");
+        }
+
+        // Parse the BenchmarkDotNet options up front, to get at the parsed jobs below
+        (bool isSuccess, IConfig parsedConfig, _) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
         if (!isSuccess)
             return;
 
-        // Benchmarks using newer APIs cannot compile against the baseline, and guarding the source is not
-        // enough: BenchmarkDotNet builds its boilerplate from the default build, so they must leave the run.
+        // Benchmarks using newer APIs can't compile against the baseline package. Source #if
+        // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
         if (customArgs.BaselineVersion != null) {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
         }
 
         // When "--baseline" is specified, add a baseline for each job
         if (customArgs.BaselineVersion is string version) {
+            // With no --job or --runtimes, the parsed config has no jobs yet. The switcher only
+            // adds the default job if the config still has none, so add the local job here too.
+            // Otherwise a plain --baseline run would silently skip the comparison.
+            Job[] jobs = parsedConfig.GetJobs().ToArray();
+            if (jobs.Length == 0) {
+                jobs = new[] { Job.Default };
+                initialConfig.AddJob(Job.Default);
+            }
             bool isFirst = true;
-            foreach (Job job in parsedConfig.GetJobs().ToArray()) {
+            foreach (Job job in jobs) {
                 // With several --runtimes, BenchmarkDotNet already makes the first one the baseline, and
                 // a group may only have one.
                 bool makeBaseline = isFirst && !job.Meta.Baseline;
@@ -46,12 +57,13 @@ class Program {
                     .WithId($"{job.Id}-NuGet")
                     .WithMsBuildArguments(msBuildArgs.ToArray())
                     .WithBaseline(makeBaseline));
+                logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
                 isFirst = false;
             }
         }
 
-        // Args go to the switcher rather than into a config: given an empty array it ignores --filter
-        // and drops into interactive selection.
+        // Args go to the switcher itself, not into the config. Given an empty array, it ignores
+        // --filter and drops into interactive selection.
         BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
             .Run(benchmarkArgs, initialConfig);
@@ -82,6 +94,11 @@ public class CustomArguments {
             return null;
         }
         string value = args[index + 1];
+        if (value.StartsWith("-", StringComparison.Ordinal)) {
+            // Missing value: don't eat the next option. The flag stays behind, so
+            // BenchmarkDotNet reports it as an unknown option instead of running wrong.
+            return null;
+        }
         args.RemoveRange(index, 2);
         return value;
     }
