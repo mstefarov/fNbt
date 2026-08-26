@@ -280,10 +280,7 @@ namespace fNbt {
                         throw new InvalidDataException("Failed to decompress ZLib data.", ex);
                     }
 #else
-                    if (stream.ReadByte() != 0x78) {
-                        throw new InvalidDataException(WrongZLibHeaderMessage);
-                    }
-                    stream.ReadByte();
+                    ValidateZLibHeader(stream);
                     using (var decStream = new DeflateStream(stream, CompressionMode.Decompress, true)) {
                         if (bufferSize > 0) {
                             LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
@@ -636,10 +633,7 @@ namespace fNbt {
                         throw new InvalidDataException("Failed to decompress ZLib data.", ex);
                     }
 #else
-                    if (stream.ReadByte() != 0x78) {
-                        throw new InvalidDataException(WrongZLibHeaderMessage);
-                    }
-                    stream.ReadByte();
+                    ValidateZLibHeader(stream);
                     using (var decStream = new DeflateStream(new PeekStream(stream), CompressionMode.Decompress, true)) {
                         return GetRootNameInternal(decStream, bigEndian);
                     }
@@ -681,7 +675,21 @@ namespace fNbt {
         }
 
 
-        const string WrongZLibHeaderMessage = "Unrecognized ZLib header. Expected 0x78";
+#if !NET6_0_OR_GREATER
+        // netstandard2.0 reads ZLib through a raw DeflateStream, so the two header bytes are
+        // checked manually. The Adler-32 trailer is not validated.
+        static void ValidateZLibHeader(Stream stream) {
+            int cmf = stream.ReadByte();
+            int flg = stream.ReadByte();
+            // Compression method must be deflate, window at most 32 KiB,
+            // no preset dictionary, and the check bits must make sense.
+            if (cmf < 0 || flg < 0 ||
+                (cmf & 0x0F) != 8 || (cmf >> 4) > 7 ||
+                (flg & 0x20) != 0 || ((cmf << 8) | flg) % 31 != 0) {
+                throw new InvalidDataException("Invalid ZLib header.");
+            }
+        }
+#endif
 
         // ZLibStream throws this on a bad header or checksum. We just want to re-wrap it in a nicer exception.
         const string ZLibExceptionTypeName = "System.IO.Compression.ZLibException";

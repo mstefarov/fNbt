@@ -227,6 +227,22 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ZLibSmallWindowHeaderLoads() {
+            // Valid ZLib headers are not always 0x78. Declare a 512-byte window instead,
+            // legal here because the payload is tiny.
+            var root = new NbtCompound("root") { new NbtInt("v", 12345) };
+            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
+            doc[0] = 0x18; // CM=8, CINFO=1
+            doc[1] = 0x19; // FCHECK valid, FDICT clear
+
+            var file = new NbtFile();
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib);
+            Assert.AreEqual(12345, file.RootTag["v"].IntValue);
+            Assert.AreEqual("root", NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.ZLib, true, 0));
+        }
+
+
+        [TestMethod]
         public void SaveToBufferCompressed() {
             // The compressed branch of SaveToBuffer is separate code from the exact-size
             // uncompressed path, and nothing else covers it
