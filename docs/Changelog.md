@@ -1,3 +1,14 @@
+## 2.0.0 (fNbt, unreleased)
+- Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
+    JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassicWorld.
+    BedrockNetwork (varint encoding) is declared but not implemented yet.
+- Add NbtBlob, for reading and writing raw NBT documents without file-level
+    framing: network packet payloads, LevelDB values, and NBT embedded inside
+    other formats. Blobs support unnamed and non-compound roots (JavaNetwork),
+    absent documents (a lone TAG_End byte), back-to-back documents via
+    ReadConcatenatedTags, and reads that stop exactly at the end of one
+    document, leaving trailing bytes in place.
+
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
     Minecraft's own limit, instead of crashing the process with an uncatchable
