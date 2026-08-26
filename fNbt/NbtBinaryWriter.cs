@@ -36,6 +36,8 @@ namespace fNbt {
         // Swap is only needed if endianness of the runtime differs from desired NBT stream
         readonly bool swapNeeded;
 
+        readonly bool useVarInt;
+
         int depth;
 
 
@@ -53,11 +55,16 @@ namespace fNbt {
         }
 
 
-        public NbtBinaryWriter(Stream input, bool bigEndian) {
+        public NbtBinaryWriter(Stream input, bool bigEndian)
+            : this(input, bigEndian, false) { }
+
+
+        public NbtBinaryWriter(Stream input, bool bigEndian, bool useVarInt) {
             if (input == null) throw new ArgumentNullException(nameof(input));
             if (!input.CanWrite) throw new ArgumentException("Given stream must be writable", nameof(input));
             stream = input;
             swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
+            this.useVarInt = useVarInt;
         }
 
 
@@ -86,6 +93,11 @@ namespace fNbt {
 
 
         public void Write(int value) {
+            if (useVarInt) {
+                // Zigzag-encoded, like the reader's ReadInt32
+                WriteUnsignedVarInt32((uint)(value << 1) ^ (uint)(value >> 31));
+                return;
+            }
             unchecked {
                 if (swapNeeded) {
                     buffer[0] = (byte)(value >> 24);
@@ -104,6 +116,10 @@ namespace fNbt {
 
 
         public void Write(long value) {
+            if (useVarInt) {
+                WriteUnsignedVarInt64((ulong)(value << 1) ^ (ulong)(value >> 63));
+                return;
+            }
             unchecked {
                 if (swapNeeded) {
                     buffer[0] = (byte)(value >> 56);
@@ -181,14 +197,19 @@ namespace fNbt {
                 throw new ArgumentNullException(nameof(value));
             }
 
-            // The length prefix is an unsigned 16-bit byte count.
-            // Refuse anything past 65,535 bytes to avoid corrupting the stream.
             int numBytes = Encoding.GetByteCount(value);
-            if (numBytes > ushort.MaxValue) {
-                throw new NbtFormatException(
-                    "String is too long to write: " + numBytes + " bytes (maximum is 65535).");
+            if (useVarInt) {
+                // BedrockNetwork length prefix is a plain unsigned varint
+                WriteUnsignedVarInt32((uint)numBytes);
+            } else {
+                // The length prefix is an unsigned 16-bit byte count.
+                // Refuse anything past 65,535 bytes to avoid corrupting the stream.
+                if (numBytes > ushort.MaxValue) {
+                    throw new NbtFormatException(
+                        "String is too long to write: " + numBytes + " bytes (maximum is 65535).");
+                }
+                Write((short)numBytes);
             }
-            Write((short)numBytes);
 
             if (numBytes <= BufferSize) {
                 // If the string fits entirely in the buffer, encode and write it as one
@@ -215,6 +236,24 @@ namespace fNbt {
                     numLeft -= charCount;
                 }
             }
+        }
+
+
+        void WriteUnsignedVarInt32(uint value) {
+            while (value >= 0x80) {
+                stream.WriteByte((byte)(value | 0x80));
+                value >>= 7;
+            }
+            stream.WriteByte((byte)value);
+        }
+
+
+        void WriteUnsignedVarInt64(ulong value) {
+            while (value >= 0x80) {
+                stream.WriteByte((byte)(value | 0x80));
+                value >>= 7;
+            }
+            stream.WriteByte((byte)value);
         }
 
 

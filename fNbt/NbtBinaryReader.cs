@@ -12,6 +12,7 @@ namespace fNbt {
         byte[]? seekBuffer;
         const int SeekBufferSize = 8 * 1024;
         readonly bool swapNeeded;
+        readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
         int depth;
 
@@ -31,8 +32,13 @@ namespace fNbt {
 
 
         public NbtBinaryReader(Stream input, bool bigEndian)
+            : this(input, bigEndian, false) { }
+
+
+        public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt)
             : base(input) {
             swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
+            this.useVarInt = useVarInt;
         }
 
 
@@ -55,6 +61,10 @@ namespace fNbt {
 
 
         public override int ReadInt32() {
+            if (useVarInt) {
+                uint raw = ReadUnsignedVarInt32();
+                return (int)(raw >> 1) ^ -(int)(raw & 1);
+            }
             if (swapNeeded) {
                 return Swap(base.ReadInt32());
             } else {
@@ -64,10 +74,43 @@ namespace fNbt {
 
 
         public override long ReadInt64() {
+            if (useVarInt) {
+                ulong raw = ReadUnsignedVarInt64();
+                return (long)(raw >> 1) ^ -(long)(raw & 1);
+            }
             if (swapNeeded) {
                 return Swap(base.ReadInt64());
             } else {
                 return base.ReadInt64();
+            }
+        }
+
+
+        // BedrockNetwork varints, 7 bits per byte, least-significant group first.
+        // TAG_Int/TAG_Long values and container lengths are zigzag-encoded on top of
+        // these; string lengths use the plain unsigned form.
+        uint ReadUnsignedVarInt32() {
+            uint result = 0;
+            int shift = 0;
+            while (true) {
+                byte b = ReadByte();
+                result |= (uint)(b & 0x7F) << shift;
+                if ((b & 0x80) == 0) return result;
+                shift += 7;
+                if (shift >= 35) throw new NbtFormatException("VarInt32 is too long.");
+            }
+        }
+
+
+        ulong ReadUnsignedVarInt64() {
+            ulong result = 0;
+            int shift = 0;
+            while (true) {
+                byte b = ReadByte();
+                result |= (ulong)(b & 0x7F) << shift;
+                if ((b & 0x80) == 0) return result;
+                shift += 7;
+                if (shift >= 70) throw new NbtFormatException("VarInt64 is too long.");
             }
         }
 
@@ -94,8 +137,9 @@ namespace fNbt {
 
 
         public override string ReadString() {
-            // The prefix is an unsigned 16-bit byte count in Java, valid up to length 65,535.
-            int length = (ushort)ReadInt16();
+            // The prefix is an unsigned 16-bit byte count in Java (valid up to length 65,535),
+            // and an unsigned varint in BedrockNetwork.
+            int length = useVarInt ? checked((int)ReadUnsignedVarInt32()) : (ushort)ReadInt16();
             if (length < stringConversionBuffer.Length) {
                 int stringBytesRead = 0;
                 while (stringBytesRead < length) {
@@ -160,7 +204,7 @@ namespace fNbt {
 
 
         public void SkipString() {
-            int length = (ushort)ReadInt16();
+            int length = useVarInt ? checked((int)ReadUnsignedVarInt32()) : (ushort)ReadInt16();
             Skip(length);
         }
 
