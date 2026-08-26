@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("github.com/mstefarov/fNbt")]
 [assembly: AssemblyProduct("fNbt")]
-[assembly: AssemblyCopyright("2012-2024 Matvei Stefarov")]
+[assembly: AssemblyCopyright("2012-2026 Matvei Stefarov")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -38,7 +38,7 @@ using System.Runtime.InteropServices;
 
 // AssemblyVersion stays at 1.0.0.0 across 1.x, so Framework apps built against 1.0.0 bind without redirects.
 [assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 // Potentially speed up resource probes
 

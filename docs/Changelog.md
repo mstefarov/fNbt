@@ -1,3 +1,29 @@
+## 1.1.1 (fNbt)
+- Every code path now rejects tags nested more than 512 levels deep, matching
+    Minecraft's own limit, instead of crashing the process with an uncatchable
+    stack overflow.
+- Fixed several ways a corrupt document could load silently wrong: 32-bit
+    overflow in list/array skip math, skipped lists of TAG_Long_Array consuming
+    zero bytes, and huge declared lengths allocating before validation (#24).
+    Malformed files now fail with helpful exceptions.
+- String length prefixes now parse as unsigned, matching Minecraft Java.
+    Strings of 32,768 to 65,535 bytes load correctly, and trying to write
+    anything longer throws instead of corrupting output.
+- NbtWriter.BeginList now accepts TAG_End as an empty list's element type,
+    matching Minecraft Java and Bedrock.
+- NbtWriter.WriteByteArray(Stream, ...) now throws on an undersized source
+    instead of spinning in a read loop forever.
+- Fixed parent-tracking bugs that could cause problems when moving tags between
+    containers: cloned NbtList children came out detached, indexer setters kept
+    the displaced tag's Parent, Insert skipped some of Add's guards, and
+    it was possible to accidentally create a reference cycle. Also, AddRange
+    and the collection constructors now validate the whole batch before
+    changing any tags' parents.
+- NbtReader's ReadListAsArray now validates up front. Reading corrupt data now
+    toggles its error state instead of making it desync.
+- Fixed valid ZLib streams getting rejected with InvalidDataException if they
+    did not start with exactly 0x78.
+
 ## 1.1.0 (fNbt)
 - Add NbtComparer, for comparing tags and whole trees by structure and value.
 - Add a .NET 8 target alongside .NET Standard 2.0.
