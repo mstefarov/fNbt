@@ -36,6 +36,22 @@ namespace fNbt {
         // Swap is only needed if endianness of the runtime differs from desired NBT stream
         readonly bool swapNeeded;
 
+        int depth;
+
+
+        // Writing a tag tree is recursive. Check for ridiculously nested tags before the stack runs out.
+        public void IncreaseDepth() {
+            if (depth >= NbtTag.MaxDepth) {
+                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+            }
+            depth++;
+        }
+
+
+        public void DecreaseDepth() {
+            depth--;
+        }
+
 
         public NbtBinaryWriter(Stream input, bool bigEndian) {
             if (input == null) throw new ArgumentNullException(nameof(input));
@@ -165,8 +181,13 @@ namespace fNbt {
                 throw new ArgumentNullException(nameof(value));
             }
 
-            // Write out string length (as number of bytes)
+            // The length prefix is an unsigned 16-bit byte count.
+            // Refuse anything past 65,535 bytes to avoid corrupting the stream.
             int numBytes = Encoding.GetByteCount(value);
+            if (numBytes > ushort.MaxValue) {
+                throw new NbtFormatException(
+                    "String is too long to write: " + numBytes + " bytes (maximum is 65535).");
+            }
             Write((short)numBytes);
 
             if (numBytes <= BufferSize) {

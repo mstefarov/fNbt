@@ -91,15 +91,11 @@ namespace fNbt {
             }
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                readStream.Skip(length * sizeof(long));
+                readStream.Skip<long>(length);
                 return false;
             }
 
-            Value = new long[length];
-
-            for (int i = 0; i < length; i++) {
-                Value[i] = readStream.ReadInt64();
-            }
+            Value = readStream.ReadInt64Array(length);
 
             return true;
         }
@@ -112,7 +108,7 @@ namespace fNbt {
                 throw new NbtFormatException("Negative length given in TAG_Long_Array");
             }
 
-            readStream.Skip(length * sizeof(long));
+            readStream.Skip<long>(length);
         }
 
 

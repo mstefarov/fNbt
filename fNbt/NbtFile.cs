@@ -21,7 +21,11 @@ namespace fNbt {
         public NbtCompression FileCompression { get; private set; }
 
         /// <summary> Root tag of this file. Must be a named CompoundTag. Defaults to an empty-named tag. </summary>
+        /// <remarks> The assigned tag may already belong to another compound or list: <c>NbtFile</c> is not
+        /// a container and does not set or clear <c>Parent</c>. Saving then writes only this subtree,
+        /// as a standalone document. </remarks>
         /// <exception cref="ArgumentException"> If given tag is unnamed. </exception>
+        /// <exception cref="ArgumentNullException"> If value is <c>null</c>. </exception>
         public NbtCompound RootTag {
             get { return rootTag; }
             set {
@@ -264,12 +268,16 @@ namespace fNbt {
                 case NbtCompression.ZLib:
 #if NET6_0_OR_GREATER
                     // Built-in ZLibStream is faster and validates the checksum too
-                    using (var decStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Decompress, true)) {
-                        if (bufferSize > 0) {
-                            LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
-                        } else {
-                            LoadFromStreamInternal(decStream, selector);
+                    try {
+                        using (var decStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Decompress, true)) {
+                            if (bufferSize > 0) {
+                                LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
+                            } else {
+                                LoadFromStreamInternal(decStream, selector);
+                            }
                         }
+                    } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
+                        throw new InvalidDataException("Failed to decompress ZLib data.", ex);
                     }
 #else
                     if (stream.ReadByte() != 0x78) {
@@ -369,7 +377,10 @@ namespace fNbt {
 
         #region Saving
 
-        /// <summary> Saves this NBT file to a stream. Nothing is written to stream if RootTag is <c>null</c>. </summary>
+        /// <summary> Saves this NBT file to a file. Nothing is written if RootTag is <c>null</c>. </summary>
+        /// <remarks> The file is created or truncated up front, so a failed save can leave it
+        /// partially written. If you are overwriting an existing file, write to a temp file first
+        /// then use <c>File.Replace</c> to swap it with the original. </remarks>
         /// <param name="fileName"> File to write data to. May not be <c>null</c>. </param>
         /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
         /// <returns> Number of bytes written to the file. </returns>
@@ -380,7 +391,9 @@ namespace fNbt {
         /// <exception cref="IOException"> If an I/O error occurred while creating the file. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements. </exception>
+        /// or if an NbtList tag had Unknown list type and no elements;
+        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToFile(string fileName, NbtCompression compression) {
             if (fileName == null) throw new ArgumentNullException(nameof(fileName));
 
@@ -396,7 +409,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Saves this NBT file to a stream. Nothing is written to stream if RootTag is <c>null</c>. </summary>
+        /// <summary> Saves this NBT file to a buffer. Nothing is written if RootTag is <c>null</c>. </summary>
         /// <param name="buffer"> Buffer to write data to. May not be <c>null</c>. </param>
         /// <param name="index"> The index into <paramref name="buffer"/> at which the stream should begin. </param>
         /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
@@ -408,7 +421,9 @@ namespace fNbt {
         /// <exception cref="InvalidDataException"> If given stream does not support writing. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements. </exception>
+        /// or if an NbtList tag had Unknown list type and no elements;
+        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToBuffer(byte[] buffer, int index, NbtCompression compression) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
 
@@ -427,7 +442,9 @@ namespace fNbt {
         /// <exception cref="NotSupportedException"> If the serialized document does not fit in a single array. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements. </exception>
+        /// or if an NbtList tag had Unknown list type and no elements;
+        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
                 // Uncompressed size can be measured up front, since counting writes copies nothing. Growing
@@ -460,7 +477,9 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If RootTag is null;
         /// or if RootTag is unnamed;
         /// or if one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements. </exception>
+        /// or if an NbtList tag had Unknown list type and no elements;
+        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToStream(Stream stream, NbtCompression compression) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
 
@@ -607,6 +626,16 @@ namespace fNbt {
                     return GetRootNameInternal(stream, bigEndian);
 
                 case NbtCompression.ZLib:
+#if NET6_0_OR_GREATER
+                    // Only validates the zlib header. The trailing checksum cannot be validated by peeking.
+                    try {
+                        using (var decStream = new System.IO.Compression.ZLibStream(new PeekStream(stream), CompressionMode.Decompress, true)) {
+                            return GetRootNameInternal(decStream, bigEndian);
+                        }
+                    } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
+                        throw new InvalidDataException("Failed to decompress ZLib data.", ex);
+                    }
+#else
                     if (stream.ReadByte() != 0x78) {
                         throw new InvalidDataException(WrongZLibHeaderMessage);
                     }
@@ -614,6 +643,7 @@ namespace fNbt {
                     using (var decStream = new DeflateStream(new PeekStream(stream), CompressionMode.Decompress, true)) {
                         return GetRootNameInternal(decStream, bigEndian);
                     }
+#endif
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(compression));
@@ -652,5 +682,8 @@ namespace fNbt {
 
 
         const string WrongZLibHeaderMessage = "Unrecognized ZLib header. Expected 0x78";
+
+        // ZLibStream throws this on a bad header or checksum. We just want to re-wrap it in a nicer exception.
+        const string ZLibExceptionTypeName = "System.IO.Compression.ZLibException";
     }
 }

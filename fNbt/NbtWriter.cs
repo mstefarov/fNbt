@@ -58,7 +58,8 @@ namespace fNbt {
         /// <summary> Begins an unnamed compound tag. </summary>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named compound tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// tags are nested more than 512 levels deep. </exception>
         public void BeginCompound() {
             EnforceConstraints(null, NbtTagType.Compound);
             GoDown(NbtTagType.Compound);
@@ -68,7 +69,8 @@ namespace fNbt {
         /// <summary> Begins a named compound tag. </summary>
         /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed compound tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed compound tag was expected -OR- a tag of a different type was expected -OR-
+        /// tags are nested more than 512 levels deep. </exception>
         public void BeginCompound(string tagName) {
             EnforceConstraints(tagName, NbtTagType.Compound);
             GoDown(NbtTagType.Compound);
@@ -94,15 +96,20 @@ namespace fNbt {
         /// <param name="size"> Number of elements in this list. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named list tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// tags are nested more than 512 levels deep. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="size"/> is negative -OR-
-        /// <paramref name="elementType"/> is not a valid NbtTagType. </exception>
+        /// <paramref name="elementType"/> is not a valid list element type
+        /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(NbtTagType elementType, int size) {
             if (size < 0) {
                 throw new ArgumentOutOfRangeException(nameof(size), "List size may not be negative.");
             }
+            // Modern Minecraft (Java and Bedrock) uses TAG_End as the element type of an empty list.
             if (elementType < NbtTagType.Byte || elementType > NbtTagType.LongArray) {
-                throw new ArgumentOutOfRangeException(nameof(elementType));
+                if (elementType != NbtTagType.End || size != 0) {
+                    throw new ArgumentOutOfRangeException(nameof(elementType));
+                }
             }
             EnforceConstraints(null, NbtTagType.List);
             GoDown(NbtTagType.List);
@@ -119,15 +126,20 @@ namespace fNbt {
         /// <param name="elementType"> Type of elements of this list. </param>
         /// <param name="size"> Number of elements in this list. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed list tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed list tag was expected -OR- a tag of a different type was expected -OR-
+        /// tags are nested more than 512 levels deep. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="size"/> is negative -OR-
-        /// <paramref name="elementType"/> is not a valid NbtTagType. </exception>
+        /// <paramref name="elementType"/> is not a valid list element type
+        /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(string tagName, NbtTagType elementType, int size) {
             if (size < 0) {
                 throw new ArgumentOutOfRangeException(nameof(size), "List size may not be negative.");
             }
+            // Modern Minecraft (Java and Bedrock) uses TAG_End as the element type of an empty list.
             if (elementType < NbtTagType.Byte || elementType > NbtTagType.LongArray) {
-                throw new ArgumentOutOfRangeException(nameof(elementType));
+                if (elementType != NbtTagType.End || size != 0) {
+                    throw new ArgumentOutOfRangeException(nameof(elementType));
+                }
             }
             EnforceConstraints(tagName, NbtTagType.List);
             GoDown(NbtTagType.List);
@@ -307,7 +319,8 @@ namespace fNbt {
         /// <param name="value"> The string to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named string tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// <paramref name="value"/> is longer than 65,535 bytes in UTF-8. </exception>
         public void WriteString(string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             EnforceConstraints(null, NbtTagType.String);
@@ -319,7 +332,8 @@ namespace fNbt {
         /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
         /// <param name="value"> The string to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed string tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed string tag was expected -OR- a tag of a different type was expected -OR-
+        /// <paramref name="value"/> is longer than 65,535 bytes in UTF-8. </exception>
         public void WriteString(string tagName, string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             EnforceConstraints(tagName, NbtTagType.String);
@@ -651,7 +665,9 @@ namespace fNbt {
         /// Use this method sparingly with NbtWriter -- constructing NbtTag objects defeats the purpose of this class.
         /// If you already have lots of NbtTag objects, you might as well use NbtFile to write them all at once. </summary>
         /// <param name="tag"> Tag to write. Must not be null. </param>
-        /// <exception cref="NbtFormatException"> No more tags can be written -OR- given tag is unacceptable at this time. </exception>
+        /// <exception cref="NbtFormatException"> No more tags can be written -OR-
+        /// given tag is unacceptable at this time -OR- its tree is nested more than 512 levels deep -OR-
+        /// a string inside it is longer than 65,535 bytes in UTF-8. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
@@ -678,6 +694,10 @@ namespace fNbt {
         void GoDown(NbtTagType thisType) {
             if (nodes == null) {
                 nodes = new Stack<NbtWriterNode>();
+            }
+            // The stack holds every open container except the root, so add 1 for the depth check.
+            if (nodes.Count + 1 >= NbtTag.MaxDepth) {
+                throw new NbtFormatException(NbtTag.DepthLimitMessage);
             }
             var newNode = new NbtWriterNode {
                 ParentType = parentType,
@@ -749,6 +769,10 @@ namespace fNbt {
             while (bytesWritten < count) {
                 int bytesToRead = Math.Min(count - bytesWritten, maxBytesToWrite);
                 int bytesRead = dataSource.Read(buffer, 0, bytesToRead);
+                if (bytesRead == 0) {
+                    // Actual stream length was less than the given count.
+                    throw new EndOfStreamException();
+                }
                 writer.Write(buffer, 0, bytesRead);
                 bytesWritten += bytesRead;
             }

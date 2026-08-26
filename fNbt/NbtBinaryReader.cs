@@ -13,6 +13,21 @@ namespace fNbt {
         const int SeekBufferSize = 8 * 1024;
         readonly bool swapNeeded;
         readonly byte[] stringConversionBuffer = new byte[64];
+        int depth;
+
+
+        // Parsing nested tags is recursive. Check for ridiculously nested tags before the stack runs out.
+        public void IncreaseDepth() {
+            if (depth >= NbtTag.MaxDepth) {
+                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+            }
+            depth++;
+        }
+
+
+        public void DecreaseDepth() {
+            depth--;
+        }
 
 
         public NbtBinaryReader(Stream input, bool bigEndian)
@@ -22,10 +37,8 @@ namespace fNbt {
 
 
         public NbtTagType ReadTagType() {
-            int type = ReadByte();
-            if (type < 0) {
-                throw new EndOfStreamException();
-            } else if (type > (int)NbtTagType.LongArray) {
+            byte type = ReadByte(); // Throws at end of stream
+            if (type > (byte)NbtTagType.LongArray) {
                 throw new NbtFormatException("NBT tag type out of range: " + type);
             }
             return (NbtTagType)type;
@@ -81,10 +94,8 @@ namespace fNbt {
 
 
         public override string ReadString() {
-            short length = ReadInt16();
-            if (length < 0) {
-                throw new NbtFormatException("Negative string length given!");
-            }
+            // The prefix is an unsigned 16-bit byte count in Java, valid up to length 65,535.
+            int length = (ushort)ReadInt16();
             if (length < stringConversionBuffer.Length) {
                 int stringBytesRead = 0;
                 while (stringBytesRead < length) {
@@ -106,16 +117,22 @@ namespace fNbt {
         }
 
 
-        public void Skip(int bytesToSkip) {
+        void Skip(long bytesToSkip) {
             if (bytesToSkip < 0) {
                 throw new ArgumentOutOfRangeException(nameof(bytesToSkip));
             } else if (BaseStream.CanSeek) {
+                // Setting Position past the end succeeds silently, so a corrupt length would
+                // cause problems or corruption at some later read. Check up front so it fails here.
+                long remaining = BaseStream.Length - BaseStream.Position;
+                if (bytesToSkip > remaining) {
+                    throw new EndOfStreamException();
+                }
                 BaseStream.Position += bytesToSkip;
             } else if (bytesToSkip != 0) {
                 if (seekBuffer == null) seekBuffer = new byte[SeekBufferSize];
-                int bytesSkipped = 0;
+                long bytesSkipped = 0;
                 while (bytesSkipped < bytesToSkip) {
-                    int bytesToRead = Math.Min(SeekBufferSize, bytesToSkip - bytesSkipped);
+                    int bytesToRead = (int)Math.Min(SeekBufferSize, bytesToSkip - bytesSkipped);
                     int bytesReadThisTime = BaseStream.Read(seekBuffer, 0, bytesToRead);
                     if (bytesReadThisTime == 0) {
                         throw new EndOfStreamException();
@@ -123,6 +140,12 @@ namespace fNbt {
                     bytesSkipped += bytesReadThisTime;
                 }
             }
+        }
+
+
+        // Converts element count to a byte count here, taking care not to overflow.
+        public unsafe void Skip<T>(int elementCount) where T : unmanaged {
+            Skip((long)elementCount * sizeof(T));
         }
 
 
@@ -137,11 +160,47 @@ namespace fNbt {
 
 
         public void SkipString() {
-            short length = ReadInt16();
-            if (length < 0) {
-                throw new NbtFormatException("Negative string length given!");
-            }
+            int length = (ushort)ReadInt16();
             Skip(length);
+        }
+
+
+        // Rejects impossible array/list lengths that can't fit in the remaining stream,
+        // to prevent massive allocations. Only seekable streams can be efficiently checked.
+        public void EnsureCanRead(long byteCount) {
+            if (BaseStream.CanSeek && byteCount > BaseStream.Length - BaseStream.Position) {
+                throw new EndOfStreamException();
+            }
+        }
+
+
+        public byte[] ReadArray(int length) {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (length == 0) return Array.Empty<byte>();
+            EnsureCanRead(length);
+            byte[] result = ReadBytes(length);
+            if (result.Length < length) throw new EndOfStreamException();
+            return result;
+        }
+
+
+        public int[] ReadInt32Array(int length) {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (length == 0) return Array.Empty<int>();
+            EnsureCanRead((long)length * sizeof(int));
+            int[] result = new int[length];
+            for (int i = 0; i < length; i++) result[i] = ReadInt32();
+            return result;
+        }
+
+
+        public long[] ReadInt64Array(int length) {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (length == 0) return Array.Empty<long>();
+            EnsureCanRead((long)length * sizeof(long));
+            long[] result = new long[length];
+            for (int i = 0; i < length; i++) result[i] = ReadInt64();
+            return result;
         }
 
 

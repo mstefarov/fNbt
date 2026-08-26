@@ -330,6 +330,10 @@ namespace fNbt {
 
         // Goes one step down the NBT file's hierarchy, preserving current state
         void GoDown() {
+            if (Depth > NbtTag.MaxDepth) {
+                state = NbtParseState.Error;
+                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+            }
             if (nodes == null) nodes = new Stack<NbtReaderNode>();
             var newNode = new NbtReaderNode {
                 ListIndex = ListIndex,
@@ -388,15 +392,15 @@ namespace fNbt {
                     break;
 
                 case NbtTagType.ByteArray:
-                    reader.Skip(TagLength);
+                    reader.Skip<byte>(TagLength);
                     break;
 
                 case NbtTagType.IntArray:
-                    reader.Skip(sizeof(int) * TagLength);
+                    reader.Skip<int>(TagLength);
                     break;
 
                 case NbtTagType.LongArray:
-                    reader.Skip(sizeof(long) * TagLength);
+                    reader.Skip<long>(TagLength);
                     break;
 
                 case NbtTagType.String:
@@ -582,11 +586,17 @@ namespace fNbt {
         }
 
 
-        static void AddToParent(NbtTag thisTag, NbtTag parent) {
+        void AddToParent(NbtTag thisTag, NbtTag parent) {
             if (parent is NbtList parentAsList) {
                 parentAsList.Add(thisTag);
             } else if (parent is NbtCompound parentAsCompound) {
-                parentAsCompound.Add(thisTag);
+                try {
+                    parentAsCompound.Add(thisTag);
+                } catch (ArgumentException) {
+                    // A duplicate name is malformed input, not a caller error.
+                    state = NbtParseState.Error;
+                    throw new NbtFormatException("Duplicate tag name in compound: " + thisTag.Name);
+                }
             } else {
                 // cannot happen unless NbtReader is bugged
                 throw new NbtFormatException(InvalidParentTagError);
@@ -623,26 +633,13 @@ namespace fNbt {
                     return new NbtString(TagName, reader.ReadString());
 
                 case NbtTagType.ByteArray:
-                    byte[] value = reader.ReadBytes(TagLength);
-                    if (value.Length < TagLength) {
-                        throw new EndOfStreamException();
-                    }
-                    return new NbtByteArray(TagName, value);
+                    return new NbtByteArray(TagName, reader.ReadArray(TagLength));
 
                 case NbtTagType.IntArray:
-                    var ints = new int[TagLength];
-                    for (int i = 0; i < TagLength; i++) {
-                        ints[i] = reader.ReadInt32();
-                    }
-                    return new NbtIntArray(TagName, ints);
+                    return new NbtIntArray(TagName, reader.ReadInt32Array(TagLength));
 
                 case NbtTagType.LongArray:
-                    var longs = new long[TagLength];
-                    for (int i = 0; i < TagLength; i++) {
-                        longs[i] = reader.ReadInt64();
-                    }
-
-                    return new NbtLongArray(TagName, longs);
+                    return new NbtLongArray(TagName, reader.ReadInt64Array(TagLength));
 
                 default:
                     throw new InvalidOperationException(NonValueTagError);
@@ -715,28 +712,15 @@ namespace fNbt {
                     break;
 
                 case NbtTagType.ByteArray:
-                    byte[] valueArr = reader.ReadBytes(TagLength);
-                    if (valueArr.Length < TagLength) {
-                        throw new EndOfStreamException();
-                    }
-                    value = valueArr;
+                    value = reader.ReadArray(TagLength);
                     break;
 
                 case NbtTagType.IntArray:
-                    var intValue = new int[TagLength];
-                    for (int i = 0; i < TagLength; i++) {
-                        intValue[i] = reader.ReadInt32();
-                    }
-                    value = intValue;
+                    value = reader.ReadInt32Array(TagLength);
                     break;
 
                 case NbtTagType.LongArray:
-                    var longValue = new long[TagLength];
-                    for (int i = 0; i < TagLength; i++) {
-                        longValue[i] = reader.ReadInt64();
-                    }
-
-                    value = longValue;
+                    value = reader.ReadInt64Array(TagLength);
                     break;
 
                 case NbtTagType.String:
@@ -758,23 +742,34 @@ namespace fNbt {
         /// <typeparam name="T"> Element type of the array to be returned.
         /// Tag contents should be convertible to this type. </typeparam>
         /// <returns> List contents converted to an array of the requested type. </returns>
-        /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
+        /// <exception cref="EndOfStreamException"> End of stream has been reached, or the list's
+        /// declared length does not fit in the remaining stream. </exception>
         /// <exception cref="InvalidOperationException"> Current tag is not of type List. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public T[] ReadListAsArray<T>() {
+            NbtTagType elementType;
             switch (state) {
                 case NbtParseState.AtStreamEnd:
                     throw new EndOfStreamException();
                 case NbtParseState.Error:
                     throw new InvalidReaderStateException(ErroneousStateError);
                 case NbtParseState.AtListBeginning:
+                    // Validate before changing any state
+                    elementType = ListType;
+                    if (!IsListValueType(elementType)) {
+                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+                    }
                     GoDown();
                     ListIndex = 0;
-                    TagType = ListType;
+                    TagType = elementType;
                     state = NbtParseState.InList;
                     break;
                 case NbtParseState.InList:
+                    elementType = ListType;
+                    if (!IsListValueType(elementType)) {
+                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+                    }
                     break;
                 default:
                     throw new InvalidOperationException("ReadListAsArray may only be used on List tags.");
@@ -782,68 +777,110 @@ namespace fNbt {
 
             int elementsToRead = ParentTagLength - ListIndex;
 
-            // special handling for reading byte arrays (as byte arrays)
-            if (ListType == NbtTagType.Byte && typeof(T) == typeof(byte)) {
-                TagsRead += elementsToRead;
-                ListIndex = ParentTagLength - 1;
-                T[] val = (T[])(object)reader.ReadBytes(elementsToRead);
-                if (val.Length < elementsToRead) {
-                    throw new EndOfStreamException();
+            try {
+                // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
+                reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType));
+
+                // special handling for reading byte arrays (as byte arrays)
+                if (elementType == NbtTagType.Byte && typeof(T) == typeof(byte)) {
+                    T[] val = (T[])(object)reader.ReadArray(elementsToRead);
+                    FinishListRead(elementsToRead);
+                    return val;
                 }
-                return val;
-            }
 
-            // for everything else, gotta read elements one-by-one
-            var result = new T[elementsToRead];
-            switch (ListType) {
+                // for everything else, gotta read elements one-by-one
+                var result = new T[elementsToRead];
+                switch (elementType) {
+                    case NbtTagType.Byte:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadByte(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    case NbtTagType.Short:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadInt16(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    case NbtTagType.Int:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadInt32(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    case NbtTagType.Long:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadInt64(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    case NbtTagType.Float:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadSingle(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    case NbtTagType.Double:
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadDouble(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+
+                    default: // must be String, the only value type left
+                        for (int i = 0; i < elementsToRead; i++) {
+                            result[i] = (T)Convert.ChangeType(reader.ReadString(), typeof(T), CultureInfo.InvariantCulture);
+                        }
+                        break;
+                }
+                FinishListRead(elementsToRead);
+                return result;
+            } catch {
+                // A failed read or conversion leaves the stream desynchronised
+                state = NbtParseState.Error;
+                throw;
+            }
+        }
+
+
+        // Marks every element consumed, leaving the reader ready to step out of the list
+        void FinishListRead(int elementsRead) {
+            TagsRead += elementsRead;
+            ListIndex = ParentTagLength;
+            atValue = false;
+        }
+
+
+        static bool IsListValueType(NbtTagType type) {
+            switch (type) {
                 case NbtTagType.Byte:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadByte(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.Short:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadInt16(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.Int:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadInt32(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.Long:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadInt64(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.Float:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadSingle(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.Double:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadDouble(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
                 case NbtTagType.String:
-                    for (int i = 0; i < elementsToRead; i++) {
-                        result[i] = (T)Convert.ChangeType(reader.ReadString(), typeof(T), CultureInfo.InvariantCulture);
-                    }
-                    break;
-
+                    return true;
                 default:
-                    throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+                    return false;
             }
-            TagsRead += elementsToRead;
-            ListIndex = ParentTagLength - 1;
-            return result;
+        }
+
+
+        // Smallest serialized size (lower bound) for an element of the given type.
+        static int MinElementSize(NbtTagType type) {
+            switch (type) {
+                case NbtTagType.Byte:
+                    return 1;
+                case NbtTagType.Short:
+                case NbtTagType.String: // empty string has 2-byte length prefix
+                    return 2;
+                case NbtTagType.Int:
+                case NbtTagType.Float:
+                    return 4;
+                default: // Long, Double
+                    return 8;
+            }
         }
 
 

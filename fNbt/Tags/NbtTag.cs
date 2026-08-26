@@ -1,10 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
 namespace fNbt {
     /// <summary> Base class for different kinds of named binary tags. </summary>
     public abstract class NbtTag : ICloneable {
+        // Reading, writing, cloning, and printing are all recursive.
+        // A stack overflow cannot be caught, so every recursive walk caps depth instead.
+        // Matches Minecraft's own limit. Real NBT is nowhere near this deep.
+        internal const int MaxDepth = 512;
+
+        internal const string DepthLimitMessage =
+            "NBT tags are nested deeper than the supported limit (512 levels).";
+
         /// <summary> Parent compound tag, either NbtList or NbtCompound, if any.
         /// May be <c>null</c> for detached tags. </summary>
         public NbtTag? Parent { get; internal set; }
@@ -28,10 +37,13 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Name of this tag. Immutable, and set by the constructor. May be <c>null</c>. </summary>
+        /// <summary> Name of this tag. May be <c>null</c>.
+        /// Renaming a tag that resides in an <c>NbtCompound</c> re-keys it in that compound. </summary>
         /// <exception cref="ArgumentNullException"> If <paramref name="value"/> is <c>null</c>, and <c>Parent</c> tag is an NbtCompound.
         /// Name of tags inside an <c>NbtCompound</c> may not be null. </exception>
         /// <exception cref="ArgumentException"> If this tag resides in an <c>NbtCompound</c>, and a sibling tag with the name already exists. </exception>
+        /// <exception cref="InvalidOperationException"> If this tag's parent compound no longer contains it,
+        /// which most likely indicates unsynchronized modification from multiple threads. </exception>
         public string? Name {
             get { return name; }
             set {
@@ -44,7 +56,7 @@ namespace fNbt {
                         throw new ArgumentNullException(nameof(value),
                                                         "Name of tags inside an NbtCompound may not be null.");
                     } else if (name != null) {
-                        parentAsCompound.RenameTag(name, value);
+                        parentAsCompound.RenameTag(this, name, value);
                     }
                 }
 
@@ -55,19 +67,42 @@ namespace fNbt {
         // Used by impls to bypass setter checks (and avoid side effects) when initializing state
         internal string? name;
 
-        /// <summary> Gets the full name of this tag, including all parent tag names, separated by dots. 
+        /// <summary> Gets the full name of this tag, including all parent tag names, separated by dots.
         /// Unnamed tags show up as empty strings. </summary>
         public string Path {
             get {
                 if (Parent == null) {
                     return Name ?? "";
                 }
-                if (Parent is NbtList parentAsList) {
-                    return parentAsList.Path + '[' + parentAsList.IndexOf(this) + ']';
-                } else {
-                    return Parent.Path + '.' + Name;
+                // Built iteratively: more efficient than recursion and no risk of stack overflow.
+                var segments = new List<NbtTag>();
+                for (NbtTag? tag = this; tag != null; tag = tag.Parent) {
+                    segments.Add(tag);
                 }
+                var sb = new StringBuilder();
+                for (int i = segments.Count - 1; i >= 0; i--) {
+                    NbtTag tag = segments[i];
+                    if (tag.Parent is NbtList parentAsList) {
+                        sb.Append('[').Append(parentAsList.IndexOf(tag)).Append(']');
+                    } else {
+                        if (tag.Parent != null) sb.Append('.');
+                        sb.Append(tag.Name);
+                    }
+                }
+                return sb.ToString();
             }
+        }
+
+
+        // Whether the given tag is this tag or one of its ancestors.
+        // Used to reject additions that would create a reference cycle.
+        internal bool IsDescendantOf(NbtTag tag) {
+            // Only containers have descendants, so the walk is skipped for value tags
+            if (!(tag is NbtCompound || tag is NbtList)) return false;
+            for (NbtTag? t = this; t != null; t = t.Parent) {
+                if (ReferenceEquals(t, tag)) return true;
+            }
+            return false;
         }
 
         internal abstract bool ReadTag(NbtBinaryReader readStream);
@@ -320,6 +355,7 @@ namespace fNbt {
         /// <summary> Prints contents of this tag, and any child tags, to a string.
         /// Indents the string using multiples of the given indentation string. </summary>
         /// <returns> A string representing contents of this tag, and all child tags (if any). </returns>
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public override string ToString() {
             return ToString(DefaultIndentString);
         }
@@ -330,11 +366,19 @@ namespace fNbt {
         public abstract object Clone();
 
 
+        // Depth-tracking clone, used by deep copies of compounds and lists.
+        // Throws for ridiculously deep nesting instead of overflowing the stack.
+        internal virtual NbtTag Clone(int depth) {
+            return (NbtTag)Clone(); // Default implementation for Value tags that do not recurse.
+        }
+
+
         /// <summary> Prints contents of this tag, and any child tags, to a string.
         /// Indents the string using multiples of the given indentation string. </summary>
         /// <param name="indentString"> String to be used for indentation. </param>
         /// <returns> A string representing contents of this tag, and all child tags (if any). </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="indentString"/> is <c>null</c>. </exception>
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToString(string indentString) {
             if (indentString == null) throw new ArgumentNullException(nameof(indentString));
             var sb = new StringBuilder();

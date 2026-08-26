@@ -11,9 +11,9 @@ namespace fNbt {
         /// <summary> Gets a singleton instance of the NbtComparer. </summary>
         public static NbtComparer Instance { get; } = new NbtComparer();
 
-        // Comparison recurses, and a few kilobytes of hostile input can nest thousands of levels deep.
+        // Comparison recurses, and a few kilobytes of malformed input can nest thousands of levels deep.
         // A StackOverflowException cannot be caught, so cap instead. Real NBT is nowhere near this deep.
-        private const int MaxDepth = 512;
+        private const int MaxDepth = NbtTag.MaxDepth;
 
         private NbtComparer() { }
 

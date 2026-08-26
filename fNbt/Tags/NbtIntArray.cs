@@ -88,14 +88,11 @@ namespace fNbt {
             }
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                readStream.Skip(length * sizeof(int));
+                readStream.Skip<int>(length);
                 return false;
             }
 
-            Value = new int[length];
-            for (int i = 0; i < length; i++) {
-                Value[i] = readStream.ReadInt32();
-            }
+            Value = readStream.ReadInt32Array(length);
             return true;
         }
 
@@ -105,7 +102,7 @@ namespace fNbt {
             if (length < 0) {
                 throw new NbtFormatException("Negative length given in TAG_Int_Array");
             }
-            readStream.Skip(length * sizeof(int));
+            readStream.Skip<int>(length);
         }
 
 

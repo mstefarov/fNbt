@@ -42,13 +42,18 @@ namespace fNbt {
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to assign to this tag's Value. May not be null </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>, or one of the tags is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If some of the given tags were not named, or two tags with the same name were given. </exception>
+        /// <exception cref="ArgumentException"> If some of the given tags were not named, or two tags with the same name were given,
+        /// or a tag already has a Parent. </exception>
         public NbtCompound(string? tagName, IEnumerable<NbtTag> tags) {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
-            this.tags = new Dictionary<string, NbtTag>((tags as ICollection<NbtTag>)?.Count ?? 0);
+            List<NbtTag> toAdd = new List<NbtTag>(tags);
+            this.tags = new Dictionary<string, NbtTag>(toAdd.Count);
             name = tagName;
-            foreach (NbtTag tag in tags) {
-                Add(tag);
+            // Validate first, so a bad batch doesn't leave any tags pointing to a half-constructed parent.
+            ValidateForAdd(toAdd, nameof(tags));
+            foreach (NbtTag tag in toAdd) {
+                this.tags.Add(tag.Name!, tag);
+                tag.Parent = this;
             }
         }
 
@@ -56,13 +61,22 @@ namespace fNbt {
         /// <summary> Creates a deep copy of given NbtCompound. </summary>
         /// <param name="other"> An existing NbtCompound to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
-        public NbtCompound(NbtCompound other) {
+        /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
+        public NbtCompound(NbtCompound other)
+            : this(other, 0) { }
+
+
+        NbtCompound(NbtCompound other, int depth) {
             if (other == null) throw new ArgumentNullException(nameof(other));
+            if (depth >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
             // Sized up front: growing a dictionary re-allocates its entry and bucket arrays each time.
             tags = new Dictionary<string, NbtTag>(other.tags.Count);
             name = other.name;
+            // Fresh clones can't be duplicate keys or cycles, no need to revalidate.
             foreach (NbtTag tag in other.tags.Values) {
-                Add((NbtTag)tag.Clone());
+                NbtTag childClone = tag.Clone(depth + 1);
+                tags.Add(childClone.Name!, childClone);
+                childClone.Parent = this;
             }
         }
 
@@ -72,7 +86,7 @@ namespace fNbt {
         /// <param name="tagName"> The name of the tag to get or set. Must match tag's actual name. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>; or if trying to assign null value. </exception>
         /// <exception cref="ArgumentException"> <paramref name="tagName"/> does not match the given tag's actual name;
-        /// or given tag already has a Parent. </exception>
+        /// or given tag already has a Parent; or it is this compound or one of its ancestors. </exception>
         public override NbtTag? this[string tagName] {
             get { return Get<NbtTag>(tagName); }
             set {
@@ -86,6 +100,12 @@ namespace fNbt {
                     throw new ArgumentException("A tag may only be added to one compound/list at a time.");
                 } else if (value == this) {
                     throw new ArgumentException("Cannot add tag to itself");
+                } else if (IsDescendantOf(value)) {
+                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
+                }
+                // Clear the displaced tag's Parent so it doesn't keep pointing here
+                if (tags.TryGetValue(tagName, out NbtTag? displaced) && !ReferenceEquals(displaced, value)) {
+                    displaced.Parent = null;
                 }
                 tags[tagName] = value;
                 value.Parent = this;
@@ -168,11 +188,37 @@ namespace fNbt {
         /// <param name="newTags"> The collection whose elements should be added to this NbtCompound. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTags"/> is <c>null</c>, or one of the tags in newTags is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If one of the given tags was unnamed,
-        /// or if a tag with the given name already exists in this NbtCompound. </exception>
+        /// or a tag with the same name already exists or appears twice in the batch,
+        /// or a tag already has a Parent, or is this compound or one of its ancestors. </exception>
         public void AddRange(IEnumerable<NbtTag> newTags) {
             if (newTags == null) throw new ArgumentNullException(nameof(newTags));
-            foreach (NbtTag tag in newTags) {
-                Add(tag);
+            // Validate the whole batch first, so we don't partially add/reparent some tags on exception.
+            List<NbtTag> toAdd = new List<NbtTag>(newTags);
+            ValidateForAdd(toAdd, nameof(newTags));
+            foreach (NbtTag tag in toAdd) {
+                tags.Add(tag.Name!, tag);
+                tag.Parent = this;
+            }
+        }
+
+
+        // Checks that every tag in the batch can be added, without changing any fields.
+        void ValidateForAdd(List<NbtTag> toAdd, string paramName) {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (NbtTag tag in toAdd) {
+                if (tag == null) {
+                    throw new ArgumentNullException(paramName, "A tag in the collection is null.");
+                } else if (tag == this) {
+                    throw new ArgumentException("Cannot add tag to itself");
+                } else if (tag.Name == null) {
+                    throw new ArgumentException("Only named tags are allowed in compound tags.");
+                } else if (tag.Parent != null) {
+                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+                } else if (IsDescendantOf(tag)) {
+                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
+                } else if (tags.ContainsKey(tag.Name) || !seen.Add(tag.Name)) {
+                    throw new ArgumentException("A tag with the name '" + tag.Name + "' already exists.");
+                }
             }
         }
 
@@ -204,15 +250,22 @@ namespace fNbt {
         }
 
 
-        internal void RenameTag(string oldName, string newName) {
+        internal void RenameTag(NbtTag tag, string oldName, string newName) {
             NullableSupport.Assert(oldName != null);
             NullableSupport.Assert(newName != null);
             NullableSupport.Assert(newName != oldName);
             if (tags.TryGetValue(newName, out _)) {
-                throw new ArgumentException("Cannot rename: a tag with the name already exists in this compound.");
+                throw new ArgumentException(
+                    "Cannot rename tag '" + oldName + "' to '" + newName +
+                    "': the compound already contains a tag with that name.");
             }
-            if (!tags.TryGetValue(oldName, out NbtTag? tag)) {
-                throw new ArgumentException("Cannot rename: no tag found to rename.");
+            // Verify this compound actually holds the tag under oldName.
+            // A stale Parent link must not re-key whatever now lives at that key.
+            if (!tags.TryGetValue(oldName, out NbtTag? existing) || !ReferenceEquals(existing, tag)) {
+                throw new InvalidOperationException(
+                    "Cannot rename tag '" + oldName + "': it is missing from its parent compound. " +
+                    "The Parent link is out of sync, most likely because the compound was modified " +
+                    "from another thread.");
             }
             tags.Remove(oldName);
             tags.Add(newName, tag);
@@ -221,12 +274,12 @@ namespace fNbt {
 
         /// <summary> Gets a collection containing all tag names in this NbtCompound. </summary>
         public IEnumerable<string> Names {
-            get { return tags.Keys; }
+            get => tags.Keys;
         }
 
         /// <summary> Gets a collection containing all tags in this NbtCompound. </summary>
         public IEnumerable<NbtTag> Tags {
-            get { return tags.Values; }
+            get => tags.Values;
         }
 
 
@@ -238,11 +291,13 @@ namespace fNbt {
                 return false;
             }
 
+            readStream.IncreaseDepth();
             while (true) {
                 NbtTagType nextTag = readStream.ReadTagType();
                 NbtTag newTag;
                 switch (nextTag) {
                     case NbtTagType.End:
+                        readStream.DecreaseDepth();
                         return true;
 
                     case NbtTagType.Byte:
@@ -301,18 +356,24 @@ namespace fNbt {
                 string tagName = readStream.ReadString();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream)) {
-                    tags.Add(tagName, newTag);
+                    try {
+                        tags.Add(tagName, newTag);
+                    } catch (ArgumentException) {
+                        throw new NbtFormatException("Duplicate tag name in compound: " + tagName);
+                    }
                 }
             }
         }
 
 
         internal override void SkipTag(NbtBinaryReader readStream) {
+            readStream.IncreaseDepth();
             while (true) {
                 NbtTagType nextTag = readStream.ReadTagType();
                 NbtTag newTag;
                 switch (nextTag) {
                     case NbtTagType.End:
+                        readStream.DecreaseDepth();
                         return;
 
                     case NbtTagType.Byte:
@@ -381,10 +442,12 @@ namespace fNbt {
 
 
         internal override void WriteData(NbtBinaryWriter writeStream) {
+            writeStream.IncreaseDepth();
             foreach (NbtTag tag in tags.Values) {
                 tag.WriteTag(writeStream);
             }
             writeStream.Write(NbtTagType.End);
+            writeStream.DecreaseDepth();
         }
 
         #endregion
@@ -412,16 +475,19 @@ namespace fNbt {
         /// <param name="newTag"> The object to add to this NbtCompound. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If the given tag is unnamed;
-        /// or if a tag with the given name already exists in this NbtCompound. </exception>
+        /// or if a tag with the given name already exists in this NbtCompound;
+        /// or it already has a Parent; or it is this compound or one of its ancestors. </exception>
         public void Add(NbtTag newTag) {
             if (newTag == null) {
                 throw new ArgumentNullException(nameof(newTag));
             } else if (newTag == this) {
-                throw new ArgumentException("Cannot add tag to self");
+                throw new ArgumentException("Cannot add tag to itself");
             } else if (newTag.Name == null) {
                 throw new ArgumentException("Only named tags are allowed in compound tags.");
             } else if (newTag.Parent != null) {
                 throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+            } else if (IsDescendantOf(newTag)) {
+                throw new ArgumentException("A tag may not be added to one of its own descendants.");
             }
             tags.Add(newTag.Name, newTag);
             newTag.Parent = this;
@@ -515,12 +581,19 @@ namespace fNbt {
 
 
         /// <inheritdoc />
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public override object Clone() {
-            return new NbtCompound(this);
+            return new NbtCompound(this, 0);
+        }
+
+
+        internal override NbtTag Clone(int depth) {
+            return new NbtCompound(this, depth);
         }
 
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
+            if (indentLevel >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
             for (int i = 0; i < indentLevel; i++) {
                 sb.Append(indentString);
             }

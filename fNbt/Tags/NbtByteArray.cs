@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Globalization;
-using System.IO;
 using System.Text;
 
 namespace fNbt {
@@ -89,13 +88,10 @@ namespace fNbt {
             }
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                readStream.Skip(length);
+                readStream.Skip<byte>(length);
                 return false;
             }
-            Value = readStream.ReadBytes(length);
-            if (Value.Length < length) {
-                throw new EndOfStreamException();
-            }
+            Value = readStream.ReadArray(length);
             return true;
         }
 
@@ -105,7 +101,7 @@ namespace fNbt {
             if (length < 0) {
                 throw new NbtFormatException("Negative length given in TAG_Byte_Array");
             }
-            readStream.Skip(length);
+            readStream.Skip<byte>(length);
         }
 
 
