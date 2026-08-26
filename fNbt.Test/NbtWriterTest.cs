@@ -305,10 +305,6 @@ namespace fNbt.Test {
 
                     writer.BeginList("list", NbtTagType.Int, 1);
 
-                    // invalid list type
-                    Assert.Throws<ArgumentOutOfRangeException>(() => writer.BeginList(NbtTagType.End, 0));
-                    Assert.Throws<ArgumentOutOfRangeException>(() => writer.BeginList("list", NbtTagType.End, 0));
-
                     // call EndCompound when not in a compound
                     Assert.Throws<NbtFormatException>(writer.EndCompound);
 
@@ -500,6 +496,86 @@ namespace fNbt.Test {
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtLongArray(new long[0])));
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtList(NbtTagType.Byte)));
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtCompound()));
+            }
+        }
+
+
+        [TestMethod]
+        public void WriteByteArrayFromShortStreamThrows() {
+            // A source shorter than count used to spin forever returning 0. It must throw instead.
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                Assert.Throws<EndOfStreamException>(
+                    () => writer.WriteByteArray("arr", new MemoryStream(new byte[5]), 10));
+            }
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                writer.BeginList("list", NbtTagType.ByteArray, 1);
+                Assert.Throws<EndOfStreamException>(
+                    () => writer.WriteByteArray(new MemoryStream(new byte[5]), 10));
+            }
+        }
+
+
+        [TestMethod]
+        public void EmptyEndTypedListRoundTrips() {
+            byte[] granular;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                writer.BeginList("emptyList", NbtTagType.End, 0);
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+                granular = ms.ToArray();
+            }
+
+            // Byte-identical to what NbtFile emits for the same document
+            var objectModel = new NbtFile(new NbtCompound("root") {
+                new NbtList("emptyList", NbtTagType.End)
+            });
+            byte[] tree = objectModel.SaveToBuffer(NbtCompression.None);
+            CollectionAssert.AreEqual(tree, granular);
+
+            var reloaded = new NbtFile();
+            reloaded.LoadFromBuffer(granular, 0, granular.Length, NbtCompression.None);
+            NbtList list = reloaded.RootTag.Get<NbtList>("emptyList");
+            Assert.AreEqual(0, list.Count);
+            Assert.AreEqual(NbtTagType.End, list.ListType);
+        }
+
+
+        [TestMethod]
+        public void UnnamedEmptyEndTypedListRoundTrips() {
+            // The unnamed BeginList overload must also accept an empty End-typed list nested
+            // in a list of lists, matching what NbtFile writes.
+            byte[] granular;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                writer.BeginList("listOfLists", NbtTagType.List, 1);
+                writer.BeginList(NbtTagType.End, 0);
+                writer.EndList();
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+                granular = ms.ToArray();
+            }
+
+            var reloaded = new NbtFile();
+            reloaded.LoadFromBuffer(granular, 0, granular.Length, NbtCompression.None);
+            NbtList outer = reloaded.RootTag.Get<NbtList>("listOfLists");
+            Assert.AreEqual(1, outer.Count);
+            Assert.AreEqual(0, outer.Get<NbtList>(0).Count);
+            Assert.AreEqual(NbtTagType.End, outer.Get<NbtList>(0).ListType);
+        }
+
+
+        [TestMethod]
+        public void BadListTypesRejected() {
+            // "End" is only valid for empty lists, and "Unknown" is never valid.
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                Assert.Throws<ArgumentOutOfRangeException>(() => writer.BeginList("bad", NbtTagType.End, 1));
+                Assert.Throws<ArgumentOutOfRangeException>(() => writer.BeginList("bad", NbtTagType.Unknown, 0));
             }
         }
 

@@ -12,6 +12,21 @@ namespace fNbt.Test {
         public static readonly string BigZLib = Path.Combine(DirName, "bigtest.nbt.z");
 
 
+        // Big-endian primitives for hand-building corrupt or exotic documents byte by byte
+        public static void WriteBEShort(Stream s, short value) {
+            s.WriteByte((byte)(value >> 8));
+            s.WriteByte((byte)value);
+        }
+
+
+        public static void WriteBEInt(Stream s, int value) {
+            s.WriteByte((byte)(value >> 24));
+            s.WriteByte((byte)(value >> 16));
+            s.WriteByte((byte)(value >> 8));
+            s.WriteByte((byte)value);
+        }
+
+
         // creates a compound containing lists of every kind of tag
         public static NbtCompound MakeListTest() {
             return new NbtCompound("Root") {

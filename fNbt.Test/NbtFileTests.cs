@@ -183,6 +183,21 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void LongStringRoundTrips() {
+            // The length prefix is unsigned, so strings of 32,768..65,535 bytes are valid
+            foreach (int len in new[] { 32767, 32768, 40000, 65535 }) {
+                var value = new string('a', len);
+                var root = new NbtCompound("root") { new NbtString("s", value) };
+                byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.None);
+
+                var file = new NbtFile();
+                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+                Assert.AreEqual(value, file.RootTag.Get<NbtString>("s").Value);
+            }
+        }
+
+
+        [TestMethod]
         public void LoadFromStream() {
             LoadFromStreamInternal(TestFiles.Big, NbtCompression.None);
             LoadFromStreamInternal(TestFiles.BigGZip, NbtCompression.GZip);
@@ -208,6 +223,19 @@ namespace fNbt.Test {
             var buffer2 = new byte[buffer1.Length];
             Assert.AreEqual(testFile.SaveToBuffer(buffer2, 0, NbtCompression.None), buffer2.Length);
             CollectionAssert.AreEqual(buffer1, buffer2);
+        }
+
+
+        [TestMethod]
+        public void SaveToBufferCompressed() {
+            // The compressed branch of SaveToBuffer is separate code from the exact-size
+            // uncompressed path, and nothing else covers it
+            var root = new NbtCompound("root") { new NbtInt("v", 12345), new NbtString("s", "hello") };
+            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
+            var file = new NbtFile();
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib);
+            Assert.AreEqual(12345, file.RootTag["v"].IntValue);
+            Assert.AreEqual("hello", file.RootTag.Get<NbtString>("s").Value);
         }
 
 

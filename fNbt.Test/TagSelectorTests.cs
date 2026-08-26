@@ -1,6 +1,58 @@
-﻿namespace fNbt.Test {
+﻿using System.IO;
+
+namespace fNbt.Test {
     [TestClass]
     public sealed class TagSelectorTests {
+        [TestMethod]
+        public void SkippingListOfLongArrays() {
+            // Bugfix regression test: NbtList.SkipTag had no LongArray case.
+            // Each skipped element consumed zero bytes, desyncing the reader.
+            var root = new NbtCompound("root") {
+                new NbtList("skipme", NbtTagType.LongArray) {
+                    new NbtLongArray(new long[] { 1, 2 }),
+                    new NbtLongArray(new long[] { 3, 4, 5 })
+                },
+                new NbtInt("after", 0x41424344)
+            };
+            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.None);
+
+            var file = new NbtFile();
+            long consumed = file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None,
+                                                tag => tag.Name != "skipme");
+            Assert.AreEqual(doc.Length, consumed);
+            Assert.AreEqual(1, file.RootTag.Count);
+            Assert.AreEqual(0x41424344, file.RootTag["after"].IntValue);
+        }
+
+
+        [TestMethod]
+        public void SkippingListOfInvalidTypeThrows() {
+            // A skipped List<End> with a nonzero count must be rejected the way a normal load
+            // rejects it, instead of quietly skipping zero bytes per element
+            byte[] doc;
+            using (var ms = new MemoryStream()) {
+                ms.WriteByte(0x0A); // root compound, named ""
+                ms.WriteByte(0);
+                ms.WriteByte(0);
+                ms.WriteByte(0x09); // TAG_List "skipme"
+                ms.WriteByte(0);
+                ms.WriteByte(6);
+                foreach (char c in "skipme") ms.WriteByte((byte)c);
+                ms.WriteByte(0x00); // element type: End
+                ms.WriteByte(0); // count: 3
+                ms.WriteByte(0);
+                ms.WriteByte(0);
+                ms.WriteByte(3);
+                ms.WriteByte(0x00); // root's TAG_End
+                doc = ms.ToArray();
+            }
+            var file = new NbtFile();
+            Assert.Throws<NbtFormatException>(
+                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None,
+                                          tag => tag.Name != "skipme"));
+        }
+
+
         [TestMethod]
         public void SkippingTagsOnFileLoad() {
             var loadedFile = new NbtFile();

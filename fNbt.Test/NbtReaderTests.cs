@@ -437,10 +437,62 @@ namespace fNbt.Test {
             // try reading list of compounds (should fail)
             reader.ReadToFollowing("CompoundList");
             Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<NbtCompound>());
+            // That failed call should have been recoverable. Assert that we didn't desync or enter bad state.
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.Compound, reader.TagType);
 
             // skip to the end of the stream
             while (reader.ReadToFollowing()) { }
             Assert.Throws<EndOfStreamException>(() => reader.ReadListAsArray<int>());
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayOversizedCountThrows() {
+            // An oversized list count must not allocate a huge array before reading.
+            // On a seekable stream the bound catches it up front.
+            byte[] doc;
+            using (var ms = new MemoryStream()) {
+                ms.WriteByte(0x0A); // root compound ""
+                ms.WriteByte(0);
+                ms.WriteByte(0);
+                ms.WriteByte(0x09); // TAG_List "l"
+                ms.WriteByte(0);
+                ms.WriteByte(1);
+                ms.WriteByte((byte)'l');
+                ms.WriteByte(0x03); // element type Int
+                ms.WriteByte(0x7F); // count 0x7FFFFFFF
+                ms.WriteByte(0xFF);
+                ms.WriteByte(0xFF);
+                ms.WriteByte(0xFF);
+                ms.WriteByte(0x00); // root End
+                doc = ms.ToArray();
+            }
+            var reader = new NbtReader(new MemoryStream(doc));
+            reader.ReadToFollowing("l");
+            Assert.Throws<EndOfStreamException>(() => reader.ReadListAsArray<int>());
+            // Partial reads due to bad count are not recoverable.
+            Assert.IsTrue(reader.IsInErrorState);
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayTwiceReturnsEmpty() {
+            // Reading a value list to completion, then calling again, must return an empty array
+            // rather than reading past the list end.
+            NbtCompound intList = TestFiles.MakeListTest();
+            var ms = new MemoryStream();
+            new NbtFile(intList).SaveToStream(ms, NbtCompression.None);
+            ms.Seek(0, SeekOrigin.Begin);
+            var reader = new NbtReader(ms);
+
+            reader.ReadToFollowing("IntList");
+            int[] first = reader.ReadListAsArray<int>();
+            Assert.AreEqual(3, first.Length);
+            int[] second = reader.ReadListAsArray<int>();
+            Assert.AreEqual(0, second.Length);
+            Assert.IsFalse(reader.IsInErrorState);
         }
 
 
@@ -637,13 +689,15 @@ namespace fNbt.Test {
 
             byte[] badStringLength = {
                 0x0A, // Compound tag
-                0xFF, 0xFF, 0x66, // Root name 'f' (with string length given as "-1")
+                0xFF, 0xFF, 0x66, // Root name 'f' (string length prefix 0xFFFF = 65535 unsigned bytes)
                 0x00 // end tag
             };
-            Assert.Throws<NbtFormatException>(() => TryReadBadFile(badStringLength));
-            Assert.Throws<NbtFormatException>(
+            // The prefix is unsigned, so 0xFFFF is a valid 65535-byte length. The string is
+            // truncated, so it fails with EndOfStreamException rather than a negative-length error.
+            Assert.Throws<EndOfStreamException>(() => TryReadBadFile(badStringLength));
+            Assert.Throws<EndOfStreamException>(
                 () => new NbtFile().LoadFromBuffer(badStringLength, 0, badStringLength.Length, NbtCompression.None));
-            Assert.Throws<NbtFormatException>(
+            Assert.Throws<EndOfStreamException>(
                 () => NbtFile.ReadRootTagName(new MemoryStream(badStringLength), NbtCompression.None, true, 0));
 
             byte[] badSecondTag = {
