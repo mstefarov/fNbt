@@ -219,6 +219,10 @@ namespace fNbt {
 
 
         /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
+        /// <remarks> Compressed data is read to the end of the stream: the decompressor reads ahead in
+        /// chunks, so the document's exact extent is unknowable, and reading it all guarantees the
+        /// container checksum gets validated. Uncompressed loads stop exactly at the end of the
+        /// document, leaving any trailing bytes in place. </remarks>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.
@@ -254,11 +258,15 @@ namespace fNbt {
                 case NbtCompression.GZip:
                     using (var decStream = new GZipStream(stream, CompressionMode.Decompress, true)) {
                         if (bufferSize > 0) {
-                            LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
+                            var bufferedStream = new BufferedStream(decStream, bufferSize);
+                            LoadFromStreamInternal(bufferedStream, selector);
+                            DrainToEnd(bufferedStream);
                         } else {
                             LoadFromStreamInternal(decStream, selector);
+                            DrainToEnd(decStream);
                         }
                     }
+                    FinishCompressedLoad(stream);
                     break;
 
                 case NbtCompression.None:
@@ -271,9 +279,12 @@ namespace fNbt {
                     try {
                         using (var decStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Decompress, true)) {
                             if (bufferSize > 0) {
-                                LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
+                                var bufferedStream = new BufferedStream(decStream, bufferSize);
+                                LoadFromStreamInternal(bufferedStream, selector);
+                                DrainToEnd(bufferedStream);
                             } else {
                                 LoadFromStreamInternal(decStream, selector);
+                                DrainToEnd(decStream);
                             }
                         }
                     } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
@@ -281,14 +292,19 @@ namespace fNbt {
                     }
 #else
                     ValidateZLibHeader(stream);
-                    using (var decStream = new DeflateStream(stream, CompressionMode.Decompress, true)) {
+                    using (var decStream = new ZLibStream(stream, CompressionMode.Decompress, true)) {
                         if (bufferSize > 0) {
-                            LoadFromStreamInternal(new BufferedStream(decStream, bufferSize), selector);
+                            var bufferedStream = new BufferedStream(decStream, bufferSize);
+                            LoadFromStreamInternal(bufferedStream, selector);
+                            DrainToEnd(bufferedStream);
                         } else {
                             LoadFromStreamInternal(decStream, selector);
+                            DrainToEnd(decStream);
                         }
+                        ValidateZLibChecksum(stream, startOffset, decStream.Checksum);
                     }
 #endif
+                    FinishCompressedLoad(stream);
                     break;
 
                 default:
@@ -317,6 +333,48 @@ namespace fNbt {
         public long LoadFromStream(Stream stream, NbtCompression compression) {
             return LoadFromStream(stream, compression, null);
         }
+
+
+        // Reading a decompressor to its end forces it to process the container's trailer, so
+        // checksum validation cannot depend on how the input happened to be chunked.
+        static void DrainToEnd(Stream stream) {
+            byte[] buffer = new byte[4096];
+            while (stream.Read(buffer, 0, buffer.Length) > 0) { }
+        }
+
+
+        // Compressed loads consume the source stream to its end: the decompressor reads ahead in
+        // chunks, so the document's exact extent within the stream is unknowable. Consuming the
+        // rest makes the returned byte count deterministic instead of chunking-dependent.
+        static void FinishCompressedLoad(Stream stream) {
+            if (stream.CanSeek) {
+                stream.Position = stream.Length;
+            } else {
+                DrainToEnd(stream);
+            }
+        }
+
+
+#if !NET6_0_OR_GREATER
+        // After draining, the document runs to the end of the stream, so the last four bytes are
+        // the big-endian Adler-32 trailer. Non-seekable streams cannot be validated: the
+        // decompressor buffers past the deflate data, leaving the trailer out of reach.
+        static void ValidateZLibChecksum(Stream stream, long startOffset, int computedChecksum) {
+            if (!stream.CanSeek) return;
+            long length = stream.Length;
+            // 2-byte header + deflate data + 4-byte trailer; anything shorter failed already
+            if (length - startOffset < 7) return;
+            stream.Position = length - 4;
+            int b0 = stream.ReadByte();
+            int b1 = stream.ReadByte();
+            int b2 = stream.ReadByte();
+            int b3 = stream.ReadByte();
+            uint expected = (uint)((b0 << 24) | (b1 << 16) | (b2 << 8) | b3);
+            if (expected != (uint)computedChecksum) {
+                throw new InvalidDataException("Failed to decompress ZLib data: checksum mismatch.");
+            }
+        }
+#endif
 
 
         static NbtCompression DetectCompression(Stream stream) {
@@ -676,8 +734,8 @@ namespace fNbt {
 
 
 #if !NET6_0_OR_GREATER
-        // netstandard2.0 reads ZLib through a raw DeflateStream, so the two header bytes are
-        // checked manually. The Adler-32 trailer is not validated.
+        // netstandard2.0 reads ZLib through a DeflateStream, so the two header bytes are checked
+        // manually. Full loads validate the Adler-32 trailer separately; peeks cannot.
         static void ValidateZLibHeader(Stream stream) {
             int cmf = stream.ReadByte();
             int flg = stream.ReadByte();

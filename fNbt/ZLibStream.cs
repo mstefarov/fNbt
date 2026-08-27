@@ -3,8 +3,9 @@ using System.IO;
 using System.IO.Compression;
 
 namespace fNbt {
-    /// <summary> DeflateStream wrapper that calculates Adler32 checksum of the written data,
-    /// to allow writing ZLib header (RFC-1950). </summary>
+    /// <summary> DeflateStream wrapper that calculates the Adler32 checksum of the data passing
+    /// through it, in either direction, to support the ZLib container (RFC-1950): writing the
+    /// trailer when compressing, and validating it when decompressing on netstandard2.0. </summary>
     internal sealed class ZLibStream : DeflateStream {
         uint adler32A = 1,
              adler32B;
@@ -44,6 +45,15 @@ namespace fNbt {
         public override void Write(byte[] array, int offset, int count) {
             UpdateChecksum(array, offset, count);
             base.Write(array, offset, count);
+        }
+
+
+        public override int Read(byte[] array, int offset, int count) {
+            int bytesRead = base.Read(array, offset, count);
+            if (bytesRead > 0) {
+                UpdateChecksum(array, offset, bytesRead);
+            }
+            return bytesRead;
         }
     }
 }

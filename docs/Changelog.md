@@ -8,6 +8,13 @@
     absent documents (a lone TAG_End byte), back-to-back documents via
     ReadConcatenatedTags, and reads that stop exactly at the end of one
     document, leaving trailing bytes in place.
+- Compressed loads now read the stream to its end and always validate the
+    container checksum. On .NET Standard 2.0, ZLib Adler-32 checksums are now
+    validated (previously corrupt data could load silently); on all targets,
+    checksum validation and the returned byte count no longer depend on how
+    the decompressor chunked its reads. ZLib validation on .NET Standard 2.0
+    needs a seekable stream, and trailing data after a ZLib document fails
+    the checksum there.
 
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
