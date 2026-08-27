@@ -54,14 +54,11 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CodecMatchesNbtBlobOutput() {
+        public void CodecRoundTripPreservesTree() {
             NbtCompound root = MakeSampleRoot("hello");
             var codec = new NbtCodec(NbtFlavor.Bedrock);
 
             byte[] codecBytes = codec.WriteTag(root);
-            byte[] blobBytes = NbtBlob.WriteTag(root, NbtFlavor.Bedrock);
-            CollectionAssert.AreEqual(blobBytes, codecBytes);
-
             NbtTag read = codec.ReadTag(codecBytes, 0, codecBytes.Length, out int bytesConsumed);
             Assert.AreEqual(codecBytes.Length, bytesConsumed);
             Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
@@ -71,7 +68,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void MaxAllocationCapsArrayAllocations() {
             var root = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
 
             // Without the cap, the same document loads fine
             var openCodec = new NbtCodec(NbtFlavor.Java);
@@ -82,7 +79,7 @@ namespace fNbt.Test {
 
             // Int arrays count element size: 20k elements = 80 KB > 64 KB
             var intRoot = new NbtCompound("r") { new NbtIntArray("ints", new int[20_000]) };
-            byte[] intDoc = NbtBlob.WriteTag(intRoot, NbtFlavor.Java);
+            byte[] intDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(intRoot);
             Assert.Throws<NbtFormatException>(() => cappedCodec.ReadTag(intDoc, 0, intDoc.Length, out _));
         }
 
@@ -90,14 +87,14 @@ namespace fNbt.Test {
         [TestMethod]
         public void MaxAllocationCapsStringAllocations() {
             var root = new NbtCompound("r") { new NbtString("s", new string('x', 100)) };
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
 
             var cappedCodec = new NbtCodec(new NbtOptions { MaxAllocation = 64 });
             Assert.Throws<NbtFormatException>(() => cappedCodec.ReadTag(doc, 0, doc.Length, out _));
 
             // A small document loads fine under the same cap
             var smallRoot = new NbtCompound("r") { new NbtString("s", "short") };
-            byte[] smallDoc = NbtBlob.WriteTag(smallRoot, NbtFlavor.Java);
+            byte[] smallDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(smallRoot);
             Assert.IsTrue(NbtComparer.Instance.Equals(
                 smallRoot, cappedCodec.ReadTag(smallDoc, 0, smallDoc.Length, out _)));
         }
@@ -153,7 +150,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void ReadValidationRejectsDisallowedContent() {
             var root = new NbtCompound("r") { new NbtLongArray("longs", new long[] { 1 }) };
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
 
             // Default: generous
             new NbtCodec(NbtFlavor.JavaLegacy).ReadTag(doc, 0, doc.Length, out _);

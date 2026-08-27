@@ -4,8 +4,10 @@ using System.IO;
 using System.Linq;
 
 namespace fNbt.Test {
+    // Document-level semantics of NbtCodec: root rules per flavor, absent documents,
+    // exact consumption, and concatenated reads.
     [TestClass]
-    public class NbtBlobTests {
+    public class NbtCodecDocumentTests {
         static NbtCompound MakeSampleRoot(string name) {
             return new NbtCompound(name) {
                 new NbtInt("id", 42),
@@ -23,24 +25,35 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ForReturnsCachedEquivalentCodec() {
+            Assert.AreSame(NbtCodec.For(NbtFlavor.Java), NbtCodec.For(NbtFlavor.Java));
+
+            NbtCompound root = MakeSampleRoot("hello");
+            byte[] cached = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
+            byte[] fresh = new NbtCodec(NbtFlavor.Bedrock).WriteTag(root);
+            CollectionAssert.AreEqual(fresh, cached);
+        }
+
+
+        [TestMethod]
         public void JavaWriteMatchesNbtFileOutput() {
             NbtCompound root = MakeSampleRoot("hello");
-            byte[] blobBytes = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            byte[] codecBytes = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
 
             var file = new NbtFile(root) { BigEndian = true };
             byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
-            CollectionAssert.AreEqual(fileBytes, blobBytes);
+            CollectionAssert.AreEqual(fileBytes, codecBytes);
         }
 
 
         [TestMethod]
         public void BedrockWriteMatchesLittleEndianNbtFileOutput() {
             NbtCompound root = MakeSampleRoot("hello");
-            byte[] blobBytes = NbtBlob.WriteTag(root, NbtFlavor.Bedrock);
+            byte[] codecBytes = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
 
             var file = new NbtFile(root) { BigEndian = false };
             byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
-            CollectionAssert.AreEqual(fileBytes, blobBytes);
+            CollectionAssert.AreEqual(fileBytes, codecBytes);
         }
 
 
@@ -48,7 +61,7 @@ namespace fNbt.Test {
         public void EndiannessProducesExpectedBytes() {
             var root = new NbtCompound("") { new NbtInt("i", 1) };
 
-            byte[] javaDoc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            byte[] javaDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
             CollectionAssert.AreEqual(new byte[] {
                 0x0A, 0x00, 0x00, // TAG_Compound, name ""
                 0x03, 0x00, 0x01, (byte)'i', // TAG_Int "i"
@@ -56,7 +69,7 @@ namespace fNbt.Test {
                 0x00 // TAG_End
             }, javaDoc);
 
-            byte[] bedrockDoc = NbtBlob.WriteTag(root, NbtFlavor.Bedrock);
+            byte[] bedrockDoc = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
             CollectionAssert.AreEqual(new byte[] {
                 0x0A, 0x00, 0x00,
                 0x03, 0x01, 0x00, (byte)'i',
@@ -69,9 +82,10 @@ namespace fNbt.Test {
         [TestMethod]
         public void JavaRoundTripPreservesTree() {
             NbtCompound root = MakeSampleRoot("hello");
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(root);
 
-            NbtTag read = NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.Java, out int bytesConsumed);
+            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual("hello", read.Name);
             Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
@@ -79,27 +93,17 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void BedrockRoundTripPreservesTree() {
-            NbtCompound root = MakeSampleRoot("hello");
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Bedrock);
-
-            NbtTag read = NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.Bedrock, out int bytesConsumed);
-            Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
-        }
-
-
-        [TestMethod]
         public void JavaNetworkOmitsRootName() {
             var root = new NbtCompound("ignored") { new NbtByte("b", 7) };
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.JavaNetwork);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
+            byte[] doc = codec.WriteTag(root);
             CollectionAssert.AreEqual(new byte[] {
                 0x0A, // TAG_Compound, no name
                 0x01, 0x00, 0x01, (byte)'b', 0x07, // TAG_Byte "b" = 7
                 0x00 // TAG_End
             }, doc);
 
-            NbtTag read = NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.JavaNetwork, out int bytesConsumed);
+            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.IsNull(read.Name);
             Assert.AreEqual(7, read["b"].ByteValue);
@@ -108,54 +112,54 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void JavaNetworkAllowsNonCompoundRoots() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
+
             // TAG_Int root, e.g. a numeric payload
-            byte[] intDoc = NbtBlob.WriteTag(new NbtInt(42), NbtFlavor.JavaNetwork);
+            byte[] intDoc = codec.WriteTag(new NbtInt(42));
             CollectionAssert.AreEqual(new byte[] { 0x03, 0x00, 0x00, 0x00, 42 }, intDoc);
-            NbtTag intRead = NbtBlob.ReadTag(intDoc, 0, intDoc.Length, NbtFlavor.JavaNetwork, out _);
-            Assert.AreEqual(42, intRead.IntValue);
+            Assert.AreEqual(42, codec.ReadTag(intDoc, 0, intDoc.Length, out _).IntValue);
 
             // TAG_String root, e.g. a text component
-            byte[] strDoc = NbtBlob.WriteTag(new NbtString("hi"), NbtFlavor.JavaNetwork);
+            byte[] strDoc = codec.WriteTag(new NbtString("hi"));
             CollectionAssert.AreEqual(new byte[] { 0x08, 0x00, 0x02, (byte)'h', (byte)'i' }, strDoc);
-            NbtTag strRead = NbtBlob.ReadTag(strDoc, 0, strDoc.Length, NbtFlavor.JavaNetwork, out _);
-            Assert.AreEqual("hi", strRead.StringValue);
+            Assert.AreEqual("hi", codec.ReadTag(strDoc, 0, strDoc.Length, out _).StringValue);
         }
 
 
         [TestMethod]
         public void JavaNetworkAbsentDocument() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
+
             // Writing a null tag produces a lone TAG_End byte
-            byte[] doc = NbtBlob.WriteTag(null, NbtFlavor.JavaNetwork);
+            byte[] doc = codec.WriteTag(null);
             CollectionAssert.AreEqual(new byte[] { 0x00 }, doc);
 
             // TryReadTag reports it as absent
-            Assert.IsFalse(NbtBlob.TryReadTag(doc, 0, doc.Length, NbtFlavor.JavaNetwork,
-                                              out NbtTag tag, out int bytesConsumed));
+            Assert.IsFalse(codec.TryReadTag(doc, 0, doc.Length, out NbtTag tag, out int bytesConsumed));
             Assert.IsNull(tag);
             Assert.AreEqual(1, bytesConsumed);
 
             // Plain ReadTag refuses it
-            Assert.Throws<NbtFormatException>(
-                () => NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.JavaNetwork, out _));
+            Assert.Throws<NbtFormatException>(() => codec.ReadTag(doc, 0, doc.Length, out _));
 
             // Flavors with mandatory compound roots can express neither the write...
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.WriteTag(null, NbtFlavor.Java));
+            Assert.Throws<ArgumentNullException>(() => NbtCodec.For(NbtFlavor.Java).WriteTag(null));
             // ...nor the read
             Assert.Throws<NbtFormatException>(
-                () => NbtBlob.TryReadTag(doc, 0, doc.Length, NbtFlavor.Java, out _, out _));
+                () => NbtCodec.For(NbtFlavor.Java).TryReadTag(doc, 0, doc.Length, out _, out _));
         }
 
 
         [TestMethod]
         public void TryReadTagAtCleanEndOfStreamReturnsFalse() {
-            Assert.IsFalse(NbtBlob.TryReadTag(new byte[0], 0, 0, NbtFlavor.Java,
-                                              out NbtTag tag, out int bytesConsumed));
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            Assert.IsFalse(codec.TryReadTag(new byte[0], 0, 0, out NbtTag tag, out int bytesConsumed));
             Assert.IsNull(tag);
             Assert.AreEqual(0, bytesConsumed);
 
             // With actual data present, TryReadTag reads it
-            byte[] doc = NbtBlob.WriteTag(MakeSampleRoot("r"), NbtFlavor.Java);
-            Assert.IsTrue(NbtBlob.TryReadTag(doc, 0, doc.Length, NbtFlavor.Java, out tag, out bytesConsumed));
+            byte[] doc = codec.WriteTag(MakeSampleRoot("r"));
+            Assert.IsTrue(codec.TryReadTag(doc, 0, doc.Length, out tag, out bytesConsumed));
             Assert.AreEqual("r", tag.Name);
             Assert.AreEqual(doc.Length, bytesConsumed);
         }
@@ -163,16 +167,17 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void TrailingBytesAreLeftAlone() {
-            byte[] doc = NbtBlob.WriteTag(MakeSampleRoot("r"), NbtFlavor.Java);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(MakeSampleRoot("r"));
             byte[] padded = doc.Concat(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }).ToArray();
 
-            NbtTag read = NbtBlob.ReadTag(padded, 0, padded.Length, NbtFlavor.Java, out int bytesConsumed);
+            NbtTag read = codec.ReadTag(padded, 0, padded.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual("r", read.Name);
 
             // The stream overload stops at the same exact position
             using (var ms = new MemoryStream(padded)) {
-                NbtBlob.ReadTag(ms, NbtFlavor.Java);
+                codec.ReadTag(ms);
                 Assert.AreEqual(doc.Length, ms.Position);
             }
         }
@@ -181,13 +186,14 @@ namespace fNbt.Test {
         [TestMethod]
         public void ConcatenatedTagsRoundTrip() {
             // LevelDB values are back-to-back little-endian roots
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             using (var ms = new MemoryStream()) {
                 for (int i = 0; i < 3; i++) {
-                    NbtBlob.WriteTag(new NbtCompound("root" + i) { new NbtInt("i", i) }, ms, NbtFlavor.Bedrock);
+                    codec.WriteTag(new NbtCompound("root" + i) { new NbtInt("i", i) }, ms);
                 }
                 ms.Position = 0;
 
-                List<NbtTag> tags = NbtBlob.ReadConcatenatedTags(ms, NbtFlavor.Bedrock).ToList();
+                List<NbtTag> tags = codec.ReadConcatenatedTags(ms).ToList();
                 Assert.AreEqual(3, tags.Count);
                 for (int i = 0; i < 3; i++) {
                     Assert.AreEqual("root" + i, tags[i].Name);
@@ -201,20 +207,21 @@ namespace fNbt.Test {
         [TestMethod]
         public void ConcatenatedTagsOnEmptyStreamYieldsNothing() {
             using (var ms = new MemoryStream()) {
-                Assert.AreEqual(0, NbtBlob.ReadConcatenatedTags(ms, NbtFlavor.Bedrock).Count());
+                Assert.AreEqual(0, NbtCodec.For(NbtFlavor.Bedrock).ReadConcatenatedTags(ms).Count());
             }
         }
 
 
         [TestMethod]
         public void ConcatenatedTagsOnNonSeekableStreamWorks() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             using (var ms = new MemoryStream()) {
-                NbtBlob.WriteTag(new NbtCompound("a") { new NbtInt("i", 1) }, ms, NbtFlavor.Bedrock);
-                NbtBlob.WriteTag(new NbtCompound("b") { new NbtInt("i", 2) }, ms, NbtFlavor.Bedrock);
+                codec.WriteTag(new NbtCompound("a") { new NbtInt("i", 1) }, ms);
+                codec.WriteTag(new NbtCompound("b") { new NbtInt("i", 2) }, ms);
                 ms.Position = 0;
 
                 var nss = new NonSeekableStream(ms);
-                List<NbtTag> tags = NbtBlob.ReadConcatenatedTags(nss, NbtFlavor.Bedrock).ToList();
+                List<NbtTag> tags = codec.ReadConcatenatedTags(nss).ToList();
                 Assert.AreEqual(2, tags.Count);
                 Assert.AreEqual("a", tags[0].Name);
                 Assert.AreEqual("b", tags[1].Name);
@@ -224,14 +231,15 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ConcatenatedTagsThrowOnTruncatedDocument() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             using (var ms = new MemoryStream()) {
-                NbtBlob.WriteTag(new NbtCompound("a") { new NbtInt("i", 1) }, ms, NbtFlavor.Bedrock);
-                NbtBlob.WriteTag(new NbtCompound("b") { new NbtInt("i", 2) }, ms, NbtFlavor.Bedrock);
+                codec.WriteTag(new NbtCompound("a") { new NbtInt("i", 1) }, ms);
+                codec.WriteTag(new NbtCompound("b") { new NbtInt("i", 2) }, ms);
                 byte[] truncated = ms.ToArray().Take((int)ms.Length - 3).ToArray();
 
                 using (var tms = new MemoryStream(truncated)) {
                     Assert.Throws<EndOfStreamException>(
-                        () => NbtBlob.ReadConcatenatedTags(tms, NbtFlavor.Bedrock).ToList());
+                        () => codec.ReadConcatenatedTags(tms).ToList());
                 }
             }
         }
@@ -239,10 +247,12 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void FileFlavorsRequireCompoundRootOnWrite() {
-            Assert.Throws<NbtFormatException>(() => NbtBlob.WriteTag(new NbtInt(1), NbtFlavor.Java));
-            Assert.Throws<NbtFormatException>(() => NbtBlob.WriteTag(new NbtString("s", "v"), NbtFlavor.Bedrock));
             Assert.Throws<NbtFormatException>(
-                () => NbtBlob.WriteTag(new NbtList("l", NbtTagType.Int), NbtFlavor.ClassiCube));
+                () => NbtCodec.For(NbtFlavor.Java).WriteTag(new NbtInt(1)));
+            Assert.Throws<NbtFormatException>(
+                () => NbtCodec.For(NbtFlavor.Bedrock).WriteTag(new NbtString("s", "v")));
+            Assert.Throws<NbtFormatException>(
+                () => NbtCodec.For(NbtFlavor.ClassiCube).WriteTag(new NbtList("l", NbtTagType.Int)));
         }
 
 
@@ -254,7 +264,7 @@ namespace fNbt.Test {
                 0x08, 0x00, 0x01, (byte)'s', // TAG_String "s"
                 0x00, 0x02, (byte)'h', (byte)'i'
             };
-            NbtTag read = NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.Java, out int bytesConsumed);
+            NbtTag read = NbtCodec.For(NbtFlavor.Java).ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual("s", read.Name);
             Assert.AreEqual("hi", read.StringValue);
@@ -263,14 +273,14 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ExpectedRootTypeIsEnforced() {
-            byte[] doc = NbtBlob.WriteTag(new NbtInt(42), NbtFlavor.JavaNetwork);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
+            byte[] doc = codec.WriteTag(new NbtInt(42));
 
             using (var ms = new MemoryStream(doc)) {
-                Assert.Throws<NbtFormatException>(
-                    () => NbtBlob.ReadTag(ms, NbtFlavor.JavaNetwork, NbtTagType.Compound));
+                Assert.Throws<NbtFormatException>(() => codec.ReadTag(ms, NbtTagType.Compound));
             }
             using (var ms = new MemoryStream(doc)) {
-                NbtTag read = NbtBlob.ReadTag(ms, NbtFlavor.JavaNetwork, NbtTagType.Int);
+                NbtTag read = codec.ReadTag(ms, NbtTagType.Int);
                 Assert.AreEqual(42, read.IntValue);
             }
         }
@@ -278,28 +288,26 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void BedrockNetworkIsNotYetSupported() {
-            var root = new NbtCompound("") { new NbtInt("i", 1) };
-            Assert.Throws<NotSupportedException>(() => NbtBlob.WriteTag(root, NbtFlavor.BedrockNetwork));
-            Assert.Throws<NotSupportedException>(
-                () => NbtBlob.ReadTag(new byte[] { 0x0A }, 0, 1, NbtFlavor.BedrockNetwork, out _));
+            Assert.Throws<NotSupportedException>(() => NbtCodec.For(NbtFlavor.BedrockNetwork));
+            Assert.Throws<NotSupportedException>(() => new NbtCodec(NbtFlavor.BedrockNetwork));
         }
 
 
         [TestMethod]
         public void TruncatedDocumentThrows() {
-            byte[] doc = NbtBlob.WriteTag(MakeSampleRoot("r"), NbtFlavor.Java);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(MakeSampleRoot("r"));
             byte[] truncated = doc.Take(doc.Length - 3).ToArray();
 
             Assert.Throws<EndOfStreamException>(
-                () => NbtBlob.ReadTag(truncated, 0, truncated.Length, NbtFlavor.Java, out _));
+                () => codec.ReadTag(truncated, 0, truncated.Length, out _));
 
             // A partial document is a hard error even for TryReadTag: only a clean
             // end-of-stream before the first byte reads as "no tag".
             Assert.Throws<EndOfStreamException>(
-                () => NbtBlob.TryReadTag(truncated, 0, truncated.Length, NbtFlavor.Java, out _, out _));
+                () => codec.TryReadTag(truncated, 0, truncated.Length, out _, out _));
 
-            Assert.Throws<EndOfStreamException>(
-                () => NbtBlob.ReadTag(new byte[0], 0, 0, NbtFlavor.Java, out _));
+            Assert.Throws<EndOfStreamException>(() => codec.ReadTag(new byte[0], 0, 0, out _));
         }
 
 
@@ -323,21 +331,23 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void DepthLimitIsEnforced() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+
             byte[] okDoc = MakeNestedCompoundDoc(512);
-            NbtTag read = NbtBlob.ReadTag(okDoc, 0, okDoc.Length, NbtFlavor.Java, out _);
+            NbtTag read = codec.ReadTag(okDoc, 0, okDoc.Length, out _);
             Assert.IsNotNull(((NbtCompound)read).Get<NbtCompound>("c"));
 
             byte[] deepDoc = MakeNestedCompoundDoc(513);
-            Assert.Throws<NbtFormatException>(
-                () => NbtBlob.ReadTag(deepDoc, 0, deepDoc.Length, NbtFlavor.Java, out _));
+            Assert.Throws<NbtFormatException>(() => codec.ReadTag(deepDoc, 0, deepDoc.Length, out _));
         }
 
 
         [TestMethod]
         public void NullRootNameIsWrittenAsEmpty() {
             var root = new NbtCompound { new NbtInt("i", 1) }; // unnamed
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
-            NbtTag read = NbtBlob.ReadTag(doc, 0, doc.Length, NbtFlavor.Java, out _);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(root);
+            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out _);
             Assert.AreEqual("", read.Name);
             Assert.AreEqual(1, read["i"].IntValue);
         }
@@ -349,9 +359,9 @@ namespace fNbt.Test {
             file.LoadFromFile(TestFiles.Small, NbtCompression.None, null);
 
             using (FileStream fs = File.OpenRead(TestFiles.Small)) {
-                NbtTag blobRoot = NbtBlob.ReadTag(fs, NbtFlavor.Java);
+                NbtTag codecRoot = NbtCodec.For(NbtFlavor.Java).ReadTag(fs);
                 Assert.AreEqual(fs.Length, fs.Position);
-                Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, blobRoot));
+                Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, codecRoot));
             }
         }
 
@@ -359,10 +369,11 @@ namespace fNbt.Test {
         [TestMethod]
         public void ReadingThroughAwkwardStreamsWorks() {
             NbtCompound root = MakeSampleRoot("r");
-            byte[] doc = NbtBlob.WriteTag(root, NbtFlavor.Java);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(root);
             using (var ms = new MemoryStream(doc)) {
                 var awkward = new PartialReadStream(new NonSeekableStream(ms), 1);
-                NbtTag read = NbtBlob.ReadTag(awkward, NbtFlavor.Java);
+                NbtTag read = codec.ReadTag(awkward);
                 Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
             }
         }
@@ -371,15 +382,13 @@ namespace fNbt.Test {
         [TestMethod]
         public void NullArgumentsThrow() {
             var root = new NbtCompound("r");
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.ReadTag((Stream)null, NbtFlavor.Java));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.ReadTag(new MemoryStream(), null));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.ReadTag(null, 0, 0, NbtFlavor.Java, out _));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.TryReadTag((Stream)null, NbtFlavor.Java, out _));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.ReadConcatenatedTags(null, NbtFlavor.Java));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.ReadConcatenatedTags(new MemoryStream(), null));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.WriteTag(root, null, NbtFlavor.Java));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.WriteTag(root, new MemoryStream(), null));
-            Assert.Throws<ArgumentNullException>(() => NbtBlob.WriteTag(root, (NbtFlavor)null));
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            Assert.Throws<ArgumentNullException>(() => NbtCodec.For(null));
+            Assert.Throws<ArgumentNullException>(() => codec.ReadTag((Stream)null));
+            Assert.Throws<ArgumentNullException>(() => codec.ReadTag(null, 0, 0, out _));
+            Assert.Throws<ArgumentNullException>(() => codec.TryReadTag((Stream)null, out _));
+            Assert.Throws<ArgumentNullException>(() => codec.ReadConcatenatedTags(null));
+            Assert.Throws<ArgumentNullException>(() => codec.WriteTag(root, null));
         }
     }
 }

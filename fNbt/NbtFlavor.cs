@@ -95,7 +95,7 @@ namespace fNbt {
         }
 
 
-        // One shared default-options codec per flavor, backing the NbtBlob statics.
+        // One shared default-options codec per flavor, backing NbtCodec.For.
         NbtCodec? defaultCodec;
 
         internal NbtCodec DefaultCodec {

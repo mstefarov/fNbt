@@ -8,13 +8,24 @@ namespace fNbt {
     /// <summary> Reads and writes single NBT documents ("blobs") with a fixed set of
     /// <see cref="NbtOptions"/>, resolved once at construction. Create one per context and reuse
     /// it; instances are immutable and safe to share between threads. </summary>
-    /// <remarks> Blobs carry no file-level framing and are never compressed at this layer. Reads
+    /// <remarks> Blobs carry no file-level framing and are never compressed at this layer:
+    /// network packet payloads, LevelDB values, and NBT embedded inside other formats. Reads
     /// stop exactly at the end of one document, leaving trailing bytes in place, and accept any
     /// root tag type unless <see cref="NbtOptions.ValidateOnRead"/> is set. Writes enforce the
     /// flavor's root rules, and its conformance rules when <see cref="NbtOptions.ValidateOnWrite"/>
-    /// is set. The <see cref="NbtBlob"/> statics are shorthand for default-options instances of
-    /// this class. </remarks>
+    /// is set. For one-off use with default options, <see cref="For"/> returns a cached
+    /// per-flavor instance. </remarks>
     public sealed class NbtCodec {
+        /// <summary> Returns a cached codec with default options for the given flavor,
+        /// for one-off use: <c>NbtCodec.For(NbtFlavor.Bedrock).ReadTag(stream)</c>. </summary>
+        /// <param name="flavor"> Encoding to read and write. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
+        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
+        public static NbtCodec For(NbtFlavor flavor) {
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            return flavor.DefaultCodec;
+        }
+
         /// <summary> The settings this codec was created with. </summary>
         public NbtOptions Options { get; }
 

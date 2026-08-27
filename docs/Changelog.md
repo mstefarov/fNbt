@@ -2,16 +2,15 @@
 - Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube.
     BedrockNetwork (varint encoding) is declared but not implemented yet.
-- Add NbtBlob, for reading and writing raw NBT documents without file-level
+- Add NbtCodec, for reading and writing raw NBT documents without file-level
     framing: network packet payloads, LevelDB values, and NBT embedded inside
-    other formats. Blobs support unnamed and non-compound roots (JavaNetwork),
+    other formats. Supports unnamed and non-compound roots (JavaNetwork),
     absent documents (a lone TAG_End byte), back-to-back documents via
     ReadConcatenatedTags, and reads that stop exactly at the end of one
-    document, leaving trailing bytes in place.
-- Add NbtOptions and NbtCodec. NbtOptions is an immutable settings object
-    (flavor, validation toggles, allocation limit); NbtCodec applies one set
-    of options to blob reads and writes, resolved once at construction. The
-    NbtBlob statics are now shorthand for default-options codecs.
+    document, leaving trailing bytes in place. NbtCodec.For(flavor) returns
+    a cached default-options instance for one-off use.
+- Add NbtOptions, an immutable settings object (flavor, validation toggles,
+    allocation limit) that each NbtCodec resolves once at construction.
 - Add per-flavor conformance validation: on by default for writes, refusing
     tag types and string lengths the flavor's own readers reject (for example
     TAG_Int_Array or 300-byte strings under ClassiCube); opt-in for reads,
