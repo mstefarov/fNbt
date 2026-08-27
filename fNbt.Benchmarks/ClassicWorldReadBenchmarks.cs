@@ -22,7 +22,9 @@ public class ClassicWorldReadBenchmarks {
 
     // Whole-Map Loading
 
-    [Benchmark(Description = "Load map from file (GZip)", Baseline = true)]
+    // No Baseline=true here: with --baseline runs, the NuGet job is the baseline, and a method
+    // baseline on top would make every ratio compare against this method instead of per-method.
+    [Benchmark(Description = "Load map from file (GZip)")]
     public NbtFile LoadFromFile() {
         var file = new NbtFile();
         file.LoadFromFile(map.FilePath, NbtCompression.AutoDetect, null);

@@ -29,7 +29,8 @@ public class ClassicWorldWriteBenchmarks {
 
     // High-Level Map Saving
 
-    [Benchmark(Description = "Save map to stream (uncompressed)", Baseline = true)]
+    // No Baseline=true here, for the same reason as ClassicWorldReadBenchmarks
+    [Benchmark(Description = "Save map to stream (uncompressed)")]
     public void SaveUncompressed() {
         sink.Position = 0;
         mapFile.SaveToStream(sink, NbtCompression.None);
