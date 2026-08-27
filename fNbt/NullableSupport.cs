@@ -43,4 +43,10 @@ namespace System.Diagnostics.CodeAnalysis
         public bool ReturnValue { get; }
     }
 }
+
+namespace System.Runtime.CompilerServices
+{
+    /// <summary>Enables C# init-only property setters on frameworks that predate them.</summary>
+    internal static class IsExternalInit { }
+}
 #endif

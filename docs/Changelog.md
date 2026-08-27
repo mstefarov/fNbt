@@ -8,6 +8,20 @@
     absent documents (a lone TAG_End byte), back-to-back documents via
     ReadConcatenatedTags, and reads that stop exactly at the end of one
     document, leaving trailing bytes in place.
+- Add NbtOptions and NbtCodec. NbtOptions is an immutable settings object
+    (flavor, validation toggles, allocation limit); NbtCodec applies one set
+    of options to blob reads and writes, resolved once at construction. The
+    NbtBlob statics are now shorthand for default-options codecs.
+- Add per-flavor conformance validation: on by default for writes, refusing
+    tag types and string lengths the flavor's own readers reject (for example
+    TAG_Int_Array or 300-byte strings under ClassiCube); opt-in for reads,
+    which stay generous by default. Flavors now expose MaxTagType,
+    MaxStringBytes, and DefaultCompression.
+- Add NbtOptions.MaxAllocation: an opt-in cap, in bytes, on any single
+    allocation driven by a length declared in the input. Guards against tiny
+    corrupt documents declaring huge arrays, which matters most on compressed
+    and non-seekable streams where declared lengths cannot be checked against
+    the bytes actually available.
 - Compressed loads now read the stream to its end and always validate the
     container checksum. On .NET Standard 2.0, ZLib Adler-32 checksums are now
     validated (previously corrupt data could load silently); on all targets,

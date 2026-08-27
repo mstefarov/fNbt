@@ -16,6 +16,34 @@ namespace fNbt {
         readonly byte[] stringConversionBuffer = new byte[64];
         int depth;
 
+        // Opt-in limits, set once by NbtCodec before parsing. Defaults keep every check a
+        // single always-false comparison.
+        long maxAllocation = long.MaxValue;
+        int maxStringBytes = int.MaxValue;
+        NbtTagType maxTagType = NbtTagType.LongArray;
+        string? tagTypeLimitSource;
+
+
+        internal void SetLimits(long newMaxAllocation, NbtFlavor? readValidationFlavor) {
+            maxAllocation = newMaxAllocation;
+            maxStringBytes = (int)Math.Min(int.MaxValue, newMaxAllocation);
+            if (readValidationFlavor != null) {
+                maxTagType = readValidationFlavor.MaxTagType;
+                maxStringBytes = Math.Min(maxStringBytes, readValidationFlavor.MaxStringBytes);
+                tagTypeLimitSource = readValidationFlavor.Name;
+            }
+        }
+
+
+        // Opt-in cap on any single allocation driven by a length declared in the input
+        public void EnsureAllocation(long byteCount) {
+            if (byteCount > maxAllocation) {
+                throw new NbtFormatException(
+                    "Declared data size (" + byteCount + " bytes) exceeds the MaxAllocation limit (" +
+                    maxAllocation + " bytes).");
+            }
+        }
+
 
         // Parsing nested tags is recursive. Check for ridiculously nested tags before the stack runs out.
         public void IncreaseDepth() {
@@ -44,8 +72,15 @@ namespace fNbt {
 
         public NbtTagType ReadTagType() {
             byte type = ReadByte(); // Throws at end of stream
-            if (type > (byte)NbtTagType.LongArray) {
-                throw new NbtFormatException("NBT tag type out of range: " + type);
+            // maxTagType is LongArray unless read validation lowered it, so the common case
+            // stays a single comparison
+            if (type > (byte)maxTagType) {
+                if (type > (byte)NbtTagType.LongArray) {
+                    throw new NbtFormatException("NBT tag type out of range: " + type);
+                }
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName((NbtTagType)type) + " is not permitted by the " +
+                    tagTypeLimitSource + " flavor.");
             }
             return (NbtTagType)type;
         }
@@ -140,6 +175,11 @@ namespace fNbt {
             // The prefix is an unsigned 16-bit byte count in Java (valid up to length 65,535),
             // and an unsigned varint in BedrockNetwork.
             int length = useVarInt ? checked((int)ReadUnsignedVarInt32()) : (ushort)ReadInt16();
+            if (length > maxStringBytes) {
+                throw new NbtFormatException(
+                    "Declared string length (" + length + " bytes) exceeds the configured limit (" +
+                    maxStringBytes + " bytes).");
+            }
             if (length < stringConversionBuffer.Length) {
                 int stringBytesRead = 0;
                 while (stringBytesRead < length) {
@@ -226,6 +266,7 @@ namespace fNbt {
         public byte[] ReadArray(int length) {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<byte>();
+            EnsureAllocation(length);
             EnsureCanRead(length);
             byte[] result = ReadBytes(length);
             if (result.Length < length) throw new EndOfStreamException();
@@ -236,6 +277,7 @@ namespace fNbt {
         public int[] ReadInt32Array(int length) {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<int>();
+            EnsureAllocation((long)length * sizeof(int));
             // Varint elements are at least one byte each; fixed-width math would over-estimate
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
             int[] result = new int[length];
@@ -247,6 +289,7 @@ namespace fNbt {
         public long[] ReadInt64Array(int length) {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<long>();
+            EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
             long[] result = new long[length];
             for (int i = 0; i < length; i++) result[i] = ReadInt64();

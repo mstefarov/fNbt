@@ -779,6 +779,7 @@ namespace fNbt {
 
             try {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
+                reader.EnsureAllocation((long)elementsToRead * MinElementSize(elementType));
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType));
 
                 // special handling for reading byte arrays (as byte arrays)
