@@ -189,6 +189,11 @@ namespace fNbt {
 
         // Converts element count to a byte count here, taking care not to overflow.
         public unsafe void Skip<T>(int elementCount) where T : unmanaged {
+            if (useVarInt) {
+                // Varint elements have no fixed width, so byte math cannot skip them.
+                // Needs an element-wise skip before any varint flavor is wired up.
+                throw new NotSupportedException("Cannot bulk-skip varint-encoded elements.");
+            }
             Skip((long)elementCount * sizeof(T));
         }
 
@@ -231,7 +236,8 @@ namespace fNbt {
         public int[] ReadInt32Array(int length) {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<int>();
-            EnsureCanRead((long)length * sizeof(int));
+            // Varint elements are at least one byte each; fixed-width math would over-estimate
+            EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
             int[] result = new int[length];
             for (int i = 0; i < length; i++) result[i] = ReadInt32();
             return result;
@@ -241,7 +247,7 @@ namespace fNbt {
         public long[] ReadInt64Array(int length) {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<long>();
-            EnsureCanRead((long)length * sizeof(long));
+            EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
             long[] result = new long[length];
             for (int i = 0; i < length; i++) result[i] = ReadInt64();
             return result;
