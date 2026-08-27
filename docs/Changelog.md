@@ -1,6 +1,6 @@
 ## 2.0.0 (fNbt, unreleased)
 - Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
-    JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassicWorld.
+    JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube.
     BedrockNetwork (varint encoding) is declared but not implemented yet.
 - Add NbtBlob, for reading and writing raw NBT documents without file-level
     framing: network packet payloads, LevelDB values, and NBT embedded inside

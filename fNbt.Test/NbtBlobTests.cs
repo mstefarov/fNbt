@@ -242,7 +242,7 @@ namespace fNbt.Test {
             Assert.Throws<NbtFormatException>(() => NbtBlob.WriteTag(new NbtInt(1), NbtFlavor.Java));
             Assert.Throws<NbtFormatException>(() => NbtBlob.WriteTag(new NbtString("s", "v"), NbtFlavor.Bedrock));
             Assert.Throws<NbtFormatException>(
-                () => NbtBlob.WriteTag(new NbtList("l", NbtTagType.Int), NbtFlavor.ClassicWorld));
+                () => NbtBlob.WriteTag(new NbtList("l", NbtTagType.Int), NbtFlavor.ClassiCube));
         }
 
 

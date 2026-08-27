@@ -7,7 +7,7 @@ namespace fNbt.Test {
         static NbtFlavor[] AllFlavors() {
             return new[] {
                 NbtFlavor.Java, NbtFlavor.JavaAnvil, NbtFlavor.JavaLegacy, NbtFlavor.JavaNetwork,
-                NbtFlavor.Bedrock, NbtFlavor.BedrockNetwork, NbtFlavor.ClassicWorld
+                NbtFlavor.Bedrock, NbtFlavor.BedrockNetwork, NbtFlavor.ClassiCube
             };
         }
 
@@ -18,7 +18,7 @@ namespace fNbt.Test {
             Assert.IsTrue(NbtFlavor.JavaAnvil.BigEndian);
             Assert.IsTrue(NbtFlavor.JavaLegacy.BigEndian);
             Assert.IsTrue(NbtFlavor.JavaNetwork.BigEndian);
-            Assert.IsTrue(NbtFlavor.ClassicWorld.BigEndian);
+            Assert.IsTrue(NbtFlavor.ClassiCube.BigEndian);
             Assert.IsFalse(NbtFlavor.Bedrock.BigEndian);
             Assert.IsFalse(NbtFlavor.BedrockNetwork.BigEndian);
         }
@@ -56,7 +56,7 @@ namespace fNbt.Test {
             Assert.AreEqual("JavaNetwork", NbtFlavor.JavaNetwork.Name);
             Assert.AreEqual("Bedrock", NbtFlavor.Bedrock.Name);
             Assert.AreEqual("BedrockNetwork", NbtFlavor.BedrockNetwork.Name);
-            Assert.AreEqual("ClassicWorld", NbtFlavor.ClassicWorld.Name);
+            Assert.AreEqual("ClassiCube", NbtFlavor.ClassiCube.Name);
         }
     }
 }

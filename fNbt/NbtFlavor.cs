@@ -33,15 +33,17 @@ namespace fNbt {
         /// <see cref="NotSupportedException"/>. </summary>
         public static NbtFlavor BedrockNetwork { get; } = new NbtFlavor("BedrockNetwork", false, true);
 
-        /// <summary> ClassicWorld (<c>.cw</c>) maps, used by ClassiCube, MCGalaxy, and fCraft.
-        /// Big-endian with a named <c>TAG_Compound</c> root, like <see cref="JavaAnvil"/>. </summary>
-        public static NbtFlavor ClassicWorld { get; } = new NbtFlavor("ClassicWorld", true);
+        /// <summary> The profile of ClassicWorld (<c>.cw</c>) maps that the ClassiCube client can load:
+        /// big-endian with a named <c>TAG_Compound</c> root, GZip-compressed, tag types 0-10.
+        /// Spec-compliant ClassicWorld files that use <c>TAG_Int_Array</c> match
+        /// <see cref="JavaAnvil"/> instead. </summary>
+        public static NbtFlavor ClassiCube { get; } = new NbtFlavor("ClassiCube", true);
 
 
         /// <summary> Short display name of this flavor, e.g. "Java" or "BedrockNetwork". </summary>
         public string Name { get; }
 
-        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and ClassicWorld,
+        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and ClassiCube,
         /// false for the Bedrock flavors. </summary>
         public bool BigEndian { get; }
 
