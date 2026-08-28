@@ -552,7 +552,7 @@ namespace fNbt {
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
-        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToFile(string fileName, NbtCompression compression) {
             if (fileName == null) throw new ArgumentNullException(nameof(fileName));
@@ -582,7 +582,7 @@ namespace fNbt {
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
-        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToBuffer(byte[] buffer, int index, NbtCompression compression) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
@@ -603,7 +603,7 @@ namespace fNbt {
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
-        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
@@ -638,7 +638,7 @@ namespace fNbt {
         /// or if RootTag is unnamed;
         /// or if one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
-        /// or if a string is longer than 65,535 bytes in UTF-8;
+        /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToStream(Stream stream, NbtCompression compression) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));

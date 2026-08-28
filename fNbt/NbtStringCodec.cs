@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 
 namespace fNbt {
@@ -8,6 +8,32 @@ namespace fNbt {
     // throws NbtFormatException on truly malformed data instead of substituting U+FFFD.
     internal static class NbtStringCodec {
         static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+
+        // Printable ASCII (no NUL) is byte-identical in every encoding handled here and
+        // dominates real tag names and values, so both directions fast-path it on one scan.
+        public static bool IsAsciiNoNul(string value) {
+#if NET8_0_OR_GREATER
+            return !value.AsSpan().ContainsAnyExceptInRange('\u0001', '\u007F');
+#else
+            foreach (char c in value) {
+                if (c == '\0' || c > '\u007F') return false;
+            }
+            return true;
+#endif
+        }
+
+
+        static bool IsAscii(byte[] buffer, int offset, int count) {
+#if NET8_0_OR_GREATER
+            return !buffer.AsSpan(offset, count).ContainsAnyExceptInRange((byte)0x00, (byte)0x7F);
+#else
+            for (int i = offset; i < offset + count; i++) {
+                if (buffer[i] > 0x7F) return false;
+            }
+            return true;
+#endif
+        }
 
 
         // True if the string encodes differently in modified UTF-8 than in standard UTF-8:
@@ -69,6 +95,9 @@ namespace fNbt {
 
         public static string Decode(byte[] buffer, int offset, int count) {
             if (count == 0) return "";
+            if (IsAscii(buffer, offset, count)) {
+                return Encoding.ASCII.GetString(buffer, offset, count);
+            }
             // 0xC0 (overlong NUL) and 0xED (surrogate code units) are the only lead bytes where
             // valid Java output differs from standard UTF-8, so their absence means the
             // framework decoder gives the same answer.

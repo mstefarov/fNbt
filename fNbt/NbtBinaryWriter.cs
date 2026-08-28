@@ -205,19 +205,22 @@ namespace fNbt {
                 throw new ArgumentNullException(nameof(value));
             }
 
-            // Strings with NULs or surrogates encode differently in modified UTF-8; everything
-            // else is byte-identical in both encodings and stays on the standard path below.
-            if (modifiedUtf8 && NbtStringCodec.NeedsModifiedEncoding(value)) {
+            int numBytes;
+            if (NbtStringCodec.IsAsciiNoNul(value)) {
+                // Byte-identical in both encodings, and the length needs no separate count
+                numBytes = value.Length;
+            } else if (modifiedUtf8 && NbtStringCodec.NeedsModifiedEncoding(value)) {
+                // NULs and surrogates encode differently in modified UTF-8; everything else
+                // is byte-identical in both encodings and stays on the standard path below
                 WriteModifiedUtf8(value);
                 return;
-            }
-
-            int numBytes;
-            try {
-                numBytes = Encoding.GetByteCount(value);
-            } catch (EncoderFallbackException ex) {
-                throw new NbtFormatException(
-                    "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+            } else {
+                try {
+                    numBytes = Encoding.GetByteCount(value);
+                } catch (EncoderFallbackException ex) {
+                    throw new NbtFormatException(
+                        "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+                }
             }
             if (useVarInt) {
                 // BedrockNetwork length prefix is a plain unsigned varint

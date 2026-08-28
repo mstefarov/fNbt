@@ -105,7 +105,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void UncompressedLoadStillStopsExactlyAtDocumentEnd() {
             // Draining is a compressed-path behavior only. Uncompressed loads keep exact
-            // consumption; NbtBlob and concatenated reads depend on it.
+            // consumption; NbtCodec and concatenated reads depend on it.
             byte[] doc = MakeDoc(NbtCompression.None);
             byte[] padded = doc.Concat(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF }).ToArray();
             using (var ms = new MemoryStream(padded)) {

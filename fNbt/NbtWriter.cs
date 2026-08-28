@@ -369,7 +369,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named string tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded -OR-
-        /// <paramref name="value"/> is longer than 65,535 bytes in UTF-8. </exception>
+        /// <paramref name="value"/> is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
         public void WriteString(string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             EnforceConstraints(null, NbtTagType.String);
@@ -382,7 +382,7 @@ namespace fNbt {
         /// <param name="value"> The string to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed string tag was expected -OR- a tag of a different type was expected -OR-
-        /// <paramref name="value"/> is longer than 65,535 bytes in UTF-8. </exception>
+        /// <paramref name="value"/> is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
         public void WriteString(string tagName, string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             EnforceConstraints(tagName, NbtTagType.String);
@@ -716,7 +716,7 @@ namespace fNbt {
         /// <param name="tag"> Tag to write. Must not be null. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// given tag is unacceptable at this time -OR- its tree is nested more than 512 levels deep -OR-
-        /// a string inside it is longer than 65,535 bytes in UTF-8. </exception>
+        /// a string inside it is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
