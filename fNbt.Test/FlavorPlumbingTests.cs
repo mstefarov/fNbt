@@ -68,20 +68,18 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void FileApisRejectUnsupportedFlavors() {
+        public void FileApisRejectUnnamedRootFlavors() {
+            // JavaNetwork has no root name, which the named-root APIs cannot express
             Assert.Throws<ArgumentException>(() => new NbtFile().Flavor = NbtFlavor.JavaNetwork);
-            Assert.Throws<NotSupportedException>(() => new NbtFile().Flavor = NbtFlavor.BedrockNetwork);
             Assert.Throws<ArgumentException>(
                 () => new NbtFile(new NbtOptions { Flavor = NbtFlavor.JavaNetwork }));
             Assert.Throws<ArgumentException>(() => NbtFile.DefaultFlavor = NbtFlavor.JavaNetwork);
 
             using (var ms = new MemoryStream(new byte[] { 0x0A })) {
                 Assert.Throws<ArgumentException>(() => new NbtReader(ms, NbtFlavor.JavaNetwork));
-                Assert.Throws<NotSupportedException>(() => new NbtReader(ms, NbtFlavor.BedrockNetwork));
             }
             using (var ms = new MemoryStream()) {
                 Assert.Throws<ArgumentException>(() => new NbtWriter(ms, "r", NbtFlavor.JavaNetwork));
-                Assert.Throws<NotSupportedException>(() => new NbtWriter(ms, "r", NbtFlavor.BedrockNetwork));
                 Assert.Throws<ArgumentOutOfRangeException>(
                     () => new NbtWriter(ms, "r", new NbtOptions { MaxAllocation = 0 }));
             }

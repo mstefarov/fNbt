@@ -286,14 +286,7 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void BedrockNetworkIsNotYetSupported() {
-            Assert.Throws<NotSupportedException>(() => NbtCodec.For(NbtFlavor.BedrockNetwork));
-            Assert.Throws<NotSupportedException>(() => new NbtCodec(NbtFlavor.BedrockNetwork));
-        }
-
-
-        [TestMethod]
+[TestMethod]
         public void TruncatedDocumentThrows() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
             byte[] doc = codec.WriteTag(MakeSampleRoot("r"));

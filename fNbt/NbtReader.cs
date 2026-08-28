@@ -43,7 +43,6 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
         public NbtReader(Stream stream, NbtFlavor flavor)
             : this(stream, MakeOptions(flavor)) { }
 
@@ -64,7 +63,6 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
-        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
         public NbtReader(Stream stream, NbtOptions options) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             if (options == null) throw new ArgumentNullException(nameof(options));
@@ -86,7 +84,7 @@ namespace fNbt {
                 streamStartOffset = stream.Position;
             }
 
-            reader = new NbtBinaryReader(stream, options.Flavor.BigEndian);
+            reader = new NbtBinaryReader(stream, options.Flavor.BigEndian, options.Flavor.UsesVarInts);
             long maxAllocation = options.MaxAllocation ?? long.MaxValue;
             NbtFlavor? readValidationFlavor =
                 (options.ValidateOnRead && options.Flavor.HasRestrictions) ? options.Flavor : null;
@@ -440,11 +438,17 @@ namespace fNbt {
                     break;
 
                 case NbtTagType.Float:
+                    reader.ReadSingle();
+                    break;
+
                 case NbtTagType.Int:
                     reader.ReadInt32();
                     break;
 
                 case NbtTagType.Double:
+                    reader.ReadDouble();
+                    break;
+
                 case NbtTagType.Long:
                     reader.ReadInt64();
                     break;
@@ -839,7 +843,7 @@ namespace fNbt {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
                 // The allocation estimate uses the managed element size, since T may be wider than the wire type.
                 reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
-                reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType));
+                reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType, reader.UsesVarInt));
 
                 // special handling for reading byte arrays (as byte arrays)
                 if (elementType == NbtTagType.Byte && typeof(T) == typeof(byte)) {
@@ -928,17 +932,21 @@ namespace fNbt {
 
 
         // Smallest serialized size (lower bound) for an element of the given type.
-        static int MinElementSize(NbtTagType type) {
+        static int MinElementSize(NbtTagType type, bool varInt) {
             switch (type) {
                 case NbtTagType.Byte:
                     return 1;
                 case NbtTagType.Short:
-                case NbtTagType.String: // empty string has 2-byte length prefix
                     return 2;
+                case NbtTagType.String: // empty string is just its length prefix
+                    return varInt ? 1 : 2;
                 case NbtTagType.Int:
+                    return varInt ? 1 : 4;
                 case NbtTagType.Float:
                     return 4;
-                default: // Long, Double
+                case NbtTagType.Long:
+                    return varInt ? 1 : 8;
+                default: // Double
                     return 8;
             }
         }
@@ -952,7 +960,7 @@ namespace fNbt {
             if (target == typeof(short) || target == typeof(ushort) || target == typeof(char)) return 2;
             if (target == typeof(int) || target == typeof(uint) || target == typeof(float)) return 4;
             if (target == typeof(long) || target == typeof(ulong) || target == typeof(double)) return 8;
-            return MinElementSize(wireType);
+            return MinElementSize(wireType, false);
         }
 
 

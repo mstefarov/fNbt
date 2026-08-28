@@ -51,7 +51,6 @@ namespace fNbt {
         /// or <paramref name="flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor)
             : this(stream, rootTagName, MakeOptions(flavor)) { }
 
@@ -72,7 +71,6 @@ namespace fNbt {
         /// <paramref name="options"/>, or the options' <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtOptions options) {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
             if (options == null) throw new ArgumentNullException(nameof(options));
@@ -85,7 +83,7 @@ namespace fNbt {
             }
             options.Flavor.EnsureUsableForFiles(nameof(options));
             flavor = options.Flavor;
-            writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
+            writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
             if (options.ValidateOnWrite && flavor.HasRestrictions) {
                 maxTagType = flavor.MaxTagType;
                 writer.SetMaxStringBytes(flavor.MaxStringBytes);

@@ -19,7 +19,6 @@ namespace fNbt {
         /// for one-off use: <c>NbtCodec.For(NbtFlavor.Bedrock).ReadTag(stream)</c>. </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
-        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
         public static NbtCodec For(NbtFlavor flavor) {
             if (flavor == null) throw new ArgumentNullException(nameof(flavor));
             return flavor.DefaultCodec;
@@ -40,7 +39,6 @@ namespace fNbt {
         /// (validation on write only, no allocation limit). </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
-        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
         public NbtCodec(NbtFlavor flavor)
             : this(MakeOptions(flavor)) { }
 
@@ -56,7 +54,6 @@ namespace fNbt {
         /// instance do not affect this codec. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
-        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
         public NbtCodec(NbtOptions options) {
             if (options == null) throw new ArgumentNullException(nameof(options));
             // Read each setting once, so a caller mutating the options concurrently cannot
@@ -71,9 +68,6 @@ namespace fNbt {
             if (snapshotMaxAllocation <= 0) {
                 throw new ArgumentOutOfRangeException(nameof(options), snapshotMaxAllocation,
                                                       "MaxAllocation must be positive.");
-            }
-            if (snapshotFlavor.UsesVarInts) {
-                throw new NotSupportedException("The " + snapshotFlavor.Name + " flavor is not supported yet.");
             }
             Options = new NbtOptions {
                 Flavor = snapshotFlavor,
@@ -244,7 +238,7 @@ namespace fNbt {
             if (validateOnWrite) {
                 flavor.ValidateTree(tag, 0);
             }
-            var writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
+            var writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
             writer.Write(tag.TagType);
             if (flavor.HasRootName) {
                 writer.Write(tag.Name ?? "");
@@ -318,7 +312,7 @@ namespace fNbt {
                     NbtTag.GetCanonicalTagName(tagType) + " is not permitted by the " +
                     readValidationFlavor.Name + " flavor.");
             }
-            var reader = new NbtBinaryReader(stream, flavor.BigEndian);
+            var reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
             if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
                 reader.SetLimits(maxAllocation, readValidationFlavor);
             }

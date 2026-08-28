@@ -43,8 +43,8 @@ namespace fNbt {
 
         /// <summary> Bedrock Edition network encoding, 0.16 and later. Little-endian, with
         /// <c>TAG_Int</c>/<c>TAG_Long</c> values and container lengths as zigzag varints, and string
-        /// lengths as unsigned varints. Not implemented yet: reading or writing currently throws
-        /// <see cref="NotSupportedException"/>. </summary>
+        /// lengths as unsigned varints. Not a file format, though blobs of it may be embedded
+        /// inside files. </summary>
         public static NbtFlavor BedrockNetwork { get; } =
             new NbtFlavor("BedrockNetwork", bigEndian: false, modifiedUtf8: false,
                           NbtTagType.IntArray, int.MaxValue,
@@ -103,12 +103,9 @@ namespace fNbt {
         }
 
 
-        // Guards for the named-root APIs (NbtFile, NbtReader, NbtWriter), which cannot express
-        // unnamed-root flavors. NbtCodec does its own varint check and permits JavaNetwork.
+        // Guard for the named-root APIs (NbtFile, NbtReader, NbtWriter), which cannot express
+        // unnamed-root flavors. NbtCodec permits JavaNetwork.
         internal void EnsureUsableForFiles(string paramName) {
-            if (UsesVarInts) {
-                throw new NotSupportedException("The " + Name + " flavor is not supported yet.");
-            }
             if (!HasRootName) {
                 throw new ArgumentException(
                     "The " + Name + " flavor has no root name; use NbtCodec to read and write it.", paramName);

@@ -174,7 +174,6 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentNullException>(() => new NbtCodec(new NbtOptions { Flavor = null }));
             Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = 0 }));
             Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = -5 }));
-            Assert.Throws<NotSupportedException>(() => new NbtCodec(NbtFlavor.BedrockNetwork));
         }
 
 

@@ -69,6 +69,11 @@ namespace fNbt {
         }
 
 
+        public bool UsesVarInt {
+            get { return useVarInt; }
+        }
+
+
         public NbtTagType ReadTagType() {
             return RequireValidTagType(ReadByte()); // ReadByte throws at end of stream
         }
@@ -232,12 +237,26 @@ namespace fNbt {
 
         // Converts element count to a byte count here, taking care not to overflow.
         public unsafe void Skip<T>(int elementCount) where T : unmanaged {
-            if (useVarInt) {
-                // Varint elements have no fixed width, so byte math cannot skip them.
-                // Needs an element-wise skip before any varint flavor is wired up.
-                throw new NotSupportedException("Cannot bulk-skip varint-encoded elements.");
+            if (useVarInt && (typeof(T) == typeof(int) || typeof(T) == typeof(long))) {
+                // Varint elements have no fixed width, so they are skipped one at a time,
+                // enforcing the same width limits as the read path
+                SkipVarInts(elementCount, typeof(T) == typeof(int) ? 5 : 10);
+                return;
             }
             Skip((long)elementCount * sizeof(T));
+        }
+
+
+        void SkipVarInts(int elementCount, int maxBytesEach) {
+            for (int i = 0; i < elementCount; i++) {
+                int bytesRead = 0;
+                while ((ReadByte() & 0x80) != 0) {
+                    if (++bytesRead >= maxBytesEach) {
+                        throw new NbtFormatException(
+                            maxBytesEach == 5 ? "VarInt32 is too long." : "VarInt64 is too long.");
+                    }
+                }
+            }
         }
 
 

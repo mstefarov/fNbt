@@ -2,8 +2,14 @@
 - Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube.
     Flavors expose their format data: endianness, string encoding, MaxTagType,
-    and MaxStringBytes. BedrockNetwork (varint encoding)
-    is declared but not implemented yet.
+    and MaxStringBytes.
+- Add support for BedrockNetwork, the varint encoding Bedrock Edition has
+    used on the network since 0.16: TAG_Int and TAG_Long values and container
+    lengths are zigzag varints, and string lengths are unsigned varints.
+    NbtFile, NbtReader, NbtWriter, and NbtCodec all read and write it.
+    Writing TAG_Long_Array under this flavor fails validation, since Bedrock's
+    own reader rejects it; pass ValidateOnWrite = false to write it the way
+    third-party libraries do.
 - Add NbtCodec, for reading and writing raw NBT documents without file-level
     framing: network packet payloads, LevelDB values, and NBT embedded inside
     other formats. Supports unnamed and non-compound roots (JavaNetwork),

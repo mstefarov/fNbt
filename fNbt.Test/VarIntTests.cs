@@ -3,8 +3,8 @@ using System.IO;
 using System.Linq;
 
 namespace fNbt.Test {
-    // Exercises the varint primitives directly, via InternalsVisibleTo. No public API reaches
-    // them until the BedrockNetwork flavor is wired up, so these are the only coverage.
+    // Exercises the varint primitives directly, via InternalsVisibleTo.
+    // BedrockNetworkTests covers the same encoding through the public API.
     [TestClass]
     public class VarIntTests {
         static byte[] WriteInt32(int value) {
@@ -130,11 +130,39 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void BulkSkipOfVarIntElementsIsRefused() {
-            // Byte math cannot skip variable-width elements; the tripwire must hold
-            // until an element-wise skip exists.
-            NbtBinaryReader reader = VarIntReader(new byte[] { 0x00, 0x00, 0x00, 0x00 });
-            Assert.Throws<NotSupportedException>(() => reader.Skip<int>(4));
+        public void VarIntElementsSkipElementWise() {
+            // Byte math cannot skip variable-width elements, so ints and longs are
+            // skipped one varint at a time
+            byte[] doc = { 0x00, 0xD8, 0x04, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F, 0x2A };
+            NbtBinaryReader reader = VarIntReader(doc);
+            reader.Skip<int>(3);
+            Assert.AreEqual(42, reader.ReadByte());
+
+            reader = VarIntReader(doc);
+            reader.Skip<long>(3);
+            Assert.AreEqual(42, reader.ReadByte());
+
+            // Fixed-width element types keep plain byte math
+            reader = VarIntReader(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x2A });
+            reader.Skip<byte>(4);
+            Assert.AreEqual(42, reader.ReadByte());
+        }
+
+
+        [TestMethod]
+        public void SkippingOverlongVarIntThrows() {
+            // The skip path enforces the same width limits as the read path
+            byte[] junk32 = Enumerable.Repeat((byte)0x80, 6).ToArray();
+            Assert.Throws<NbtFormatException>(() => VarIntReader(junk32).Skip<int>(1));
+
+            byte[] junk64 = Enumerable.Repeat((byte)0x80, 11).ToArray();
+            Assert.Throws<NbtFormatException>(() => VarIntReader(junk64).Skip<long>(1));
+
+            // Ten continuation bytes are still a valid varint64 in progress; nine are fine
+            byte[] max64 = Enumerable.Repeat((byte)0x80, 9).Concat(new byte[] { 0x01 }).ToArray();
+            NbtBinaryReader reader = VarIntReader(max64);
+            reader.Skip<long>(1);
+            Assert.AreEqual(max64.Length, reader.BaseStream.Position);
         }
 
 
