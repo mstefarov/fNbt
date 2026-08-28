@@ -46,11 +46,6 @@ namespace fNbt.Test {
             Assert.AreEqual(32767, NbtFlavor.Bedrock.MaxStringBytes);
             Assert.AreEqual(int.MaxValue, NbtFlavor.BedrockNetwork.MaxStringBytes);
             Assert.AreEqual(256, NbtFlavor.ClassiCube.MaxStringBytes);
-
-            Assert.AreEqual(NbtCompression.GZip, NbtFlavor.Java.DefaultCompression);
-            Assert.AreEqual(NbtCompression.GZip, NbtFlavor.ClassiCube.DefaultCompression);
-            Assert.AreEqual(NbtCompression.None, NbtFlavor.Bedrock.DefaultCompression);
-            Assert.AreEqual(NbtCompression.None, NbtFlavor.JavaNetwork.DefaultCompression);
         }
 
 

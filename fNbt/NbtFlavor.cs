@@ -11,19 +11,19 @@ namespace fNbt {
         /// Reads every older Java-flavor file. This is the default flavor. </summary>
         public static NbtFlavor Java { get; } =
             new NbtFlavor("Java", bigEndian: true, modifiedUtf8: true,
-                          NbtTagType.LongArray, ushort.MaxValue, NbtCompression.GZip);
+                          NbtTagType.LongArray, ushort.MaxValue);
 
         /// <summary> Java Edition 1.2.1 through 1.11. Same as <see cref="Java"/>, but predates
         /// <c>TAG_Long_Array</c>. </summary>
         public static NbtFlavor JavaAnvil { get; } =
             new NbtFlavor("JavaAnvil", bigEndian: true, modifiedUtf8: true,
-                          NbtTagType.IntArray, ushort.MaxValue, NbtCompression.GZip);
+                          NbtTagType.IntArray, ushort.MaxValue);
 
         /// <summary> The original NBT format: Indev through Java Edition 1.1. Same as <see cref="Java"/>,
         /// but predates <c>TAG_Int_Array</c> and <c>TAG_Long_Array</c>. </summary>
         public static NbtFlavor JavaLegacy { get; } =
             new NbtFlavor("JavaLegacy", bigEndian: true, modifiedUtf8: true,
-                          NbtTagType.Compound, ushort.MaxValue, NbtCompression.GZip);
+                          NbtTagType.Compound, ushort.MaxValue);
 
         /// <summary> Java Edition network encoding, protocol 764 (1.20.2) and later. Big-endian like
         /// <see cref="Java"/>, but the root tag is unnamed and may be any tag type (e.g. <c>TAG_String</c>
@@ -31,7 +31,7 @@ namespace fNbt {
         /// Not a file format, though blobs of it may be embedded inside files. </summary>
         public static NbtFlavor JavaNetwork { get; } =
             new NbtFlavor("JavaNetwork", bigEndian: true, modifiedUtf8: true,
-                          NbtTagType.LongArray, ushort.MaxValue, NbtCompression.None,
+                          NbtTagType.LongArray, ushort.MaxValue,
                           hasRootName: false, allowsNonCompoundRoot: true);
 
         /// <summary> Bedrock Edition disk format: <c>level.dat</c>, <c>.mcstructure</c>, and LevelDB values.
@@ -39,7 +39,7 @@ namespace fNbt {
         /// 32,767 bytes: the length prefix is a signed 16-bit value. </summary>
         public static NbtFlavor Bedrock { get; } =
             new NbtFlavor("Bedrock", bigEndian: false, modifiedUtf8: false,
-                          NbtTagType.IntArray, short.MaxValue, NbtCompression.None);
+                          NbtTagType.IntArray, short.MaxValue);
 
         /// <summary> Bedrock Edition network encoding, 0.16 and later. Little-endian, with
         /// <c>TAG_Int</c>/<c>TAG_Long</c> values and container lengths as zigzag varints, and string
@@ -47,7 +47,7 @@ namespace fNbt {
         /// <see cref="NotSupportedException"/>. </summary>
         public static NbtFlavor BedrockNetwork { get; } =
             new NbtFlavor("BedrockNetwork", bigEndian: false, modifiedUtf8: false,
-                          NbtTagType.IntArray, int.MaxValue, NbtCompression.None,
+                          NbtTagType.IntArray, int.MaxValue,
                           usesVarInts: true);
 
         /// <summary> The profile of ClassicWorld (<c>.cw</c>) maps that the ClassiCube client can load:
@@ -56,7 +56,7 @@ namespace fNbt {
         /// <see cref="JavaAnvil"/> instead. </summary>
         public static NbtFlavor ClassiCube { get; } =
             new NbtFlavor("ClassiCube", bigEndian: true, modifiedUtf8: true,
-                          NbtTagType.Compound, 256, NbtCompression.GZip);
+                          NbtTagType.Compound, 256);
 
 
         /// <summary> Short display name of this flavor, e.g. "Java" or "BedrockNetwork". </summary>
@@ -95,12 +95,6 @@ namespace fNbt {
         /// <see cref="ClassiCube"/> (client limit), unbounded for <see cref="BedrockNetwork"/> (varint
         /// prefix). Ceilings below 65,535 are enforced only when validation is enabled. </summary>
         public int MaxStringBytes { get; }
-
-        /// <summary> Compression conventionally used for this flavor's files. Informational: APIs that
-        /// take an explicit <see cref="NbtCompression"/> are unaffected, and blobs are never
-        /// compressed at the NBT layer. </summary>
-        public NbtCompression DefaultCompression { get; }
-
 
         // Whether validation with this flavor can reject anything the wire format itself allows.
         // Flavors without restrictions skip validation entirely.
@@ -189,14 +183,13 @@ namespace fNbt {
 
 
         NbtFlavor(string name, bool bigEndian, bool modifiedUtf8, NbtTagType maxTagType,
-                  int maxStringBytes, NbtCompression defaultCompression, bool usesVarInts = false,
+                  int maxStringBytes, bool usesVarInts = false,
                   bool hasRootName = true, bool allowsNonCompoundRoot = false) {
             Name = name;
             BigEndian = bigEndian;
             UsesModifiedUtf8 = modifiedUtf8;
             MaxTagType = maxTagType;
             MaxStringBytes = maxStringBytes;
-            DefaultCompression = defaultCompression;
             UsesVarInts = usesVarInts;
             HasRootName = hasRootName;
             AllowsNonCompoundRoot = allowsNonCompoundRoot;

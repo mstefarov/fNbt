@@ -2,7 +2,7 @@
 - Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube.
     Flavors expose their format data: endianness, string encoding, MaxTagType,
-    MaxStringBytes, and DefaultCompression. BedrockNetwork (varint encoding)
+    and MaxStringBytes. BedrockNetwork (varint encoding)
     is declared but not implemented yet.
 - Add NbtCodec, for reading and writing raw NBT documents without file-level
     framing: network packet payloads, LevelDB values, and NBT embedded inside
