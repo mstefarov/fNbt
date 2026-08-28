@@ -293,7 +293,7 @@ namespace fNbt {
 
             // The element-type byte is only meaningful when elements follow it, so it is read
             // raw and interpreted after the length. Negative lengths and empty lists with
-            // arbitrary type bytes are tolerated on purpose, exceeding vanilla.
+            // arbitrary type bytes are tolerated on purpose, exceeding Minecraft's own readers.
             byte rawListType = readStream.ReadByte();
             int length = readStream.ReadInt32();
             if (length <= 0) {

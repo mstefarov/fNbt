@@ -192,7 +192,7 @@ namespace fNbt {
 
 
         /// <summary> Loads NBT data from a file using the most common settings.
-        /// Automatically detects compression. Assumes the file to be big-endian, and uses default buffer size. </summary>
+        /// Automatically detects compression, and reads with <see cref="DefaultFlavor"/>. </summary>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> is <c>null</c>. </exception>
         /// <exception cref="FileNotFoundException"> If given file was not found. </exception>

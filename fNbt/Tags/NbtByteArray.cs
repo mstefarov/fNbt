@@ -82,7 +82,7 @@ namespace fNbt {
 
 
         internal override bool ReadTag(NbtBinaryReader readStream) {
-            // Negative lengths are tolerated as empty, exceeding vanilla on purpose
+            // Negative lengths are tolerated as empty, exceeding Minecraft's own readers on purpose
             int length = Math.Max(0, readStream.ReadInt32());
 
             if (readStream.Selector != null && !readStream.Selector(this)) {

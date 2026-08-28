@@ -366,7 +366,7 @@ namespace fNbt {
                 case NbtTagType.IntArray:
                 case NbtTagType.ByteArray:
                 case NbtTagType.LongArray:
-                    // Negative lengths are tolerated as empty, exceeding vanilla on purpose
+                    // Negative lengths are tolerated as empty, exceeding Minecraft's own readers on purpose
                     TagLength = Math.Max(0, reader.ReadInt32());
                     atValue = true;
                     state = oldState;

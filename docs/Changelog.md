@@ -15,8 +15,9 @@
     other formats. Supports unnamed and non-compound roots (JavaNetwork),
     absent documents (a lone TAG_End byte), back-to-back documents via
     ReadConcatenatedTags and WriteConcatenatedTags, and reads that stop
-    exactly at the end of one document, leaving trailing bytes in place. NbtCodec.For(flavor) returns
-    a cached default-options instance for one-off use.
+    exactly at the end of one document, leaving trailing bytes in place.
+    NbtCodec.For(flavor) returns a cached default-options instance for
+    one-off use.
 - Add NbtOptions, a settings object that NbtFile, NbtReader, NbtWriter,
     and NbtCodec all accept and snapshot at construction, so later changes
     to an options instance do not affect objects already created from it.
@@ -33,9 +34,10 @@
     tag types and string lengths the flavor's own readers reject, such as
     TAG_Int_Array or 300-byte strings under ClassiCube; opt-in for reads,
     which stay generous by default. List element types are checked even
-    for empty lists, since the type byte is written either way. Little-endian files that Bedrock itself
-    cannot read, such as ones holding TAG_Long_Array, now fail to save under
-    the Bedrock flavor; pass ValidateOnWrite = false to keep writing them.
+    for empty lists, since the type byte is written either way.
+    Little-endian files that Bedrock itself cannot read, such as ones
+    holding TAG_Long_Array, now fail to save under the Bedrock flavor;
+    pass ValidateOnWrite = false to keep writing them.
 - Java flavors now write modified UTF-8, byte-compatible with Minecraft Java:
     astral characters as CESU-8 surrogate pairs, NUL as the overlong C0 80
     form, and lone surrogates preserved. Bedrock flavors keep standard UTF-8,
@@ -59,6 +61,7 @@
     decompression stopped, so it cannot block on a stream that never ends.
     ZLib validation on .NET Standard 2.0 needs a seekable stream, and
     trailing data after a ZLib document fails the checksum there.
+
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
     Minecraft's own limit, instead of crashing the process with an uncatchable
