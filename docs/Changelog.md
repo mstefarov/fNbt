@@ -13,11 +13,9 @@
     a cached default-options instance for one-off use.
 - Add NbtOptions, an immutable settings object that NbtFile, NbtReader,
     NbtWriter, and NbtCodec all accept and resolve once at construction. It
-    carries the flavor, two validation toggles, and two opt-in limits.
-    MaxAllocation caps any single allocation that a declared length asks
-    for, so a tiny corrupt document cannot demand a huge array.
-    DisallowTrailingData makes NbtFile reject uncompressed documents that
-    end before the stream does.
+    carries the flavor, two validation toggles, and the opt-in MaxAllocation
+    limit, which caps any single allocation that a declared length asks for,
+    so a tiny corrupt document cannot demand a huge array.
 - NbtFile gains a Flavor property and a static DefaultFlavor. BigEndian,
     BigEndianByDefault, and the bool reader/writer constructors still work,
     map true to the Java flavor and false to Bedrock, and are now obsolete.
