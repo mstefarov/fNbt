@@ -307,8 +307,8 @@ namespace fNbt {
         /// load cannot block on a stream that never ends. On .NET Core and later, GZip data made of
         /// several concatenated members decompresses as one continuous document, so a load reads
         /// through every member; the .NET Framework decompressor stops after the first.
-        /// Uncompressed loads stop exactly at the
-        /// end of the document, leaving any trailing bytes in place. </remarks>
+        /// Uncompressed loads stop exactly at the end of the document, leaving any trailing
+        /// bytes in place. </remarks>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.

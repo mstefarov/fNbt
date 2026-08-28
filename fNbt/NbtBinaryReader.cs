@@ -16,9 +16,9 @@ namespace fNbt {
         int depth;
 
         // Opt-in limits, set at most once by whichever entry point owns this reader, before
-        // any parsing. Defaults keep every check a single always-false comparison. maxStringBytes folds MaxAllocation in and guards
-        // reads, which allocate; skips allocate nothing, so they enforce only the flavor's
-        // own ceiling via flavorMaxStringBytes.
+        // any parsing. Defaults keep every check a single always-false comparison.
+        // maxStringBytes folds MaxAllocation in and guards reads, which allocate; skipped
+        // strings enforce only the flavor's own ceiling, since skips allocate nothing.
         long maxAllocation = long.MaxValue;
         int maxStringBytes = int.MaxValue;
         int flavorMaxStringBytes = int.MaxValue;

@@ -311,7 +311,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ReadingNonCompoundRootIsGenerous() {
-            // TAG_String root named "s" with value "hi": not something vanilla writes,
+            // TAG_String root named "s" with value "hi": not something Minecraft writes,
             // but the reader accepts what it can parse.
             byte[] doc = {
                 0x08, 0x00, 0x01, (byte)'s', // TAG_String "s"

@@ -82,7 +82,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void JavaReadAcceptsStandardUtf8Astral() {
-            // Not something vanilla Java writes, but reads are generous
+            // Not something Minecraft Java writes, but reads are generous
             byte[] doc = MakeJavaStringDoc(EmojiUtf8);
             Assert.AreEqual(Emoji, ReadStringDoc(NbtFlavor.Java, doc));
         }
@@ -146,7 +146,7 @@ namespace fNbt.Test {
         public void JavaCeilingCountsModifiedUtf8Bytes() {
             // 10,922 astral chars are 65,532 modified-UTF-8 bytes: fits.
             // 10,923 are 65,538: over the u16 prefix, must throw.
-            // (Standard UTF-8 would count only 43,692 bytes and let it through, corrupting the stream.)
+            // Standard UTF-8 would count only 43,692 bytes and let it through, corrupting the stream.
             string fits = string.Concat(Enumerable.Repeat(Emoji, 10_922));
             string over = string.Concat(Enumerable.Repeat(Emoji, 10_923));
 

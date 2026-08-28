@@ -59,6 +59,8 @@
     an offset: they wrote a length prefix of count but emitted only the
     elements between offset and count, corrupting output whenever offset
     was not zero.
+- NbtReader now enters its error state when a value read fails partway
+    through, instead of trying to continue from the middle of a payload.
 - ZLib saves on .NET 6 and later now run through the framework's ZLibStream,
     which computes the Adler-32 checksum in native code. Saving a map-sized
     document with ZLib compression gets about 1.3x faster.

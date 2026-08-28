@@ -70,9 +70,9 @@ namespace fNbt {
 
 
         // Single-byte reads and writes route through this type's own bulk methods, so the
-        // checksum sees every byte. Calling into the base instead would either skip the
-        // checksum (where DeflateStream has its own single-byte fast path) or count the byte
-        // twice (where the Stream default falls back to the bulk methods, which are virtual).
+        // checksum sees every byte exactly once. Calling into the base instead would skip
+        // the checksum on runtimes where DeflateStream has a single-byte fast path, and
+        // count the byte twice where the Stream default falls back to the virtual bulk methods.
         public override int ReadByte() {
             byte[] buffer = singleByteBuffer ?? (singleByteBuffer = new byte[1]);
             int bytesRead = Read(buffer, 0, 1);

@@ -2,7 +2,7 @@ using System;
 using System.IO;
 
 namespace fNbt.Test {
-    // Wire tolerances that exceed vanilla on purpose: negative list/array lengths read as
+    // Wire tolerances that exceed Minecraft's own readers on purpose: negative list/array lengths read as
     // empty, and an empty list accepts any element-type byte. Always on, not a toggle.
     [TestClass]
     public class WireToleranceTests {
