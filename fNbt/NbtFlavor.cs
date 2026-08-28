@@ -159,7 +159,7 @@ namespace fNbt {
         internal void ValidateString(string value) {
             // Neither encoding exceeds 4 bytes per char, so short strings skip the exact count
             if ((long)value.Length * 4 <= MaxStringBytes) return;
-            int byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
+            long byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {
                 throw new NbtFormatException(
                     "String is " + byteCount + " bytes, but the " + Name +

@@ -538,6 +538,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
+        /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToFile(string fileName, NbtCompression compression) {
             if (fileName == null) throw new ArgumentNullException(nameof(fileName));
@@ -568,6 +569,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
+        /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToBuffer(byte[] buffer, int index, NbtCompression compression) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
@@ -589,6 +591,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
+        /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
@@ -624,6 +627,7 @@ namespace fNbt {
         /// or if one of the NbtCompound tags contained unnamed tags;
         /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
+        /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
         public long SaveToStream(Stream stream, NbtCompression compression) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));

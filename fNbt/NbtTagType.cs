@@ -28,7 +28,8 @@
         /// <summary> TAG_Byte_Array: A length-prefixed array of bytes. </summary>
         ByteArray = 0x07,
 
-        /// <summary> TAG_String: A length-prefixed UTF-8 string. </summary>
+        /// <summary> TAG_String: A length-prefixed string, in the flavor's encoding:
+        /// modified UTF-8 for the Java flavors, standard UTF-8 for the Bedrock flavors. </summary>
         String = 0x08,
 
         /// <summary> TAG_List: A list of nameless tags, all of the same type. </summary>

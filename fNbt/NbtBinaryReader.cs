@@ -15,8 +15,8 @@ namespace fNbt {
         readonly byte[] stringConversionBuffer = new byte[64];
         int depth;
 
-        // Opt-in limits, set once by NbtCodec before parsing. Defaults keep every check a
-        // single always-false comparison. maxStringBytes folds MaxAllocation in and guards
+        // Opt-in limits, set at most once by whichever entry point owns this reader, before
+        // any parsing. Defaults keep every check a single always-false comparison. maxStringBytes folds MaxAllocation in and guards
         // reads, which allocate; skips allocate nothing, so they enforce only the flavor's
         // own ceiling via flavorMaxStringBytes.
         long maxAllocation = long.MaxValue;

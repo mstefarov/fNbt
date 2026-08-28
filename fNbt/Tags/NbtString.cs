@@ -3,7 +3,8 @@ using System.Globalization;
 using System.Text;
 
 namespace fNbt {
-    /// <summary> A tag containing a single string. String is stored in UTF-8 encoding. </summary>
+    /// <summary> A tag containing a single string, stored in the flavor's encoding:
+    /// modified UTF-8 for the Java flavors, standard UTF-8 for the Bedrock flavors. </summary>
     public sealed class NbtString : NbtTag {
         /// <summary> Type of this tag (String). </summary>
         public override NbtTagType TagType {

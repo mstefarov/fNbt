@@ -149,7 +149,8 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named list tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded -OR-
-        /// tags are nested more than 512 levels deep. </exception>
+        /// tags are nested more than 512 levels deep -OR-
+        /// enabled validation does not permit <paramref name="elementType"/> for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="size"/> is negative -OR-
         /// <paramref name="elementType"/> is not a valid list element type
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
@@ -183,7 +184,8 @@ namespace fNbt {
         /// <param name="size"> Number of elements in this list. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed list tag was expected -OR- a tag of a different type was expected -OR-
-        /// tags are nested more than 512 levels deep. </exception>
+        /// tags are nested more than 512 levels deep -OR-
+        /// enabled validation does not permit <paramref name="elementType"/> for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="size"/> is negative -OR-
         /// <paramref name="elementType"/> is not a valid list element type
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
@@ -580,7 +582,8 @@ namespace fNbt {
         /// <param name="data"> An int array containing the data to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named int array tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// enabled validation does not permit TAG_Int_Array for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="data"/> is null </exception>
         public void WriteIntArray(int[] data) {
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -594,7 +597,8 @@ namespace fNbt {
         /// <param name="count"> The number of elements to write. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named int array tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// enabled validation does not permit TAG_Int_Array for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="offset"/> or
         /// <paramref name="count"/> is negative. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="data"/> is null </exception>
@@ -614,7 +618,8 @@ namespace fNbt {
         /// <param name="tagName"> Name to give to this int array tag. May not be null. </param>
         /// <param name="data"> An int array containing the data to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed int array tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed int array tag was expected -OR- a tag of a different type was expected -OR-
+        /// enabled validation does not permit TAG_Int_Array for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> or
         /// <paramref name="data"/> is null </exception>
         public void WriteIntArray(string tagName, int[] data) {
@@ -629,7 +634,8 @@ namespace fNbt {
         /// <param name="offset"> The starting point in <paramref name="data"/> at which to begin writing. Must not be negative. </param>
         /// <param name="count"> The number of elements to write. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed int array tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed int array tag was expected -OR- a tag of a different type was expected -OR-
+        /// enabled validation does not permit TAG_Int_Array for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="offset"/> or
         /// <paramref name="count"/> is negative. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> or
@@ -651,7 +657,8 @@ namespace fNbt {
         /// <param name="data"> A long array containing the data to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named long array tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// enabled validation does not permit TAG_Long_Array for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="data"/> is null </exception>
         public void WriteLongArray(long[] data) {
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -665,7 +672,8 @@ namespace fNbt {
         /// <param name="count"> The number of elements to write. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// a named long array tag was expected -OR- a tag of a different type was expected -OR-
-        /// the size of a parent list has been exceeded. </exception>
+        /// the size of a parent list has been exceeded -OR-
+        /// enabled validation does not permit TAG_Long_Array for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="offset"/> or
         /// <paramref name="count"/> is negative. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="data"/> is null </exception>
@@ -685,7 +693,8 @@ namespace fNbt {
         /// <param name="tagName"> Name to give to this long array tag. May not be null. </param>
         /// <param name="data"> A long array containing the data to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed long array tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed long array tag was expected -OR- a tag of a different type was expected -OR-
+        /// enabled validation does not permit TAG_Long_Array for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> or
         /// <paramref name="data"/> is null </exception>
         public void WriteLongArray(string tagName, long[] data) {
@@ -700,7 +709,8 @@ namespace fNbt {
         /// <param name="offset"> The starting point in <paramref name="data"/> at which to begin writing. Must not be negative. </param>
         /// <param name="count"> The number of elements to write. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed long array tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed long array tag was expected -OR- a tag of a different type was expected -OR-
+        /// enabled validation does not permit TAG_Long_Array for the flavor. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="offset"/> or
         /// <paramref name="count"/> is negative. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> or
@@ -727,7 +737,8 @@ namespace fNbt {
         /// <param name="tag"> Tag to write. Must not be null. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// given tag is unacceptable at this time -OR- its tree is nested more than 512 levels deep -OR-
-        /// a string inside it is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
+        /// a string inside it is longer than the flavor's limit (65,535 bytes for the Java flavors) -OR-
+        /// enabled validation rejects a tag type or string length inside it for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));

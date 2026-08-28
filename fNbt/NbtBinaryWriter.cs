@@ -265,7 +265,7 @@ namespace fNbt {
 
 
         void WriteModifiedUtf8(string value) {
-            int numBytes = NbtStringCodec.GetModifiedByteCount(value);
+            long numBytes = NbtStringCodec.GetModifiedByteCount(value);
             if (useVarInt) {
                 WriteUnsignedVarInt32((uint)numBytes);
             } else {

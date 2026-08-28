@@ -186,6 +186,21 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ValidationCeilingCountsModifiedUtf8Bytes() {
+            // 42 emoji are 252 CESU-8 bytes: fits ClassiCube's 256-byte ceiling. 43 are 258:
+            // over, even though standard UTF-8 would count only 172 bytes and let it through.
+            string fits = string.Concat(Enumerable.Repeat(Emoji, 42));
+            string over = string.Concat(Enumerable.Repeat(Emoji, 43));
+            NbtCodec codec = NbtCodec.For(NbtFlavor.ClassiCube);
+
+            byte[] doc = codec.WriteTag(new NbtCompound("") { new NbtString("s", fits) });
+            Assert.IsTrue(doc.Length > 0);
+            Assert.Throws<NbtFormatException>(
+                () => codec.WriteTag(new NbtCompound("") { new NbtString("s", over) }));
+        }
+
+
+        [TestMethod]
         public void LenientDecodeHandlesAstralSequences() {
             // The overlong NUL forces the lenient path; the standard 4-byte astral sequence
             // must decode to a surrogate pair alongside it

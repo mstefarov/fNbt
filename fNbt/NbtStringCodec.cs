@@ -51,7 +51,7 @@ namespace fNbt {
         }
 
 
-        public static int GetByteCount(string value, bool modifiedUtf8) {
+        public static long GetByteCount(string value, bool modifiedUtf8) {
             if (modifiedUtf8 && NeedsModifiedEncoding(value)) {
                 return GetModifiedByteCount(value);
             }
@@ -64,8 +64,9 @@ namespace fNbt {
         }
 
 
-        public static int GetModifiedByteCount(string value) {
-            int count = 0;
+        // The count is a long so that even a maximum-length string cannot overflow it
+        public static long GetModifiedByteCount(string value) {
+            long count = 0;
             foreach (char c in value) {
                 if (c == '\0') count += 2;
                 else if (c < 0x80) count += 1;
