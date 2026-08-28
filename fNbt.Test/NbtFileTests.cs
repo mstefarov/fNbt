@@ -149,9 +149,11 @@ namespace fNbt.Test {
 
 
         void ReloadFileInternal(string fileName, NbtCompression compression, bool bigEndian, bool buffered) {
-            var loadedFile = new NbtFile(Path.Combine(TestFiles.DirName, fileName)) {
-                BigEndian = bigEndian
-            };
+            // Validation off: this test round-trips endianness, and bigtest's TAG_Long_Array
+            // is (correctly) rejected by Bedrock conformance validation
+            var loadedFile = new NbtFile(new NbtOptions { ValidateOnWrite = false });
+            loadedFile.LoadFromFile(Path.Combine(TestFiles.DirName, fileName), NbtCompression.AutoDetect, null);
+            loadedFile.Flavor = bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock;
             if (!buffered) {
                 loadedFile.BufferSize = 0;
             }

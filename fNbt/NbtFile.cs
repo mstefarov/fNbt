@@ -37,11 +37,58 @@ namespace fNbt {
 
         NbtCompound rootTag;
 
+        /// <summary> The flavor new NbtFiles are created with when no options are given.
+        /// Defaults to <see cref="NbtFlavor.Java"/>. </summary>
+        /// <exception cref="ArgumentNullException"> value is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> value is a flavor without a root name;
+        /// use <see cref="NbtCodec"/> for those. </exception>
+        /// <exception cref="NotSupportedException"> value is a flavor that is not yet supported. </exception>
+        public static NbtFlavor DefaultFlavor {
+            get { return defaultFlavor; }
+            set {
+                if (value == null) throw new ArgumentNullException(nameof(value));
+                value.EnsureUsableForFiles(nameof(value));
+                defaultFlavor = value;
+            }
+        }
+
+        static NbtFlavor defaultFlavor = NbtFlavor.Java;
+
         /// <summary> Whether new NbtFiles should default to big-endian encoding (default: true). </summary>
-        public static bool BigEndianByDefault { get; set; }
+        [Obsolete("Use DefaultFlavor instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
+        public static bool BigEndianByDefault {
+            get { return DefaultFlavor.BigEndian; }
+            set { DefaultFlavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock; }
+        }
+
+        /// <summary> The flavor this file reads and writes with. Initialized from
+        /// <see cref="DefaultFlavor"/>, or from the options given at construction. </summary>
+        /// <exception cref="ArgumentNullException"> value is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> value is a flavor without a root name;
+        /// use <see cref="NbtCodec"/> for those. </exception>
+        /// <exception cref="NotSupportedException"> value is a flavor that is not yet supported. </exception>
+        public NbtFlavor Flavor {
+            get { return flavor; }
+            set {
+                if (value == null) throw new ArgumentNullException(nameof(value));
+                value.EnsureUsableForFiles(nameof(value));
+                flavor = value;
+            }
+        }
+
+        NbtFlavor flavor;
 
         /// <summary> Whether this file should read/write tags in big-endian encoding format. </summary>
-        public bool BigEndian { get; set; }
+        [Obsolete("Use Flavor instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
+        public bool BigEndian {
+            get { return flavor.BigEndian; }
+            set { flavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock; }
+        }
+
+        // Validation and limit settings, fixed at construction (default options unless given)
+        readonly bool validateOnRead;
+        readonly bool validateOnWrite = true;
+        readonly long maxAllocation = long.MaxValue;
 
         /// <summary> Gets or sets the default value of <c>BufferSize</c> property. Default is 8192. 
         /// Set to 0 to disable buffering by default. </summary>
@@ -76,18 +123,55 @@ namespace fNbt {
 
         #region Constructors
 
-        // static constructor
-        static NbtFile() {
-            BigEndianByDefault = true;
+        /// <summary> Creates an empty NbtFile with the <see cref="DefaultFlavor"/> and default options.
+        /// RootTag will be set to an empty <c>NbtCompound</c> with a blank name (""). </summary>
+        public NbtFile() {
+            flavor = DefaultFlavor;
+            BufferSize = DefaultBufferSize;
+            rootTag = new NbtCompound("");
         }
 
 
-        /// <summary> Creates an empty NbtFile.
+        /// <summary> Creates an empty NbtFile with the given options.
         /// RootTag will be set to an empty <c>NbtCompound</c> with a blank name (""). </summary>
-        public NbtFile() {
-            BigEndian = BigEndianByDefault;
+        /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> The options' flavor has no root name;
+        /// use <see cref="NbtCodec"/> for those. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
+        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
+        public NbtFile(NbtOptions options) {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (options.Flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            if (options.MaxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
+            options.Flavor.EnsureUsableForFiles(nameof(options));
+            flavor = options.Flavor;
+            validateOnRead = options.ValidateOnRead;
+            validateOnWrite = options.ValidateOnWrite;
+            maxAllocation = options.MaxAllocation ?? long.MaxValue;
             BufferSize = DefaultBufferSize;
             rootTag = new NbtCompound("");
+        }
+
+
+        /// <summary> Creates a new NBT file with the given root tag and options. </summary>
+        /// <param name="rootTag"> Compound tag to set as the root tag. May not be <c>null</c>. </param>
+        /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="rootTag"/>, <paramref name="options"/>,
+        /// or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> If given <paramref name="rootTag"/> is unnamed;
+        /// or if the options' flavor has no root name. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
+        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
+        public NbtFile(NbtCompound rootTag, NbtOptions options)
+            : this(options) {
+            if (rootTag == null) throw new ArgumentNullException(nameof(rootTag));
+            RootTag = rootTag;
         }
 
 
@@ -418,9 +502,13 @@ namespace fNbt {
             if (firstByte != (int)NbtTagType.Compound) {
                 throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
             }
-            var reader = new NbtBinaryReader(stream, BigEndian) {
+            var reader = new NbtBinaryReader(stream, flavor.BigEndian) {
                 Selector = tagSelector
             };
+            NbtFlavor? readValidationFlavor = (validateOnRead && flavor.HasRestrictions) ? flavor : null;
+            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
+                reader.SetLimits(maxAllocation, readValidationFlavor);
+            }
 
             var rootCompound = new NbtCompound(reader.ReadString());
             rootCompound.ReadTag(reader);
@@ -554,6 +642,9 @@ namespace fNbt {
                 throw new NbtFormatException(
                     "Cannot save NbtFile: Root tag is not named. Its name may be an empty string, but not null.");
             }
+            if (validateOnWrite && flavor.HasRestrictions) {
+                flavor.ValidateTree(rootTag, 0);
+            }
 
             long startOffset = 0;
             if (stream.CanSeek) {
@@ -569,7 +660,7 @@ namespace fNbt {
                     int checksum;
                     using (var compressStream = new ZLibStream(stream, CompressionMode.Compress, true)) {
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, BigEndian));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian));
                         bufferedStream.Flush();
                         checksum = compressStream.Checksum;
                     }
@@ -585,13 +676,13 @@ namespace fNbt {
                     using (var compressStream = new GZipStream(stream, CompressionMode.Compress, true)) {
                         // use a buffered stream to avoid GZipping in small increments (which has a lot of overhead)
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, BigEndian));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian));
                         bufferedStream.Flush();
                     }
                     break;
 
                 case NbtCompression.None:
-                    var writer = new NbtBinaryWriter(stream, BigEndian);
+                    var writer = new NbtBinaryWriter(stream, flavor.BigEndian);
                     RootTag.WriteTag(writer);
                     break;
 
@@ -618,7 +709,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="IOException"> If an I/O error occurred while reading the file. </exception>
         public static string ReadRootTagName(string fileName) {
-            return ReadRootTagName(fileName, NbtCompression.AutoDetect, BigEndianByDefault, defaultBufferSize);
+            return ReadRootTagName(fileName, NbtCompression.AutoDetect, DefaultFlavor.BigEndian, defaultBufferSize);
         }
 
 

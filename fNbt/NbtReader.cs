@@ -17,13 +17,13 @@ namespace fNbt {
         readonly bool canSeekStream;
 
 
-        /// <summary> Initializes a new instance of the NbtReader class. </summary>
+        /// <summary> Initializes a new instance of the NbtReader class, with default options
+        /// (<see cref="NbtFlavor.Java"/>, no validation, no limits). </summary>
         /// <param name="stream"> Stream to read from. </param>
-        /// <remarks> Assumes that data in the stream is Big-Endian encoded. </remarks>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable. </exception>
         public NbtReader(Stream stream)
-            : this(stream, true) { }
+            : this(stream, NbtOptions.Default) { }
 
 
         /// <summary> Initializes a new instance of the NbtReader class. </summary>
@@ -31,8 +31,51 @@ namespace fNbt {
         /// <param name="bigEndian"> Whether NBT data is in Big-Endian encoding. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable. </exception>
-        public NbtReader(Stream stream, bool bigEndian) {
+        [Obsolete("Use NbtReader(Stream, NbtFlavor) instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
+        public NbtReader(Stream stream, bool bigEndian)
+            : this(stream, bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock) { }
+
+
+        /// <summary> Initializes a new instance of the NbtReader class for the given flavor,
+        /// with otherwise-default options. </summary>
+        /// <param name="stream"> Stream to read from. </param>
+        /// <param name="flavor"> Encoding to read with. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
+        /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
+        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
+        public NbtReader(Stream stream, NbtFlavor flavor)
+            : this(stream, MakeOptions(flavor)) { }
+
+
+        static NbtOptions MakeOptions(NbtFlavor flavor) {
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            return new NbtOptions { Flavor = flavor };
+        }
+
+
+        /// <summary> Initializes a new instance of the NbtReader class with the given options.
+        /// When read validation is on, the flavor's tag-type range and string ceiling are enforced;
+        /// <c>MaxAllocation</c> caps declared-length allocations either way. </summary>
+        /// <param name="stream"> Stream to read from. </param>
+        /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="options"/>,
+        /// or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
+        /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
+        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
+        public NbtReader(Stream stream, NbtOptions options) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (options.Flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            if (options.MaxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
+            options.Flavor.EnsureUsableForFiles(nameof(options));
             SkipEndTags = true;
             CacheTagValues = false;
             ParentTagType = NbtTagType.Unknown;
@@ -43,7 +86,13 @@ namespace fNbt {
                 streamStartOffset = stream.Position;
             }
 
-            reader = new NbtBinaryReader(stream, bigEndian);
+            reader = new NbtBinaryReader(stream, options.Flavor.BigEndian);
+            long maxAllocation = options.MaxAllocation ?? long.MaxValue;
+            NbtFlavor? readValidationFlavor =
+                (options.ValidateOnRead && options.Flavor.HasRestrictions) ? options.Flavor : null;
+            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
+                reader.SetLimits(maxAllocation, readValidationFlavor);
+            }
         }
 
 

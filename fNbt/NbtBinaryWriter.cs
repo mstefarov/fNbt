@@ -38,7 +38,15 @@ namespace fNbt {
 
         readonly bool useVarInt;
 
+        // Lowered by NbtWriter when write validation is on for a flavor with a smaller ceiling
+        int maxStringBytes = ushort.MaxValue;
+
         int depth;
+
+
+        internal void SetMaxStringBytes(int value) {
+            maxStringBytes = Math.Min(ushort.MaxValue, value);
+        }
 
 
         // Writing a tag tree is recursive. Check for ridiculously nested tags before the stack runs out.
@@ -203,10 +211,11 @@ namespace fNbt {
                 WriteUnsignedVarInt32((uint)numBytes);
             } else {
                 // The length prefix is an unsigned 16-bit byte count.
-                // Refuse anything past 65,535 bytes to avoid corrupting the stream.
-                if (numBytes > ushort.MaxValue) {
+                // Refuse anything past the ceiling to avoid corrupting the stream.
+                if (numBytes > maxStringBytes) {
                     throw new NbtFormatException(
-                        "String is too long to write: " + numBytes + " bytes (maximum is 65535).");
+                        "String is too long to write: " + numBytes + " bytes (maximum is " +
+                        maxStringBytes + ").");
                 }
                 Write((short)numBytes);
             }

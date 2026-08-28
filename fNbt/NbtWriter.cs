@@ -11,6 +11,9 @@ namespace fNbt {
         const int MaxStreamCopyBufferSize = 8 * 1024;
 
         readonly NbtBinaryWriter writer;
+        readonly NbtFlavor flavor;
+        // Lowered from LongArray only when write validation is on for a restricting flavor
+        readonly NbtTagType maxTagType = NbtTagType.LongArray;
         NbtTagType listType;
         NbtTagType parentType;
         int listIndex;
@@ -18,14 +21,14 @@ namespace fNbt {
         Stack<NbtWriterNode>? nodes;
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class. </summary>
+        /// <summary> Initializes a new instance of the NbtWriter class, with default options
+        /// (<see cref="NbtFlavor.Java"/>, validation on write). </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
-        /// <remarks> Assumes that data in the stream should be Big-Endian encoded. </remarks>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="rootTagName"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable. </exception>
         public NbtWriter(Stream stream, string rootTagName)
-            : this(stream, rootTagName, true) { }
+            : this(stream, rootTagName, NbtOptions.Default) { }
 
 
         /// <summary> Initializes a new instance of the NbtWriter class. </summary>
@@ -34,9 +37,55 @@ namespace fNbt {
         /// <param name="bigEndian"> Whether NBT data should be in Big-Endian encoding. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="rootTagName"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable. </exception>
-        public NbtWriter(Stream stream, string rootTagName, bool bigEndian) {
+        [Obsolete("Use NbtWriter(Stream, string, NbtFlavor) instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
+        public NbtWriter(Stream stream, string rootTagName, bool bigEndian)
+            : this(stream, rootTagName, bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock) { }
+
+
+        /// <summary> Initializes a new instance of the NbtWriter class for the given flavor,
+        /// with otherwise-default options. </summary>
+        /// <param name="stream"> Stream to write to. </param>
+        /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
+        /// <param name="flavor"> Encoding to write with. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="rootTagName"/>,
+        /// or <paramref name="flavor"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
+        /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
+        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
+        public NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor)
+            : this(stream, rootTagName, MakeOptions(flavor)) { }
+
+
+        static NbtOptions MakeOptions(NbtFlavor flavor) {
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            return new NbtOptions { Flavor = flavor };
+        }
+
+
+        /// <summary> Initializes a new instance of the NbtWriter class with the given options.
+        /// When write validation is on, the flavor's tag-type range and string ceiling are
+        /// enforced as tags are written. </summary>
+        /// <param name="stream"> Stream to write to. </param>
+        /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
+        /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="rootTagName"/>,
+        /// <paramref name="options"/>, or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
+        /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
+        /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
+        public NbtWriter(Stream stream, string rootTagName, NbtOptions options) {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
-            writer = new NbtBinaryWriter(stream, bigEndian);
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (options.Flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            options.Flavor.EnsureUsableForFiles(nameof(options));
+            flavor = options.Flavor;
+            writer = new NbtBinaryWriter(stream, flavor.BigEndian);
+            if (options.ValidateOnWrite && flavor.HasRestrictions) {
+                maxTagType = flavor.MaxTagType;
+                writer.SetMaxStringBytes(flavor.MaxStringBytes);
+            }
             writer.Write((byte)NbtTagType.Compound);
             writer.Write(rootTagName);
             parentType = NbtTagType.Compound;
@@ -672,6 +721,10 @@ namespace fNbt {
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             EnforceConstraints(tag.Name, tag.TagType);
+            if (maxTagType < NbtTagType.LongArray) {
+                // Only the subtree needs the pre-walk; per-call writes are checked inline
+                flavor.ValidateTree(tag, 0);
+            }
             if (tag.Name != null) {
                 tag.WriteTag(writer);
             } else {
@@ -730,6 +783,10 @@ namespace fNbt {
         void EnforceConstraints(string? name, NbtTagType desiredType) {
             if (IsDone) {
                 throw new NbtFormatException("Cannot write any more tags: root tag has been closed.");
+            }
+            if (desiredType > maxTagType) {
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName(desiredType) + " is not permitted by the " + flavor.Name + " flavor.");
             }
             if (parentType == NbtTagType.List) {
                 if (name != null) {

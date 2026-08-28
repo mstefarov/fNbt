@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Threading;
 
 namespace fNbt {
@@ -92,6 +93,62 @@ namespace fNbt {
         // Flavors without restrictions skip validation entirely.
         internal bool HasRestrictions {
             get { return MaxTagType < NbtTagType.LongArray || MaxStringBytes < ushort.MaxValue; }
+        }
+
+
+        // Guards for the named-root APIs (NbtFile, NbtReader, NbtWriter), which cannot express
+        // unnamed-root flavors. NbtCodec does its own varint check and permits JavaNetwork.
+        internal void EnsureUsableForFiles(string paramName) {
+            if (UsesVarInts) {
+                throw new NotSupportedException("The " + Name + " flavor is not supported yet.");
+            }
+            if (!HasRootName) {
+                throw new ArgumentException(
+                    "The " + Name + " flavor has no root name; use NbtCodec to read and write it.", paramName);
+            }
+        }
+
+
+        // Conformance pre-walk for write validation, run only for flavors with restrictions:
+        // every tag type within the flavor's range, every name and string value within its ceiling.
+        internal void ValidateTree(NbtTag tag, int depth) {
+            if (depth >= NbtTag.MaxDepth) {
+                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+            }
+            if (tag.TagType > MaxTagType) {
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName(tag.TagType) + " is not permitted by the " + Name + " flavor.");
+            }
+            if (tag.Name != null) {
+                ValidateString(tag.Name);
+            }
+            switch (tag.TagType) {
+                case NbtTagType.String:
+                    ValidateString(((NbtString)tag).Value);
+                    break;
+                case NbtTagType.Compound:
+                    foreach (NbtTag child in (NbtCompound)tag) {
+                        ValidateTree(child, depth + 1);
+                    }
+                    break;
+                case NbtTagType.List:
+                    foreach (NbtTag child in (NbtList)tag) {
+                        ValidateTree(child, depth + 1);
+                    }
+                    break;
+            }
+        }
+
+
+        internal void ValidateString(string value) {
+            // UTF-8 needs at most 4 bytes per char, so short strings skip the exact count
+            if ((long)value.Length * 4 <= MaxStringBytes) return;
+            int byteCount = Encoding.UTF8.GetByteCount(value);
+            if (byteCount > MaxStringBytes) {
+                throw new NbtFormatException(
+                    "String is " + byteCount + " bytes, but the " + Name +
+                    " flavor allows at most " + MaxStringBytes + ".");
+            }
         }
 
 

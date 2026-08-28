@@ -15,7 +15,15 @@
     tag types and string lengths the flavor's own readers reject (for example
     TAG_Int_Array or 300-byte strings under ClassiCube); opt-in for reads,
     which stay generous by default. Flavors now expose MaxTagType,
-    MaxStringBytes, and DefaultCompression.
+    MaxStringBytes, and DefaultCompression. Note: little-endian files that
+    Bedrock cannot actually read (for example ones holding TAG_Long_Array)
+    now fail to save under the Bedrock flavor; pass ValidateOnWrite = false
+    to keep writing them.
+- NbtFile, NbtReader, and NbtWriter now take NbtFlavor or NbtOptions.
+    NbtFile gains a Flavor property and a static DefaultFlavor; BigEndian,
+    BigEndianByDefault, and the bool reader/writer constructors still work,
+    mapping true to the Java flavor and false to Bedrock, and are marked
+    obsolete.
 - Add NbtOptions.MaxAllocation: an opt-in cap, in bytes, on any single
     allocation driven by a length declared in the input. Guards against tiny
     corrupt documents declaring huge arrays, which matters most on compressed

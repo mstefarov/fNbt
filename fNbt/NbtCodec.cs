@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Text;
 
 namespace fNbt {
     /// <summary> Reads and writes single NBT documents ("blobs") with a fixed set of
@@ -231,7 +230,7 @@ namespace fNbt {
                     NbtTag.GetCanonicalTagName(tag.TagType));
             }
             if (validateOnWrite) {
-                ValidateForWrite(tag, 0);
+                flavor.ValidateTree(tag, 0);
             }
             var writer = new NbtBinaryWriter(stream, flavor.BigEndian);
             writer.Write(tag.TagType);
@@ -329,49 +328,6 @@ namespace fNbt {
                     throw new NbtFormatException("Absent document (a lone TAG_End byte) in a concatenated stream.");
                 }
                 yield return tag;
-            }
-        }
-
-
-        // Conformance pre-walk, run only for flavors with restrictions: every tag type must be
-        // within the flavor's range, and every name and string value within its byte ceiling.
-        void ValidateForWrite(NbtTag tag, int depth) {
-            if (depth >= NbtTag.MaxDepth) {
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
-            }
-            if (tag.TagType > flavor.MaxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(tag.TagType) + " is not permitted by the " + flavor.Name + " flavor.");
-            }
-            if (tag.Name != null) {
-                ValidateStringFits(tag.Name);
-            }
-            switch (tag.TagType) {
-                case NbtTagType.String:
-                    ValidateStringFits(((NbtString)tag).Value);
-                    break;
-                case NbtTagType.Compound:
-                    foreach (NbtTag child in (NbtCompound)tag) {
-                        ValidateForWrite(child, depth + 1);
-                    }
-                    break;
-                case NbtTagType.List:
-                    foreach (NbtTag child in (NbtList)tag) {
-                        ValidateForWrite(child, depth + 1);
-                    }
-                    break;
-            }
-        }
-
-
-        void ValidateStringFits(string value) {
-            // UTF-8 needs at most 4 bytes per char, so short strings skip the exact count
-            if ((long)value.Length * 4 <= flavor.MaxStringBytes) return;
-            int byteCount = Encoding.UTF8.GetByteCount(value);
-            if (byteCount > flavor.MaxStringBytes) {
-                throw new NbtFormatException(
-                    "String is " + byteCount + " bytes, but the " + flavor.Name +
-                    " flavor allows at most " + flavor.MaxStringBytes + ".");
             }
         }
 
