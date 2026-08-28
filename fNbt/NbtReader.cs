@@ -71,6 +71,7 @@ namespace fNbt {
 
         NbtReader(Stream stream, NbtFlavor flavor, bool validateOnRead, long? maxAllocationOption) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
+            Flavor = flavor;
             SkipEndTags = true;
             CacheTagValues = false;
             ParentTagType = NbtTagType.Unknown;
@@ -90,6 +91,9 @@ namespace fNbt {
             }
         }
 
+
+        /// <summary> The flavor this reader decodes with, fixed at construction. </summary>
+        public NbtFlavor Flavor { get; }
 
         /// <summary> Gets the name of the root tag of this NBT stream. </summary>
         public string? RootName { get; private set; }

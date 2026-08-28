@@ -5,14 +5,8 @@ namespace fNbt {
     /// Every consumer snapshots the values at its own construction, so changing an options
     /// instance later does not affect objects already created from it. </summary>
     public sealed class NbtOptions {
-        /// <summary> Returns a new options instance with default settings:
+        /// <summary> Creates options with default settings:
         /// <see cref="NbtFlavor.Java"/>, validation on write only, no allocation limit. </summary>
-        public static NbtOptions Default {
-            get { return new NbtOptions(); }
-        }
-
-
-        /// <summary> Creates options with default settings. </summary>
         public NbtOptions() { }
 
 

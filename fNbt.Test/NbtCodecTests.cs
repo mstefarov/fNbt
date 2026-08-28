@@ -19,16 +19,11 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void OptionsDefaultsAreCorrect() {
-            NbtOptions options = NbtOptions.Default;
+            var options = new NbtOptions();
             Assert.AreSame(NbtFlavor.Java, options.Flavor);
             Assert.IsFalse(options.ValidateOnRead);
             Assert.IsTrue(options.ValidateOnWrite);
             Assert.IsNull(options.MaxAllocation);
-
-            // A fresh instance matches the Default singleton
-            var custom = new NbtOptions();
-            Assert.AreSame(NbtFlavor.Java, custom.Flavor);
-            Assert.IsTrue(custom.ValidateOnWrite);
 
             // The flavor constructor keeps every other default
             var flavored = new NbtOptions(NbtFlavor.Bedrock);
@@ -195,9 +190,6 @@ namespace fNbt.Test {
             // The codec keeps ClassiCube rules despite the later mutation
             var over = new NbtCompound("r") { new NbtString("s", new string('x', 300)) };
             Assert.Throws<NbtFormatException>(() => codec.WriteTag(over));
-
-            // Default returns a fresh instance every time
-            Assert.AreNotSame(NbtOptions.Default, NbtOptions.Default);
         }
 
 

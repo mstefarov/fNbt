@@ -95,6 +95,11 @@ namespace fNbt {
         }
 
 
+        /// <summary> The flavor this writer encodes with, fixed at construction. </summary>
+        public NbtFlavor Flavor {
+            get { return flavor; }
+        }
+
         /// <summary> Gets whether the root tag has been closed.
         /// No more tags may be written after the root tag has been closed. </summary>
         public bool IsDone { get; private set; }

@@ -149,6 +149,8 @@ namespace fNbt.Test {
         }
 
 
+#if NETFRAMEWORK
+        // The internal ZLibStream only exists in the netstandard2.0 build; net6+ uses the framework's
         [TestMethod]
         public void ZLibStreamChecksumCountsSingleByteAccess() {
             // The internal stream's ReadByte/WriteByte must feed the Adler-32 exactly once per
@@ -197,6 +199,7 @@ namespace fNbt.Test {
                 Assert.AreEqual(1, z.Checksum);
             }
         }
+#endif
 
 
         [TestMethod]

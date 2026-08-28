@@ -87,6 +87,19 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void EntryPointsExposeTheirFlavor() {
+            Assert.AreSame(NbtFlavor.Bedrock, NbtCodec.For(NbtFlavor.Bedrock).Flavor);
+            using (var ms = new MemoryStream(new byte[] { 0x0A })) {
+                Assert.AreSame(NbtFlavor.Bedrock, new NbtReader(ms, NbtFlavor.Bedrock).Flavor);
+            }
+            using (var ms = new MemoryStream()) {
+                Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r", NbtFlavor.Bedrock).Flavor);
+                Assert.AreSame(NbtFlavor.Java, new NbtWriter(ms, "r").Flavor);
+            }
+        }
+
+
+        [TestMethod]
         public void ReadRootTagNameWorksOnEveryFileFlavor() {
             NbtFlavor[] flavors = {
                 NbtFlavor.Java, NbtFlavor.JavaAnvil, NbtFlavor.JavaLegacy,

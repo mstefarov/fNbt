@@ -24,6 +24,11 @@ namespace fNbt {
             return flavor.DefaultCodec;
         }
 
+        /// <summary> The flavor this codec reads and writes, fixed at construction. </summary>
+        public NbtFlavor Flavor {
+            get { return flavor; }
+        }
+
         readonly NbtFlavor flavor;
         readonly long maxAllocation;
         readonly bool validateOnWrite;

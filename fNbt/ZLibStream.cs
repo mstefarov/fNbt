@@ -1,3 +1,4 @@
+#if !NET6_0_OR_GREATER
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -5,7 +6,8 @@ using System.IO.Compression;
 namespace fNbt {
     /// <summary> DeflateStream wrapper that calculates the Adler32 checksum of the data passing
     /// through it, in either direction, to support the ZLib container (RFC-1950): writing the
-    /// trailer when compressing, and validating it when decompressing on netstandard2.0. </summary>
+    /// trailer when compressing, and validating it when decompressing. net6+ builds use the
+    /// framework's System.IO.Compression.ZLibStream in both directions instead. </summary>
     internal sealed class ZLibStream : DeflateStream {
         uint adler32A = 1,
              adler32B;
@@ -85,3 +87,4 @@ namespace fNbt {
         }
     }
 }
+#endif

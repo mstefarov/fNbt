@@ -27,7 +27,8 @@
     single allocation that a declared length asks for, so a tiny corrupt
     document cannot demand a huge array.
 - NbtFile gains a Flavor property and a static DefaultFlavor, and
-    ReadRootTagName gains NbtFlavor overloads. BigEndian, BigEndianByDefault,
+    ReadRootTagName gains NbtFlavor overloads. NbtReader, NbtWriter, and
+    NbtCodec expose a read-only Flavor. BigEndian, BigEndianByDefault,
     the bool reader/writer constructors, and the bigEndian ReadRootTagName
     overloads still work, map true to the Java flavor and false to Bedrock,
     and are now obsolete. Setting BigEndian to a value that matches the
