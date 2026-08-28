@@ -715,7 +715,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads the root name from the given NBT file. </summary>
+        /// <summary> Reads the root name from the given NBT file.
+        /// Root names longer than 65,535 bytes fail with NbtFormatException. </summary>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <param name="compression"> Format in which the given file is compressed. </param>
         /// <param name="flavor"> Encoding to read with. </param>
@@ -743,7 +744,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads the root name from the given stream of NBT data. </summary>
+        /// <summary> Reads the root name from the given stream of NBT data.
+        /// Root names longer than 65,535 bytes fail with NbtFormatException. </summary>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading this stream. </param>
         /// <param name="flavor"> Encoding to read with. </param>
@@ -850,7 +852,9 @@ namespace fNbt {
                 throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
             }
             var reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
-
+            // No options reach this API, so bound the name by the largest file-flavor ceiling.
+            // Otherwise a varint prefix could demand an arbitrarily large allocation.
+            reader.SetLimits(ushort.MaxValue, null);
             return reader.ReadString();
         }
 

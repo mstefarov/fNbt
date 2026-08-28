@@ -122,5 +122,33 @@ namespace fNbt.Test {
             file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None, tag => false);
             Assert.AreEqual(0, file.RootTag.Count);
         }
+
+
+        [TestMethod]
+        public void SkippedStringsRespectFlavorCeilingButNotMaxAllocation() {
+            // A 300-byte string, valid under Java rules
+            var root = new NbtCompound("r") {
+                new NbtString("s", new string('x', 300)),
+                new NbtShort("k", 5)
+            };
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
+
+            // Read validation enforces the flavor's own ceiling on skipped strings too:
+            // conformance is about the document, not about whether the value was kept
+            var strict = new NbtFile(new NbtOptions { Flavor = NbtFlavor.ClassiCube, ValidateOnRead = true });
+            Assert.Throws<NbtFormatException>(
+                () => strict.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "s"));
+
+            // MaxAllocation does not apply to skips, which allocate nothing
+            var capped = new NbtFile(new NbtOptions { MaxAllocation = 100 });
+            capped.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "s");
+            Assert.IsFalse(capped.RootTag.Contains("s"));
+            Assert.AreEqual((short)5, capped.RootTag["k"].ShortValue);
+
+            // Reading the same string with that cap still throws
+            var cappedRead = new NbtFile(new NbtOptions { MaxAllocation = 100 });
+            Assert.Throws<NbtFormatException>(
+                () => cappedRead.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+        }
     }
 }

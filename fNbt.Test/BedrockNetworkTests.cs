@@ -248,6 +248,15 @@ namespace fNbt.Test {
             };
             Assert.Throws<EndOfStreamException>(
                 () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _));
+
+            // A length past int.MaxValue is a format error, not an OverflowException
+            byte[] overflow = {
+                0x0A, 0x00,
+                0x08, 0x01, (byte)'s', 0xFF, 0xFF, 0xFF, 0xFF, 0x0F,
+                0x00
+            };
+            Assert.Throws<NbtFormatException>(
+                () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(overflow, 0, overflow.Length, out _));
         }
 
 

@@ -176,10 +176,40 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CleanStringsAreByteIdenticalToBefore() {
-            // ASCII and BMP text never leaves the old encoding path
-            byte[] doc = StringDoc(NbtFlavor.Java, "Hello, Мир! ┌─┐");
-            byte[] expected = new UTF8EncodingCheck().GetBytes("Hello, Мир! ┌─┐");
+            // ASCII and BMP text ("Hello, Mir!" in Cyrillic plus box-drawing characters)
+            // never leaves the old encoding path
+            const string cleanBmp = "Hello, \u041C\u0438\u0440! \u250C\u2500\u2510";
+            byte[] doc = StringDoc(NbtFlavor.Java, cleanBmp);
+            byte[] expected = new UTF8EncodingCheck().GetBytes(cleanBmp);
             CollectionAssert.AreEqual(expected, StringPayload(doc, true));
+        }
+
+
+        [TestMethod]
+        public void LenientDecodeHandlesAstralSequences() {
+            // The overlong NUL forces the lenient path; the standard 4-byte astral sequence
+            // must decode to a surrogate pair alongside it
+            byte[] bytes = { 0xC0, 0x80, 0xF0, 0x9F, 0x98, 0x80 };
+            Assert.AreEqual("\0" + Emoji, NbtStringCodec.Decode(bytes, 0, bytes.Length));
+        }
+
+
+        [TestMethod]
+        public void LenientDecodeRejectsMalformedData() {
+            // The overlong NUL forces the lenient path; each tail is invalid there
+            byte[][] cases = {
+                new byte[] { 0xC0, 0x80, 0xF8 },                   // 5-byte sequence lead
+                new byte[] { 0xC0, 0x80, 0xFF },                   // invalid lead byte
+                new byte[] { 0xC0, 0x80, 0xF0, 0x80, 0x80, 0x80 }, // overlong 4-byte sequence
+                new byte[] { 0xC0, 0x80, 0xF4, 0x90, 0x80, 0x80 }, // above U+10FFFF
+                new byte[] { 0xC0, 0x80, 0xF0, 0x9F, 0x98 },       // truncated 4-byte sequence
+                new byte[] { 0xC0, 0x80, 0xF0, 0x9F, 0x28, 0x80 }, // broken continuation byte
+            };
+            foreach (byte[] data in cases) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtStringCodec.Decode(data, 0, data.Length),
+                    BitConverter.ToString(data));
+            }
         }
 
 

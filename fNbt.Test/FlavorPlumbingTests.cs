@@ -87,6 +87,43 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ReadRootTagNameWorksOnEveryFileFlavor() {
+            NbtFlavor[] flavors = {
+                NbtFlavor.Java, NbtFlavor.JavaAnvil, NbtFlavor.JavaLegacy,
+                NbtFlavor.Bedrock, NbtFlavor.BedrockNetwork, NbtFlavor.ClassiCube
+            };
+            foreach (NbtFlavor flavor in flavors) {
+                byte[] doc = new NbtFile(new NbtCompound("rootName")) { Flavor = flavor }
+                    .SaveToBuffer(NbtCompression.None);
+                using (var ms = new MemoryStream(doc)) {
+                    Assert.AreEqual("rootName",
+                                    NbtFile.ReadRootTagName(ms, NbtCompression.None, flavor),
+                                    flavor.Name);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void ReadRootTagNameBoundsHostileNameLengths() {
+            // A 5-byte document declaring a 256 MB root name must fail with a format error,
+            // not attempt the allocation
+            byte[] doc = { 0x0A, 0xFF, 0xFF, 0xFF, 0x7F };
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
+            }
+
+            // Same for a length past int.MaxValue, which must not surface as an overflow
+            byte[] overflow = { 0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F };
+            using (var ms = new MemoryStream(overflow)) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
+            }
+        }
+
+
+        [TestMethod]
         public void ReadRootTagNameTakesFlavor() {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] doc = new NbtFile(root) { Flavor = NbtFlavor.Bedrock }.SaveToBuffer(NbtCompression.None);

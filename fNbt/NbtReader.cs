@@ -957,6 +957,8 @@ namespace fNbt {
             if (target == typeof(short) || target == typeof(ushort) || target == typeof(char)) return 2;
             if (target == typeof(int) || target == typeof(uint) || target == typeof(float)) return 4;
             if (target == typeof(long) || target == typeof(ulong) || target == typeof(double)) return 8;
+            // Array slots for reference types like string hold pointers
+            if (!target.IsValueType) return IntPtr.Size;
             return MinElementSize(wireType, false);
         }
 

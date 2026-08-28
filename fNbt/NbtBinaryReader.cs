@@ -16,9 +16,12 @@ namespace fNbt {
         int depth;
 
         // Opt-in limits, set once by NbtCodec before parsing. Defaults keep every check a
-        // single always-false comparison.
+        // single always-false comparison. maxStringBytes folds MaxAllocation in and guards
+        // reads, which allocate; skips allocate nothing, so they enforce only the flavor's
+        // own ceiling via flavorMaxStringBytes.
         long maxAllocation = long.MaxValue;
         int maxStringBytes = int.MaxValue;
+        int flavorMaxStringBytes = int.MaxValue;
         NbtTagType maxTagType = NbtTagType.LongArray;
         string? tagTypeLimitSource;
 
@@ -28,7 +31,8 @@ namespace fNbt {
             maxStringBytes = (int)Math.Min(int.MaxValue, newMaxAllocation);
             if (readValidationFlavor != null) {
                 maxTagType = readValidationFlavor.MaxTagType;
-                maxStringBytes = Math.Min(maxStringBytes, readValidationFlavor.MaxStringBytes);
+                flavorMaxStringBytes = readValidationFlavor.MaxStringBytes;
+                maxStringBytes = Math.Min(maxStringBytes, flavorMaxStringBytes);
                 tagTypeLimitSource = readValidationFlavor.Name;
             }
         }
@@ -175,15 +179,22 @@ namespace fNbt {
         }
 
 
-        public override string ReadString() {
-            // The prefix is an unsigned 16-bit byte count in Java (valid up to length 65,535),
-            // and an unsigned varint in BedrockNetwork.
-            int length = useVarInt ? checked((int)ReadUnsignedVarInt32()) : (ushort)ReadInt16();
-            if (length > maxStringBytes) {
+        // The prefix is an unsigned 16-bit byte count in Java (valid up to 65,535 bytes), and
+        // an unsigned varint in BedrockNetwork. Comparing as uint also rejects varint lengths
+        // past int.MaxValue with a format error instead of an overflow.
+        int ReadStringLength(int limit) {
+            uint length = useVarInt ? ReadUnsignedVarInt32() : (ushort)ReadInt16();
+            if (length > (uint)limit) {
                 throw new NbtFormatException(
                     "Declared string length (" + length + " bytes) exceeds the configured limit (" +
-                    maxStringBytes + " bytes).");
+                    limit + " bytes).");
             }
+            return (int)length;
+        }
+
+
+        public override string ReadString() {
+            int length = ReadStringLength(maxStringBytes);
             if (length < stringConversionBuffer.Length) {
                 int stringBytesRead = 0;
                 while (stringBytesRead < length) {
@@ -289,8 +300,7 @@ namespace fNbt {
 
 
         public void SkipString() {
-            int length = useVarInt ? checked((int)ReadUnsignedVarInt32()) : (ushort)ReadInt16();
-            Skip(length);
+            Skip(ReadStringLength(flavorMaxStringBytes));
         }
 
 

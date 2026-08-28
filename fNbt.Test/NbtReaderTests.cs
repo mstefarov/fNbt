@@ -643,6 +643,52 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void MaxAllocationCapsListAsArrayReads() {
+            byte[] doc;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r");
+                writer.BeginList("longs", NbtTagType.Long, 1000);
+                for (int i = 0; i < 1000; i++) {
+                    writer.WriteLong(i);
+                }
+                writer.EndList();
+                writer.BeginList("strings", NbtTagType.String, 2000);
+                for (int i = 0; i < 2000; i++) {
+                    writer.WriteString("");
+                }
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+                doc = ms.ToArray();
+            }
+
+            // 1,000 longs need an 8,000-byte array
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, new NbtOptions { MaxAllocation = 1024 });
+                Assert.IsTrue(reader.ReadToFollowing("longs"));
+                Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<long>());
+            }
+
+            // 2,000 empty strings are only 4,000 payload bytes, but the result array alone
+            // holds 2,000 references, which the estimate must count at pointer size
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, new NbtOptions { MaxAllocation = 4096 });
+                Assert.IsTrue(reader.ReadToFollowing("strings"));
+                Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<string>());
+            }
+
+            // With room to spare, both read fine
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, new NbtOptions { MaxAllocation = 64 * 1024 });
+                Assert.IsTrue(reader.ReadToFollowing("longs"));
+                Assert.AreEqual(1000, reader.ReadListAsArray<long>().Length);
+                Assert.IsTrue(reader.ReadToFollowing("strings"));
+                Assert.AreEqual(2000, reader.ReadListAsArray<string>().Length);
+            }
+        }
+
+
+        [TestMethod]
         public void NonSeekableStreamSkip1() {
             byte[] fileBytes = File.ReadAllBytes(TestFiles.Big);
             using (var ms = new MemoryStream(fileBytes)) {
