@@ -21,9 +21,11 @@
 - Add NbtOptions, a settings object that NbtFile, NbtReader, NbtWriter,
     and NbtCodec all accept and snapshot at construction, so later changes
     to an options instance do not affect objects already created from it.
-    It carries the flavor, two validation toggles, and the opt-in
-    MaxAllocation limit, which caps any single allocation that a declared
-    length asks for, so a tiny corrupt document cannot demand a huge array.
+    It can be created for a flavor directly, e.g.
+    new NbtOptions(NbtFlavor.Bedrock), and carries the flavor, two
+    validation toggles, and the opt-in MaxAllocation limit, which caps any
+    single allocation that a declared length asks for, so a tiny corrupt
+    document cannot demand a huge array.
 - NbtFile gains a Flavor property and a static DefaultFlavor, and
     ReadRootTagName gains NbtFlavor overloads. BigEndian, BigEndianByDefault,
     the bool reader/writer constructors, and the bigEndian ReadRootTagName

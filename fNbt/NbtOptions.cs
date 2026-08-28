@@ -11,6 +11,19 @@ namespace fNbt {
             get { return new NbtOptions(); }
         }
 
+
+        /// <summary> Creates options with default settings. </summary>
+        public NbtOptions() { }
+
+
+        /// <summary> Creates options for the given flavor, with otherwise-default settings. </summary>
+        /// <param name="flavor"> The wire encoding to read and write. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
+        public NbtOptions(NbtFlavor flavor) {
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            Flavor = flavor;
+        }
+
         /// <summary> The wire encoding to read and write. Defaults to <see cref="NbtFlavor.Java"/>. </summary>
         public NbtFlavor Flavor { get; set; } = NbtFlavor.Java;
 

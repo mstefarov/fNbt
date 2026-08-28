@@ -24,10 +24,6 @@ namespace fNbt {
             return flavor.DefaultCodec;
         }
 
-        /// <summary> A snapshot of the settings this codec was created with. Changing the options
-        /// instance given to the constructor does not affect this codec or this snapshot. </summary>
-        public NbtOptions Options { get; }
-
         readonly NbtFlavor flavor;
         readonly long maxAllocation;
         readonly bool validateOnWrite;
@@ -40,13 +36,7 @@ namespace fNbt {
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtFlavor flavor)
-            : this(MakeOptions(flavor)) { }
-
-
-        static NbtOptions MakeOptions(NbtFlavor flavor) {
-            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
-            return new NbtOptions { Flavor = flavor };
-        }
+            : this(new NbtOptions(flavor)) { }
 
 
         /// <summary> Creates a codec with the given options. </summary>
@@ -55,21 +45,10 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtCodec(NbtOptions options) {
-            // Options exposes the snapshot, not the caller's instance
-            NbtFlavor snapshotFlavor = NbtOptions.SnapshotFlavor(options);
-            bool validateOnRead = options.ValidateOnRead;
-            bool snapshotValidateOnWrite = options.ValidateOnWrite;
-            long? snapshotMaxAllocation = NbtOptions.SnapshotMaxAllocation(options);
-            Options = new NbtOptions {
-                Flavor = snapshotFlavor,
-                ValidateOnRead = validateOnRead,
-                ValidateOnWrite = snapshotValidateOnWrite,
-                MaxAllocation = snapshotMaxAllocation
-            };
-            flavor = snapshotFlavor;
-            maxAllocation = snapshotMaxAllocation ?? long.MaxValue;
-            validateOnWrite = snapshotValidateOnWrite && flavor.HasRestrictions;
-            readValidationFlavor = (validateOnRead && flavor.HasRestrictions) ? flavor : null;
+            flavor = NbtOptions.SnapshotFlavor(options);
+            maxAllocation = NbtOptions.SnapshotMaxAllocation(options) ?? long.MaxValue;
+            validateOnWrite = options.ValidateOnWrite && flavor.HasRestrictions;
+            readValidationFlavor = (options.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
         }
 
 

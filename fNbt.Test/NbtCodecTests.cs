@@ -29,6 +29,14 @@ namespace fNbt.Test {
             var custom = new NbtOptions();
             Assert.AreSame(NbtFlavor.Java, custom.Flavor);
             Assert.IsTrue(custom.ValidateOnWrite);
+
+            // The flavor constructor keeps every other default
+            var flavored = new NbtOptions(NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, flavored.Flavor);
+            Assert.IsFalse(flavored.ValidateOnRead);
+            Assert.IsTrue(flavored.ValidateOnWrite);
+            Assert.IsNull(flavored.MaxAllocation);
+            Assert.Throws<ArgumentNullException>(() => new NbtOptions(null));
         }
 
 
@@ -179,16 +187,14 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void OptionsAreSnapshottedAtConstruction() {
-            var options = new NbtOptions { Flavor = NbtFlavor.ClassiCube };
+            var options = new NbtOptions(NbtFlavor.ClassiCube);
             var codec = new NbtCodec(options);
             options.Flavor = NbtFlavor.Java;
             options.ValidateOnWrite = false;
 
-            // The codec keeps ClassiCube rules and reports the snapshot
+            // The codec keeps ClassiCube rules despite the later mutation
             var over = new NbtCompound("r") { new NbtString("s", new string('x', 300)) };
             Assert.Throws<NbtFormatException>(() => codec.WriteTag(over));
-            Assert.AreSame(NbtFlavor.ClassiCube, codec.Options.Flavor);
-            Assert.IsTrue(codec.Options.ValidateOnWrite);
 
             // Default returns a fresh instance every time
             Assert.AreNotSame(NbtOptions.Default, NbtOptions.Default);
