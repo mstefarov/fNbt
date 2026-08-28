@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 
 namespace fNbt.Test {
@@ -179,6 +180,74 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = 0 }));
             Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = -5 }));
             Assert.Throws<NotSupportedException>(() => new NbtCodec(NbtFlavor.BedrockNetwork));
+        }
+
+
+        [TestMethod]
+        public void OptionsAreSnapshottedAtConstruction() {
+            var options = new NbtOptions { Flavor = NbtFlavor.ClassiCube };
+            var codec = new NbtCodec(options);
+            options.Flavor = NbtFlavor.Java;
+            options.ValidateOnWrite = false;
+
+            // The codec keeps ClassiCube rules and reports the snapshot
+            var over = new NbtCompound("r") { new NbtString("s", new string('x', 300)) };
+            Assert.Throws<NbtFormatException>(() => codec.WriteTag(over));
+            Assert.AreSame(NbtFlavor.ClassiCube, codec.Options.Flavor);
+            Assert.IsTrue(codec.Options.ValidateOnWrite);
+
+            // Default returns a fresh instance every time
+            Assert.AreNotSame(NbtOptions.Default, NbtOptions.Default);
+        }
+
+
+        [TestMethod]
+        public void WriteValidationChecksEmptyListElementTypes() {
+            // The element type is written even when no elements follow it
+            var root = new NbtCompound("r") { new NbtList("l", NbtTagType.LongArray) };
+            Assert.Throws<NbtFormatException>(() => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(root));
+            new NbtCodec(NbtFlavor.Java).WriteTag(root);
+            new NbtCodec(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnWrite = false }).WriteTag(root);
+
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", NbtFlavor.Bedrock);
+                Assert.Throws<NbtFormatException>(() => writer.BeginList("l", NbtTagType.LongArray, 0));
+            }
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationGuardsHostileDeclaredLengths() {
+            // A tiny document declaring a 64 MB array. On compressed and non-seekable streams
+            // the declared length cannot be checked against the bytes actually available, which
+            // is the scenario MaxAllocation exists for.
+            byte[] hostile = {
+                0x0A, 0x00, 0x00, // TAG_Compound ""
+                0x07, 0x00, 0x01, (byte)'a', // TAG_Byte_Array "a"
+                0x04, 0x00, 0x00, 0x00 // declared length: 64 MB
+            };
+            var capped = new NbtFile(new NbtOptions { MaxAllocation = 1_048_576 });
+
+            byte[] compressed;
+            using (var ms = new MemoryStream()) {
+                using (var gzs = new GZipStream(ms, CompressionMode.Compress, true)) {
+                    gzs.Write(hostile, 0, hostile.Length);
+                }
+                compressed = ms.ToArray();
+            }
+            Assert.Throws<NbtFormatException>(
+                () => capped.LoadFromBuffer(compressed, 0, compressed.Length, NbtCompression.GZip));
+
+            using (var ms = new MemoryStream(hostile)) {
+                Assert.Throws<NbtFormatException>(
+                    () => capped.LoadFromStream(new NonSeekableStream(ms), NbtCompression.None));
+            }
+
+            using (var ms = new MemoryStream(hostile)) {
+                var reader = new NbtReader(new NonSeekableStream(ms),
+                                           new NbtOptions { MaxAllocation = 1_048_576 });
+                Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
+            }
         }
 
 

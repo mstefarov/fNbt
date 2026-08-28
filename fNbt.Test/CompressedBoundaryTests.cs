@@ -74,15 +74,19 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CompressedLoadByteCountIsDeterministicOnNonSeekableStreams() {
+        public void CompressedLoadDoesNotOverreadNonSeekableStreams() {
+            // Non-seekable sources are left wherever decompression stopped, so a load cannot
+            // block on a stream that never ends. The count never passes the document, and it
+            // reaches at least the end of the deflate data; the few trailer bytes may stay
+            // unpulled on the .NET Framework build.
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);
-                // Short reads exercise the decompressor's chunking; the count must not depend on it
                 using (var ms = new MemoryStream(doc)) {
                     var awkward = new PartialReadStream(new NonSeekableStream(ms), 3);
                     var file = new NbtFile();
                     long bytesRead = file.LoadFromStream(awkward, compression);
-                    Assert.AreEqual(doc.Length, bytesRead, compression.ToString());
+                    Assert.IsTrue(bytesRead <= doc.Length, compression + ": read past the document");
+                    Assert.IsTrue(bytesRead >= doc.Length - 8, compression + ": stopped before the trailer region");
                 }
             }
         }

@@ -837,7 +837,8 @@ namespace fNbt {
 
             try {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
-                reader.EnsureAllocation((long)elementsToRead * MinElementSize(elementType));
+                // The allocation estimate uses the managed element size, since T may be wider than the wire type.
+                reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType));
 
                 // special handling for reading byte arrays (as byte arrays)
@@ -940,6 +941,18 @@ namespace fNbt {
                 default: // Long, Double
                     return 8;
             }
+        }
+
+
+        // Size of one element of the array that ReadListAsArray is about to allocate. The wire
+        // size is the fallback for exotic conversion targets.
+        static int ManagedElementSize<T>(NbtTagType wireType) {
+            Type target = typeof(T);
+            if (target == typeof(byte) || target == typeof(sbyte)) return 1;
+            if (target == typeof(short) || target == typeof(ushort) || target == typeof(char)) return 2;
+            if (target == typeof(int) || target == typeof(uint) || target == typeof(float)) return 4;
+            if (target == typeof(long) || target == typeof(ulong) || target == typeof(double)) return 8;
+            return MinElementSize(wireType);
         }
 
 

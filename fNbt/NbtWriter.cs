@@ -79,6 +79,10 @@ namespace fNbt {
             if (options.Flavor == null) {
                 throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
             }
+            if (options.MaxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
             options.Flavor.EnsureUsableForFiles(nameof(options));
             flavor = options.Flavor;
             writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
@@ -160,6 +164,10 @@ namespace fNbt {
                     throw new ArgumentOutOfRangeException(nameof(elementType));
                 }
             }
+            if (elementType > maxTagType) {
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
+            }
             EnforceConstraints(null, NbtTagType.List);
             GoDown(NbtTagType.List);
             listType = elementType;
@@ -189,6 +197,10 @@ namespace fNbt {
                 if (elementType != NbtTagType.End || size != 0) {
                     throw new ArgumentOutOfRangeException(nameof(elementType));
                 }
+            }
+            if (elementType > maxTagType) {
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
             }
             EnforceConstraints(tagName, NbtTagType.List);
             GoDown(NbtTagType.List);

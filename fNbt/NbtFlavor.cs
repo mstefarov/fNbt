@@ -145,7 +145,14 @@ namespace fNbt {
                     }
                     break;
                 case NbtTagType.List:
-                    foreach (NbtTag child in (NbtList)tag) {
+                    var list = (NbtList)tag;
+                    // The element type is written even for empty lists, so it needs its own check
+                    if (list.ListType > MaxTagType) {
+                        throw new NbtFormatException(
+                            NbtTag.GetCanonicalTagName(list.ListType) + " is not permitted by the " +
+                            Name + " flavor.");
+                    }
+                    foreach (NbtTag child in list) {
                         ValidateTree(child, depth + 1);
                     }
                     break;

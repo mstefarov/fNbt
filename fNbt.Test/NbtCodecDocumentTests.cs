@@ -380,6 +380,23 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void BufferOverloadsHonorIndex() {
+            NbtCompound root = MakeSampleRoot("r");
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            byte[] doc = codec.WriteTag(root);
+            byte[] padded = new byte[] { 0xAA, 0xBB, 0xCC }.Concat(doc).Concat(new byte[] { 0xDD }).ToArray();
+
+            NbtTag read = codec.ReadTag(padded, 3, doc.Length + 1, out int bytesConsumed);
+            Assert.AreEqual(doc.Length, bytesConsumed);
+            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+
+            Assert.IsTrue(codec.TryReadTag(padded, 3, doc.Length, out NbtTag tag, out bytesConsumed));
+            Assert.AreEqual(doc.Length, bytesConsumed);
+            Assert.IsTrue(NbtComparer.Instance.Equals(root, tag));
+        }
+
+
+        [TestMethod]
         public void NullArgumentsThrow() {
             var root = new NbtCompound("r");
             NbtCodec codec = NbtCodec.For(NbtFlavor.Java);

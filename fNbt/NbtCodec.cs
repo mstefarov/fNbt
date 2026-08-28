@@ -25,7 +25,8 @@ namespace fNbt {
             return flavor.DefaultCodec;
         }
 
-        /// <summary> The settings this codec was created with. </summary>
+        /// <summary> A snapshot of the settings this codec was created with. Changing the options
+        /// instance given to the constructor does not affect this codec or this snapshot. </summary>
         public NbtOptions Options { get; }
 
         readonly NbtFlavor flavor;
@@ -51,28 +52,39 @@ namespace fNbt {
 
 
         /// <summary> Creates a codec with the given options. </summary>
-        /// <param name="options"> Settings to use. Resolved once here; later changes to shared
-        /// state (there is none: options are immutable) cannot affect this codec. </param>
+        /// <param name="options"> Settings to use, snapshotted here. Later changes to the
+        /// instance do not affect this codec. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         /// <exception cref="NotSupportedException"> The options' flavor is not yet supported. </exception>
         public NbtCodec(NbtOptions options) {
             if (options == null) throw new ArgumentNullException(nameof(options));
-            if (options.Flavor == null) {
+            // Read each setting once, so a caller mutating the options concurrently cannot
+            // bypass validation. Options exposes the snapshot, not the caller's instance.
+            NbtFlavor snapshotFlavor = options.Flavor;
+            bool validateOnRead = options.ValidateOnRead;
+            bool snapshotValidateOnWrite = options.ValidateOnWrite;
+            long? snapshotMaxAllocation = options.MaxAllocation;
+            if (snapshotFlavor == null) {
                 throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
             }
-            if (options.MaxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
+            if (snapshotMaxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), snapshotMaxAllocation,
                                                       "MaxAllocation must be positive.");
             }
-            if (options.Flavor.UsesVarInts) {
-                throw new NotSupportedException("The " + options.Flavor.Name + " flavor is not supported yet.");
+            if (snapshotFlavor.UsesVarInts) {
+                throw new NotSupportedException("The " + snapshotFlavor.Name + " flavor is not supported yet.");
             }
-            Options = options;
-            flavor = options.Flavor;
-            maxAllocation = options.MaxAllocation ?? long.MaxValue;
-            validateOnWrite = options.ValidateOnWrite && flavor.HasRestrictions;
-            readValidationFlavor = (options.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
+            Options = new NbtOptions {
+                Flavor = snapshotFlavor,
+                ValidateOnRead = validateOnRead,
+                ValidateOnWrite = snapshotValidateOnWrite,
+                MaxAllocation = snapshotMaxAllocation
+            };
+            flavor = snapshotFlavor;
+            maxAllocation = snapshotMaxAllocation ?? long.MaxValue;
+            validateOnWrite = snapshotValidateOnWrite && flavor.HasRestrictions;
+            readValidationFlavor = (validateOnRead && flavor.HasRestrictions) ? flavor : null;
         }
 
 

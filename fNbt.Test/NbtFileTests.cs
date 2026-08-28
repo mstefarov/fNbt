@@ -240,7 +240,7 @@ namespace fNbt.Test {
             var file = new NbtFile();
             file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib);
             Assert.AreEqual(12345, file.RootTag["v"].IntValue);
-            Assert.AreEqual("root", NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.ZLib, true, 0));
+            Assert.AreEqual("root", NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.ZLib, NbtFlavor.Java));
         }
 
 
@@ -278,25 +278,25 @@ namespace fNbt.Test {
 
 
         void ReadRootTagInternal(string fileName, NbtCompression compression) {
-            Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.ReadRootTagName(fileName, (NbtCompression)255, true, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.ReadRootTagName(fileName, (NbtCompression)255, NbtFlavor.Java));
 
             Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName));
             // bufferSize is ignored now, so every value must give the same name, even a negative one.
             foreach (int bufferSize in new[] { -1, 0, 1, 8, 8192 }) {
-                Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, true, bufferSize));
+                Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, NbtFlavor.Java));
             }
 
             byte[] fileBytes = File.ReadAllBytes(fileName);
             using (var ms = new MemoryStream(fileBytes)) {
                 using (var nss = new NonSeekableStream(ms)) {
-                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(nss, compression, true, 0));
+                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(nss, compression, NbtFlavor.Java));
                 }
             }
 
             // Reading is chunked, so make sure a stream that hands back less than asked still works.
             using (var ms = new MemoryStream(fileBytes)) {
                 using (var prs = new PartialReadStream(ms, 1)) {
-                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(prs, compression, true, 0));
+                    Assert.AreEqual("Level", NbtFile.ReadRootTagName(prs, compression, NbtFlavor.Java));
                 }
             }
         }
@@ -373,7 +373,7 @@ namespace fNbt.Test {
 
             Assert.Throws<ArgumentNullException>(() => NbtFile.ReadRootTagName(null));
             Assert.Throws<ArgumentNullException>(
-                () => NbtFile.ReadRootTagName((Stream)null, NbtCompression.None, true, 0));
+                () => NbtFile.ReadRootTagName((Stream)null, NbtCompression.None, NbtFlavor.Java));
 
         }
 

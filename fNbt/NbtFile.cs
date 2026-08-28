@@ -54,11 +54,16 @@ namespace fNbt {
 
         static NbtFlavor defaultFlavor = NbtFlavor.Java;
 
-        /// <summary> Whether new NbtFiles should default to big-endian encoding (default: true). </summary>
+        /// <summary> Whether new NbtFiles should default to big-endian encoding (default: true).
+        /// Setting a value that matches the current default flavor's endianness keeps that flavor. </summary>
         [Obsolete("Use DefaultFlavor instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
         public static bool BigEndianByDefault {
             get { return DefaultFlavor.BigEndian; }
-            set { DefaultFlavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock; }
+            set {
+                if (DefaultFlavor.BigEndian != value) {
+                    DefaultFlavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock;
+                }
+            }
         }
 
         /// <summary> The flavor this file reads and writes with. Initialized from
@@ -78,11 +83,16 @@ namespace fNbt {
 
         NbtFlavor flavor;
 
-        /// <summary> Whether this file should read/write tags in big-endian encoding format. </summary>
+        /// <summary> Whether this file should read/write tags in big-endian encoding format.
+        /// Setting a value that matches the current flavor's endianness keeps that flavor. </summary>
         [Obsolete("Use Flavor instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
         public bool BigEndian {
             get { return flavor.BigEndian; }
-            set { flavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock; }
+            set {
+                if (flavor.BigEndian != value) {
+                    flavor = value ? NbtFlavor.Java : NbtFlavor.Bedrock;
+                }
+            }
         }
 
         // Validation and limit settings, fixed at construction (default options unless given)
@@ -303,10 +313,12 @@ namespace fNbt {
 
 
         /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
-        /// <remarks> Compressed data is read to the end of the stream: the decompressor reads ahead in
-        /// chunks, so the document's exact extent is unknowable, and reading it all guarantees the
-        /// container checksum gets validated. Uncompressed loads stop exactly at the end of the
-        /// document, leaving any trailing bytes in place. </remarks>
+        /// <remarks> Compressed loads read the whole compressed document, which guarantees the
+        /// container checksum gets validated. Seekable streams are then left at their end, making
+        /// the returned byte count deterministic; the document's exact extent is unknowable behind
+        /// decompressor read-ahead. Non-seekable streams stay wherever decompression stopped, so a
+        /// load cannot block on a stream that never ends. Uncompressed loads stop exactly at the
+        /// end of the document, leaving any trailing bytes in place. </remarks>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.
@@ -427,14 +439,13 @@ namespace fNbt {
         }
 
 
-        // Compressed loads consume the source stream to its end: the decompressor reads ahead in
-        // chunks, so the document's exact extent within the stream is unknowable. Consuming the
-        // rest makes the returned byte count deterministic instead of chunking-dependent.
+        // The decompressor reads ahead in chunks, so the document's exact extent within the
+        // stream is unknowable. Seekable sources are left at their end, which makes the returned
+        // byte count deterministic. Non-seekable sources are left wherever decompression stopped:
+        // reading further could block forever on a stream that never ends, like an open socket.
         static void FinishCompressedLoad(Stream stream) {
             if (stream.CanSeek) {
                 stream.Position = stream.Length;
-            } else {
-                DrainToEnd(stream);
             }
         }
 
@@ -709,7 +720,56 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="IOException"> If an I/O error occurred while reading the file. </exception>
         public static string ReadRootTagName(string fileName) {
-            return ReadRootTagName(fileName, NbtCompression.AutoDetect, DefaultFlavor.BigEndian, defaultBufferSize);
+            return ReadRootTagName(fileName, NbtCompression.AutoDetect, DefaultFlavor);
+        }
+
+
+        /// <summary> Reads the root name from the given NBT file. </summary>
+        /// <param name="fileName"> Name of the file from which data will be loaded. </param>
+        /// <param name="compression"> Format in which the given file is compressed. </param>
+        /// <param name="flavor"> Encoding to read with. </param>
+        /// <returns> Name of the root tag in the given NBT file. </returns>
+        /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> The flavor has no root name; use <see cref="NbtCodec"/> for those. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
+        /// <exception cref="FileNotFoundException"> If given file was not found. </exception>
+        /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
+        /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
+        /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
+        /// <exception cref="NotSupportedException"> <paramref name="flavor"/> is not yet supported. </exception>
+        /// <exception cref="IOException"> If an I/O error occurred while reading the file. </exception>
+        public static string ReadRootTagName(string fileName, NbtCompression compression, NbtFlavor flavor) {
+            if (fileName == null) {
+                throw new ArgumentNullException(nameof(fileName));
+            }
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            flavor.EnsureUsableForFiles(nameof(flavor));
+            if (!File.Exists(fileName)) {
+                throw new FileNotFoundException("Could not find the given NBT file.", fileName);
+            }
+            using (FileStream readFileStream = File.OpenRead(fileName)) {
+                return ReadRootTagName(readFileStream, compression, flavor);
+            }
+        }
+
+
+        /// <summary> Reads the root name from the given stream of NBT data. </summary>
+        /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
+        /// <param name="compression"> Compression method to use for loading this stream. </param>
+        /// <param name="flavor"> Encoding to read with. </param>
+        /// <returns> Name of the root tag in the given stream. </returns>
+        /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> The flavor has no root name; use <see cref="NbtCodec"/> for those. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
+        /// <exception cref="NotSupportedException"> If compression is set to AutoDetect, but the stream is not seekable;
+        /// or <paramref name="flavor"/> is not yet supported. </exception>
+        /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
+        /// <exception cref="InvalidDataException"> If file compression could not be detected, decompressing failed, or given stream does not support reading. </exception>
+        /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
+        public static string ReadRootTagName(Stream stream, NbtCompression compression, NbtFlavor flavor) {
+            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
+            flavor.EnsureUsableForFiles(nameof(flavor));
+            return ReadRootTagNameInternal(stream, compression, flavor.BigEndian);
         }
 
 
@@ -726,17 +786,10 @@ namespace fNbt {
         /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="IOException"> If an I/O error occurred while reading the file. </exception>
+        [Obsolete("Use ReadRootTagName(string, NbtCompression, NbtFlavor) instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
         public static string ReadRootTagName(string fileName, NbtCompression compression, bool bigEndian,
                                              int bufferSize) {
-            if (fileName == null) {
-                throw new ArgumentNullException(nameof(fileName));
-            }
-            if (!File.Exists(fileName)) {
-                throw new FileNotFoundException("Could not find the given NBT file.", fileName);
-            }
-            using (FileStream readFileStream = File.OpenRead(fileName)) {
-                return ReadRootTagName(readFileStream, compression, bigEndian, bufferSize);
-            }
+            return ReadRootTagName(fileName, compression, bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock);
         }
 
 
@@ -752,9 +805,14 @@ namespace fNbt {
         /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
         /// <exception cref="InvalidDataException"> If file compression could not be detected, decompressing failed, or given stream does not support reading. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
+        [Obsolete("Use ReadRootTagName(Stream, NbtCompression, NbtFlavor) instead. true corresponds to NbtFlavor.Java, false to NbtFlavor.Bedrock.")]
         public static string ReadRootTagName(Stream stream, NbtCompression compression, bool bigEndian,
                                              int bufferSize) {
-            // bufferSize param is no longer used because it caused perf problems due to over-reading on netcore.
+            return ReadRootTagNameInternal(stream, compression, bigEndian);
+        }
+
+
+        static string ReadRootTagNameInternal(Stream stream, NbtCompression compression, bool bigEndian) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             // detect compression, based on the first byte
             if (compression == NbtCompression.AutoDetect) {

@@ -40,6 +40,12 @@ namespace fNbt.Test {
 
             file.Flavor = NbtFlavor.ClassiCube;
             Assert.IsTrue(file.BigEndian);
+
+            // Setting a matching endianness keeps the current flavor
+            file.BigEndian = true;
+            Assert.AreSame(NbtFlavor.ClassiCube, file.Flavor);
+            file.BigEndian = false;
+            Assert.AreSame(NbtFlavor.Bedrock, file.Flavor);
 #pragma warning restore 618
         }
 
@@ -76,7 +82,30 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream()) {
                 Assert.Throws<ArgumentException>(() => new NbtWriter(ms, "r", NbtFlavor.JavaNetwork));
                 Assert.Throws<NotSupportedException>(() => new NbtWriter(ms, "r", NbtFlavor.BedrockNetwork));
+                Assert.Throws<ArgumentOutOfRangeException>(
+                    () => new NbtWriter(ms, "r", new NbtOptions { MaxAllocation = 0 }));
             }
+        }
+
+
+        [TestMethod]
+        public void ReadRootTagNameTakesFlavor() {
+            NbtCompound root = MakeSampleRoot("hello");
+            byte[] doc = new NbtFile(root) { Flavor = NbtFlavor.Bedrock }.SaveToBuffer(NbtCompression.None);
+            using (var ms = new MemoryStream(doc)) {
+                Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.Bedrock));
+            }
+            Assert.Throws<ArgumentNullException>(
+                () => NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.None, (NbtFlavor)null));
+            Assert.Throws<ArgumentException>(
+                () => NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.None, NbtFlavor.JavaNetwork));
+
+            // The obsolete bool overload still maps correctly
+#pragma warning disable 618
+            using (var ms = new MemoryStream(doc)) {
+                Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, false, 0));
+            }
+#pragma warning restore 618
         }
 
 

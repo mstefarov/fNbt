@@ -11,18 +11,23 @@
     ReadConcatenatedTags, and reads that stop exactly at the end of one
     document, leaving trailing bytes in place. NbtCodec.For(flavor) returns
     a cached default-options instance for one-off use.
-- Add NbtOptions, an immutable settings object that NbtFile, NbtReader,
-    NbtWriter, and NbtCodec all accept and resolve once at construction. It
-    carries the flavor, two validation toggles, and the opt-in MaxAllocation
-    limit, which caps any single allocation that a declared length asks for,
-    so a tiny corrupt document cannot demand a huge array.
-- NbtFile gains a Flavor property and a static DefaultFlavor. BigEndian,
-    BigEndianByDefault, and the bool reader/writer constructors still work,
-    map true to the Java flavor and false to Bedrock, and are now obsolete.
+- Add NbtOptions, a settings object that NbtFile, NbtReader, NbtWriter,
+    and NbtCodec all accept and snapshot at construction, so later changes
+    to an options instance do not affect objects already created from it.
+    It carries the flavor, two validation toggles, and the opt-in
+    MaxAllocation limit, which caps any single allocation that a declared
+    length asks for, so a tiny corrupt document cannot demand a huge array.
+- NbtFile gains a Flavor property and a static DefaultFlavor, and
+    ReadRootTagName gains NbtFlavor overloads. BigEndian, BigEndianByDefault,
+    the bool reader/writer constructors, and the bigEndian ReadRootTagName
+    overloads still work, map true to the Java flavor and false to Bedrock,
+    and are now obsolete. Setting BigEndian to a value that matches the
+    current flavor keeps that flavor.
 - Add per-flavor conformance validation: on by default for writes, refusing
     tag types and string lengths the flavor's own readers reject, such as
     TAG_Int_Array or 300-byte strings under ClassiCube; opt-in for reads,
-    which stay generous by default. Little-endian files that Bedrock itself
+    which stay generous by default. List element types are checked even
+    for empty lists, since the type byte is written either way. Little-endian files that Bedrock itself
     cannot read, such as ones holding TAG_Long_Array, now fail to save under
     the Bedrock flavor; pass ValidateOnWrite = false to keep writing them.
 - Java flavors now write modified UTF-8, byte-compatible with Minecraft Java:
@@ -39,13 +44,15 @@
 - Negative list and array lengths now read as empty instead of throwing, and
     an empty list accepts any element-type byte. Both are deliberately more
     tolerant than Minecraft's own readers.
-- Compressed loads now read the stream to its end and always validate the
-    container checksum. The .NET Standard 2.0 build now validates ZLib
-    Adler-32 checksums, where corrupt data could previously load silently,
-    and on all targets, checksum validation and the returned byte count no
-    longer depend on how the decompressor chunked its reads. ZLib validation
-    on .NET Standard 2.0 needs a seekable stream, and trailing data after a
-    ZLib document fails the checksum there.
+- Compressed loads now always validate the container checksum, and the
+    .NET Standard 2.0 build now validates ZLib Adler-32 checksums, where
+    corrupt data could previously load silently. Validation no longer
+    depends on how the decompressor chunked its reads. A compressed load
+    leaves a seekable stream at its end, which makes the returned byte
+    count deterministic, and leaves a non-seekable stream wherever
+    decompression stopped, so it cannot block on a stream that never ends.
+    ZLib validation on .NET Standard 2.0 needs a seekable stream, and
+    trailing data after a ZLib document fails the checksum there.
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
     Minecraft's own limit, instead of crashing the process with an uncatchable

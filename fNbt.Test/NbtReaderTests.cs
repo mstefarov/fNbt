@@ -658,9 +658,9 @@ namespace fNbt.Test {
         static void TryReadIncompleteRootTagName(byte[] partialData) {
 
             Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.None, true, 0), "Length=" + partialData.Length);
+                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.None, NbtFlavor.Java), "Length=" + partialData.Length);
             Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.AutoDetect, true, 0), "Length=" + partialData.Length);
+                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.AutoDetect, NbtFlavor.Java), "Length=" + partialData.Length);
         }
 
 
@@ -685,7 +685,7 @@ namespace fNbt.Test {
             Assert.Throws<NbtFormatException>(
                 () => new NbtFile().LoadFromBuffer(badHeader, 0, badHeader.Length, NbtCompression.None));
             Assert.Throws<NbtFormatException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(badHeader), NbtCompression.None, true, 0));
+                () => NbtFile.ReadRootTagName(new MemoryStream(badHeader), NbtCompression.None, NbtFlavor.Java));
 
             byte[] badStringLength = {
                 0x0A, // Compound tag
@@ -698,7 +698,7 @@ namespace fNbt.Test {
             Assert.Throws<EndOfStreamException>(
                 () => new NbtFile().LoadFromBuffer(badStringLength, 0, badStringLength.Length, NbtCompression.None));
             Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(badStringLength), NbtCompression.None, true, 0));
+                () => NbtFile.ReadRootTagName(new MemoryStream(badStringLength), NbtCompression.None, NbtFlavor.Java));
 
             byte[] badSecondTag = {
                 0x0A, // Compound tag
@@ -708,22 +708,28 @@ namespace fNbt.Test {
             };
             AssertBadFileFromBuffer(badSecondTag);
 
+            // The list's element type must be valid when elements follow it. The document is
+            // otherwise complete, so the type byte is the only defect.
             byte[] badListType = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x09, // List tag
                 0x00, 0x01, 0x67, // List tag name: 'g'
-                0xFF // invalid list tag type (-1)
+                0xFF, // invalid list tag type
+                0x00, 0x00, 0x00, 0x01, // List size: 1
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badListType);
 
+            // Negative sizes read as empty since 2.0, so an impossibly large size is the bad case
             byte[] badListSize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x09, // List tag
                 0x00, 0x01, 0x67, // List tag name: 'g'
                 0x01, // List type: Byte
-                0xFF, 0xFF, 0xFF, 0xFF, // List size: -1
+                0x7F, 0x00, 0x00, 0x00, // List size: ~2 billion, cannot fit
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badListSize);
         }
@@ -731,12 +737,14 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void BadArraySize() {
+            // Negative sizes read as empty since 2.0, so impossibly large sizes are the bad case
             byte[] badByteArraySize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x07, // ByteArray tag
                 0x00, 0x01, 0x67, // ByteArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badByteArraySize);
 
@@ -746,7 +754,8 @@ namespace fNbt.Test {
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x0b, // IntArray tag
                 0x00, 0x01, 0x66, // IntArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badIntArraySize);
 
@@ -755,7 +764,8 @@ namespace fNbt.Test {
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x0c, // LongArray tag
                 0x00, 0x01, 0x66, // LongArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badLongArraySize);
         }
@@ -763,6 +773,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void BadNestedArraySize() {
+            // Negative sizes read as empty since 2.0, so impossibly large sizes are the bad case
             byte[] badNestedByteArraySize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
@@ -770,7 +781,9 @@ namespace fNbt.Test {
                 0x00, 0x01, 0x67, // Child name: 'g'
                 0x07, // ByteArray tag
                 0x00, 0x01, 0x68, // ByteArray tag name: 'h'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00, // child end tag
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badNestedByteArraySize);
 
@@ -782,7 +795,9 @@ namespace fNbt.Test {
                 0x00, 0x01, 0x67, // Child name: 'g'
                 0x0b, // IntArray tag
                 0x00, 0x01, 0x68, // IntArray tag name: 'h'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00, // child end tag
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badNestedIntArraySize);
 
@@ -793,7 +808,9 @@ namespace fNbt.Test {
                 0x00, 0x01, 0x67, // Child name: 'g'
                 0x0c, // LongArray tag
                 0x00, 0x01, 0x68, // LongArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
+                0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
+                0x00, // child end tag
+                0x00 // end tag
             };
             AssertBadFileFromBuffer(badNestedLongArraySize);
         }
