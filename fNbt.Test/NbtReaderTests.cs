@@ -613,6 +613,36 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void FailedValueReadEntersErrorState() {
+            // A read that fails partway through a payload leaves the stream desynchronised,
+            // so the reader must poison itself instead of parsing from mid-payload
+            byte[] doc = new NbtFile(new NbtCompound("") {
+                new NbtByteArray("a", new byte[65536])
+            }).SaveToBuffer(NbtCompression.None);
+            var options = new NbtOptions { MaxAllocation = 1024 };
+
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, options);
+                reader.ReadToFollowing();
+                reader.ReadToFollowing();
+                Assert.Throws<NbtFormatException>(() => reader.ReadValue());
+                Assert.IsTrue(reader.IsInErrorState);
+                Assert.Throws<InvalidReaderStateException>(() => reader.ReadToFollowing());
+            }
+
+            // Same through the ReadAsTag path
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, options);
+                reader.ReadToFollowing();
+                reader.ReadToFollowing();
+                Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
+                Assert.IsTrue(reader.IsInErrorState);
+                Assert.Throws<InvalidReaderStateException>(() => reader.ReadToFollowing());
+            }
+        }
+
+
+        [TestMethod]
         public void NonSeekableStreamSkip1() {
             byte[] fileBytes = File.ReadAllBytes(TestFiles.Big);
             using (var ms = new MemoryStream(fileBytes)) {

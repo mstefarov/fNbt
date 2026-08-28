@@ -148,19 +148,10 @@ namespace fNbt {
         /// use <see cref="NbtCodec"/> for those. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtFile(NbtOptions options) {
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            if (options.Flavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            if (options.MaxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
-            options.Flavor.EnsureUsableForFiles(nameof(options));
-            flavor = options.Flavor;
+            flavor = NbtOptions.SnapshotFileFlavor(options);
             validateOnRead = options.ValidateOnRead;
             validateOnWrite = options.ValidateOnWrite;
-            maxAllocation = options.MaxAllocation ?? long.MaxValue;
+            maxAllocation = NbtOptions.SnapshotMaxAllocation(options) ?? long.MaxValue;
             BufferSize = DefaultBufferSize;
             rootTag = new NbtCompound("");
         }
@@ -313,7 +304,10 @@ namespace fNbt {
         /// container checksum gets validated. Seekable streams are then left at their end, making
         /// the returned byte count deterministic; the document's exact extent is unknowable behind
         /// decompressor read-ahead. Non-seekable streams stay wherever decompression stopped, so a
-        /// load cannot block on a stream that never ends. Uncompressed loads stop exactly at the
+        /// load cannot block on a stream that never ends. On .NET Core and later, GZip data made of
+        /// several concatenated members decompresses as one continuous document, so a load reads
+        /// through every member; the .NET Framework decompressor stops after the first.
+        /// Uncompressed loads stop exactly at the
         /// end of the document, leaving any trailing bytes in place. </remarks>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
@@ -384,7 +378,8 @@ namespace fNbt {
                     }
 #else
                     ValidateZLibHeader(stream);
-                    using (var decStream = new ZLibStream(stream, CompressionMode.Decompress, true)) {
+                    // A non-seekable source's trailer is out of reach, so skip the running checksum there
+                    using (var decStream = new ZLibStream(stream, CompressionMode.Decompress, true, stream.CanSeek)) {
                         if (bufferSize > 0) {
                             var bufferedStream = new BufferedStream(decStream, bufferSize);
                             LoadFromStreamInternal(bufferedStream, selector);

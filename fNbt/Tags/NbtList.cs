@@ -291,21 +291,14 @@ namespace fNbt {
                 return false;
             }
 
-            // The element-type byte is only meaningful when elements follow it, so it is read
-            // raw and interpreted after the length. Negative lengths and empty lists with
-            // arbitrary type bytes are tolerated on purpose, exceeding Minecraft's own readers.
-            byte rawListType = readStream.ReadByte();
-            int length = readStream.ReadInt32();
-            if (length <= 0) {
-                // Still counts as a nesting level, like a non-empty list would
+            NbtTagType newListType = readStream.ReadListHeader(out int length);
+            if (length == 0) {
+                // Still counts as a nesting level, like a non-empty list would. The field
+                // assignment keeps a tolerated End type without the property's checks.
                 readStream.IncreaseDepth();
                 readStream.DecreaseDepth();
-                listType = InterpretEmptyListType(rawListType);
+                listType = newListType;
                 return true;
-            }
-            NbtTagType newListType = readStream.RequireValidTagType(rawListType);
-            if (newListType == NbtTagType.End) {
-                throw new NbtFormatException("A non-empty list may not have TAG_End as its element type.");
             }
             ListType = newListType;
 
@@ -340,18 +333,12 @@ namespace fNbt {
 
 
         internal override void SkipTag(NbtBinaryReader readStream) {
-            // Same tolerances as ReadTag: nothing to skip for empty or negative lengths
-            byte rawListType = readStream.ReadByte();
-            int length = readStream.ReadInt32();
-            if (length <= 0) {
+            NbtTagType newListType = readStream.ReadListHeader(out int length);
+            if (length == 0) {
                 readStream.IncreaseDepth();
                 readStream.DecreaseDepth();
-                listType = InterpretEmptyListType(rawListType);
+                listType = newListType;
                 return;
-            }
-            NbtTagType newListType = readStream.RequireValidTagType(rawListType);
-            if (newListType == NbtTagType.End) {
-                throw new NbtFormatException("A non-empty list may not have TAG_End as its element type.");
             }
             ListType = newListType;
 
@@ -403,16 +390,6 @@ namespace fNbt {
                     break;
             }
             readStream.DecreaseDepth();
-        }
-
-
-        // A valid declared type is kept even with nothing to back it up; garbage becomes End,
-        // so the tolerated list stays writable.
-        static NbtTagType InterpretEmptyListType(byte rawListType) {
-            if (rawListType <= (byte)NbtTagType.LongArray) {
-                return (NbtTagType)rawListType;
-            }
-            return NbtTagType.End;
         }
 
 

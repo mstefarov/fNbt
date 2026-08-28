@@ -54,29 +54,6 @@ namespace fNbt {
         }
 
 
-        // These two helpers snapshot and validate the options overload's settings, reading each
-        // option once so a concurrently-mutated instance cannot bypass validation.
-        static NbtFlavor ValidOptionsFlavor(NbtOptions options) {
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            NbtFlavor flavor = options.Flavor;
-            if (flavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            flavor.EnsureUsableForFiles(nameof(options));
-            return flavor;
-        }
-
-
-        static long? ValidMaxAllocation(NbtOptions options) {
-            long? maxAllocation = options.MaxAllocation;
-            if (maxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), maxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
-            return maxAllocation;
-        }
-
-
         /// <summary> Initializes a new instance of the NbtReader class with the given options.
         /// When read validation is on, the flavor's tag-type range and string ceiling are enforced;
         /// <c>MaxAllocation</c> caps declared-length allocations either way. </summary>
@@ -88,7 +65,8 @@ namespace fNbt {
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtReader(Stream stream, NbtOptions options)
-            : this(stream, ValidOptionsFlavor(options), options.ValidateOnRead, ValidMaxAllocation(options)) { }
+            : this(stream, NbtOptions.SnapshotFileFlavor(options), options.ValidateOnRead,
+                   NbtOptions.SnapshotMaxAllocation(options)) { }
 
 
         NbtReader(Stream stream, NbtFlavor flavor, bool validateOnRead, long? maxAllocationOption) {
@@ -373,22 +351,8 @@ namespace fNbt {
                     break;
 
                 case NbtTagType.List:
-                    // Same tolerances as NbtList.ReadTag: the type byte is interpreted after
-                    // the length, and an empty list accepts any type byte
-                    byte rawListType = reader.ReadByte();
-                    TagLength = reader.ReadInt32();
-                    if (TagLength <= 0) {
-                        TagLength = 0;
-                        ListType = rawListType <= (byte)NbtTagType.LongArray
-                            ? (NbtTagType)rawListType
-                            : NbtTagType.End;
-                    } else {
-                        ListType = reader.RequireValidTagType(rawListType);
-                        if (ListType == NbtTagType.End) {
-                            throw new NbtFormatException(
-                                "A non-empty list may not have TAG_End as its element type.");
-                        }
-                    }
+                    ListType = reader.ReadListHeader(out int listLength);
+                    TagLength = listLength;
                     state = NbtParseState.AtListBeginning;
                     break;
 
@@ -691,6 +655,17 @@ namespace fNbt {
                 throw new InvalidOperationException(NoValueToReadError);
             }
             atValue = false;
+            try {
+                return ReadValueAsTagInternal();
+            } catch {
+                // A failed payload read leaves the stream desynchronised
+                state = NbtParseState.Error;
+                throw;
+            }
+        }
+
+
+        NbtTag ReadValueAsTagInternal() {
             switch (TagType) {
                 case NbtTagType.Byte:
                     return new NbtByte(TagName, reader.ReadByte());
@@ -767,52 +742,55 @@ namespace fNbt {
             valueCache = null;
             atValue = false;
             object value;
+            try {
+                value = ReadValueInternal();
+            } catch {
+                // A failed payload read leaves the stream desynchronised
+                state = NbtParseState.Error;
+                throw;
+            }
+            if (cacheTagValues) {
+                valueCache = value;
+            }
+            return value;
+        }
+
+
+        object ReadValueInternal() {
             switch (TagType) {
                 case NbtTagType.Byte:
-                    value = reader.ReadByte();
-                    break;
+                    return reader.ReadByte();
 
                 case NbtTagType.Short:
-                    value = reader.ReadInt16();
-                    break;
+                    return reader.ReadInt16();
 
                 case NbtTagType.Float:
-                    value = reader.ReadSingle();
-                    break;
+                    return reader.ReadSingle();
 
                 case NbtTagType.Int:
-                    value = reader.ReadInt32();
-                    break;
+                    return reader.ReadInt32();
 
                 case NbtTagType.Double:
-                    value = reader.ReadDouble();
-                    break;
+                    return reader.ReadDouble();
 
                 case NbtTagType.Long:
-                    value = reader.ReadInt64();
-                    break;
+                    return reader.ReadInt64();
 
                 case NbtTagType.ByteArray:
-                    value = reader.ReadArray(TagLength);
-                    break;
+                    return reader.ReadArray(TagLength);
 
                 case NbtTagType.IntArray:
-                    value = reader.ReadInt32Array(TagLength);
-                    break;
+                    return reader.ReadInt32Array(TagLength);
 
                 case NbtTagType.LongArray:
-                    value = reader.ReadInt64Array(TagLength);
-                    break;
+                    return reader.ReadInt64Array(TagLength);
 
                 case NbtTagType.String:
-                    value = reader.ReadString();
-                    break;
+                    return reader.ReadString();
 
                 default:
                     throw new InvalidOperationException(NonValueTagError);
             }
-            valueCache = cacheTagValues ? value : null;
-            return value;
         }
 
 

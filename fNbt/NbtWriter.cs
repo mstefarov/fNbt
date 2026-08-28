@@ -62,29 +62,6 @@ namespace fNbt {
         }
 
 
-        // These two helpers snapshot and validate the options overload's settings, reading each
-        // option once so a concurrently-mutated instance cannot bypass validation.
-        static NbtFlavor ValidOptionsFlavor(NbtOptions options) {
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            NbtFlavor flavor = options.Flavor;
-            if (flavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            flavor.EnsureUsableForFiles(nameof(options));
-            return flavor;
-        }
-
-
-        static long? ValidMaxAllocation(NbtOptions options) {
-            long? maxAllocation = options.MaxAllocation;
-            if (maxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), maxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
-            return maxAllocation;
-        }
-
-
         /// <summary> Initializes a new instance of the NbtWriter class with the given options.
         /// When write validation is on, the flavor's tag-type range and string ceiling are
         /// enforced as tags are written. </summary>
@@ -95,9 +72,10 @@ namespace fNbt {
         /// <paramref name="options"/>, or the options' <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtOptions options)
-            : this(stream, rootTagName, ValidOptionsFlavor(options), options.ValidateOnWrite,
-                   ValidMaxAllocation(options)) { }
+            : this(stream, rootTagName, NbtOptions.SnapshotFileFlavor(options), options.ValidateOnWrite,
+                   NbtOptions.SnapshotMaxAllocation(options)) { }
 
 
         // maxAllocation is validated by the callers and otherwise unused: writing allocates
@@ -753,11 +731,12 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
-            EnforceConstraints(tag.Name, tag.TagType);
             if (maxTagType < NbtTagType.LongArray) {
-                // Only the subtree needs the pre-walk; per-call writes are checked inline
+                // Only the subtree needs the pre-walk; per-call writes are checked inline.
+                // Validate before EnforceConstraints, which counts the tag against its list.
                 flavor.ValidateTree(tag, 0);
             }
+            EnforceConstraints(tag.Name, tag.TagType);
             if (tag.Name != null) {
                 tag.WriteTag(writer);
             } else {

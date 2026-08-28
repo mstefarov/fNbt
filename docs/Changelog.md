@@ -52,6 +52,10 @@
 - Negative list and array lengths now read as empty instead of throwing, and
     an empty list accepts any element-type byte. Both are deliberately more
     tolerant than Minecraft's own readers.
+- Fixed the NbtWriter.WriteIntArray and WriteLongArray overloads that take
+    an offset: they wrote a length prefix of count but emitted only the
+    elements between offset and count, corrupting output whenever offset
+    was not zero.
 - Compressed loads now always validate the container checksum, and the
     .NET Standard 2.0 build now validates ZLib Adler-32 checksums, where
     corrupt data could previously load silently. Validation no longer

@@ -216,6 +216,42 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void SkippingFloatsAndDoublesStaysAligned() {
+            // Floats and doubles stay fixed-width in the varint encoding; skipping them
+            // through a varint-decoding path would desync the stream
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "", NbtFlavor.BedrockNetwork);
+                writer.WriteFloat("f", 1.5f);
+                writer.WriteDouble("d", -2.5);
+                writer.WriteShort("marker", 42);
+                writer.EndCompound();
+                writer.Finish();
+
+                ms.Position = 0;
+                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
+                Assert.IsTrue(reader.ReadToFollowing("marker"));
+                Assert.AreEqual((short)42, reader.ReadValueAs<short>());
+                while (reader.ReadToFollowing()) { }
+                Assert.AreEqual(ms.Length, ms.Position);
+            }
+        }
+
+
+        [TestMethod]
+        public void HugeDeclaredStringLengthFailsBeforeAllocating() {
+            // TAG_String "s" declaring a 256 MB varint length in a 10-byte document.
+            // The plausibility check must reject it against the bytes actually available.
+            byte[] doc = {
+                0x0A, 0x00,
+                0x08, 0x01, (byte)'s', 0xFF, 0xFF, 0xFF, 0x7F,
+                0x00
+            };
+            Assert.Throws<EndOfStreamException>(
+                () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _));
+        }
+
+
+        [TestMethod]
         public void ReadRootTagNameDecodesVarIntPrefix() {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, new string('n', 200), NbtFlavor.BedrockNetwork);

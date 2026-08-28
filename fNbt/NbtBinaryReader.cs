@@ -58,10 +58,6 @@ namespace fNbt {
         }
 
 
-        public NbtBinaryReader(Stream input, bool bigEndian)
-            : this(input, bigEndian, false) { }
-
-
         public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt)
             : base(input) {
             swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
@@ -200,12 +196,34 @@ namespace fNbt {
                 }
                 return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
             } else {
+                // Varint prefixes can declare huge lengths, so check plausibility before
+                // allocating. Small strings skip the check: they read at most 64 bytes.
+                EnsureCanRead(length);
                 byte[] stringData = ReadBytes(length);
                 if (stringData.Length < length) {
                     throw new EndOfStreamException();
                 }
                 return NbtStringCodec.Decode(stringData, 0, length);
             }
+        }
+
+
+        // Reads a list's element-type byte and length with the shared wire tolerances:
+        // negative lengths count as empty, and an empty list accepts any type byte.
+        public NbtTagType ReadListHeader(out int length) {
+            byte rawListType = ReadByte();
+            length = ReadInt32();
+            if (length <= 0) {
+                length = 0;
+                return rawListType <= (byte)NbtTagType.LongArray
+                    ? (NbtTagType)rawListType
+                    : NbtTagType.End;
+            }
+            NbtTagType listType = RequireValidTagType(rawListType);
+            if (listType == NbtTagType.End) {
+                throw new NbtFormatException("A non-empty list may not have TAG_End as its element type.");
+            }
+            return listType;
         }
 
 

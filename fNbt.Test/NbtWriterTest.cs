@@ -617,6 +617,23 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void RejectedWriteTagDoesNotConsumeAListSlot() {
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
+                writer.BeginList("l", NbtTagType.String, 2);
+                // Fails the flavor's 256-byte string ceiling; the list must still have both slots
+                var over = new NbtString(new string('x', 300));
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(over));
+                writer.WriteString("a");
+                writer.WriteString("b");
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+            }
+        }
+
+
+        [TestMethod]
         public void ArraySegmentsHonorOffset() {
             int[] ints = { 10, 11, 12, 13, 14 };
             long[] longs = { 20, 21, 22, 23, 24 };

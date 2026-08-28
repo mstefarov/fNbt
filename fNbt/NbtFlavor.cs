@@ -115,10 +115,9 @@ namespace fNbt {
 
         // Conformance pre-walk for write validation, run only for flavors with restrictions:
         // every tag type within the flavor's range, every name and string value within its ceiling.
+        // Depth counts open containers, like the write walk, so a maximally deep tree that
+        // writes cleanly also validates.
         internal void ValidateTree(NbtTag tag, int depth) {
-            if (depth >= NbtTag.MaxDepth) {
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
-            }
             if (tag.TagType > MaxTagType) {
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName(tag.TagType) + " is not permitted by the " + Name + " flavor.");
@@ -131,11 +130,17 @@ namespace fNbt {
                     ValidateString(((NbtString)tag).Value);
                     break;
                 case NbtTagType.Compound:
+                    if (depth >= NbtTag.MaxDepth) {
+                        throw new NbtFormatException(NbtTag.DepthLimitMessage);
+                    }
                     foreach (NbtTag child in (NbtCompound)tag) {
                         ValidateTree(child, depth + 1);
                     }
                     break;
                 case NbtTagType.List:
+                    if (depth >= NbtTag.MaxDepth) {
+                        throw new NbtFormatException(NbtTag.DepthLimitMessage);
+                    }
                     var list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
                     if (list.ListType > MaxTagType) {

@@ -31,5 +31,36 @@ namespace fNbt {
         /// bytes actually available. Per-allocation, not a total document quota.
         /// Defaults to <c>null</c>: no limit. </summary>
         public long? MaxAllocation { get; set; }
+
+
+        // Shared snapshot-and-validate helpers for every entry point that takes options.
+        // Each reads its option once, so a concurrently mutated instance cannot bypass validation.
+
+        internal static NbtFlavor SnapshotFlavor(NbtOptions options) {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            NbtFlavor flavor = options.Flavor;
+            if (flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            return flavor;
+        }
+
+
+        // For the named-root APIs; NbtCodec uses SnapshotFlavor and permits JavaNetwork
+        internal static NbtFlavor SnapshotFileFlavor(NbtOptions options) {
+            NbtFlavor flavor = SnapshotFlavor(options);
+            flavor.EnsureUsableForFiles(nameof(options));
+            return flavor;
+        }
+
+
+        internal static long? SnapshotMaxAllocation(NbtOptions options) {
+            long? maxAllocation = options.MaxAllocation;
+            if (maxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), maxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
+            return maxAllocation;
+        }
     }
 }

@@ -61,6 +61,26 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ValidationDepthMatchesTheWriteWalk() {
+            // A maximally deep tree the write walk accepts must also pass write validation,
+            // leaves included: depth counts open containers, not every tag
+            NbtCompound okTree = MakeNestedCompoundTree(MaxDepth);
+            NbtCompound deepest = okTree;
+            while (deepest.Get<NbtCompound>("c") != null) {
+                deepest = deepest.Get<NbtCompound>("c")!;
+            }
+            deepest.Add(new NbtByte("leaf", 1));
+
+            var codec = new NbtCodec(NbtFlavor.ClassiCube);
+            byte[] doc = codec.WriteTag(okTree);
+            Assert.IsTrue(doc.Length > 0);
+
+            NbtCompound deepTree = MakeNestedCompoundTree(MaxDepth + 1);
+            Assert.Throws<NbtFormatException>(() => codec.WriteTag(deepTree));
+        }
+
+
+        [TestMethod]
         public void LoadingDocAtDepthLimitSucceeds() {
             byte[] listDoc = MakeNestedListDoc(MaxDepth - 1);
             var file = new NbtFile();

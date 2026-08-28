@@ -150,6 +150,56 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ZLibStreamChecksumCountsSingleByteAccess() {
+            // The internal stream's ReadByte/WriteByte must feed the Adler-32 exactly once per
+            // byte on every target. DeflateStream's own single-byte fast path would skip the
+            // checksum; the Stream fallback would count bytes twice.
+            byte[] payload = new byte[1000];
+            for (int i = 0; i < payload.Length; i++) {
+                payload[i] = (byte)(i * 31);
+            }
+
+            int bulkChecksum;
+            byte[] compressed;
+            using (var ms = new MemoryStream()) {
+                using (var z = new ZLibStream(ms, System.IO.Compression.CompressionMode.Compress, true)) {
+                    z.Write(payload, 0, payload.Length);
+                    bulkChecksum = z.Checksum;
+                }
+                compressed = ms.ToArray();
+            }
+
+            using (var ms = new MemoryStream()) {
+                using (var z = new ZLibStream(ms, System.IO.Compression.CompressionMode.Compress, true)) {
+                    foreach (byte b in payload) {
+                        z.WriteByte(b);
+                    }
+                    Assert.AreEqual(bulkChecksum, z.Checksum, "byte-wise write checksum");
+                }
+            }
+
+            using (var ms = new MemoryStream(compressed)) {
+                var z = new ZLibStream(ms, System.IO.Compression.CompressionMode.Decompress, true);
+                int b;
+                int index = 0;
+                while ((b = z.ReadByte()) >= 0) {
+                    Assert.AreEqual(payload[index++], (byte)b);
+                }
+                Assert.AreEqual(payload.Length, index);
+                Assert.AreEqual(bulkChecksum, z.Checksum, "byte-wise read checksum");
+            }
+
+            // With tracking off, the checksum stays at its initial value
+            using (var ms = new MemoryStream(compressed)) {
+                var z = new ZLibStream(ms, System.IO.Compression.CompressionMode.Decompress, true, trackChecksum: false);
+                var sink = new byte[payload.Length];
+                while (z.Read(sink, 0, sink.Length) > 0) { }
+                Assert.AreEqual(1, z.Checksum);
+            }
+        }
+
+
+        [TestMethod]
         public void CompressedRoundTripsStillLoadClean() {
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);

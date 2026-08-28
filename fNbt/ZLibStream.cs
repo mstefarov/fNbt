@@ -10,6 +10,12 @@ namespace fNbt {
         uint adler32A = 1,
              adler32B;
 
+        // Decompression skips the running checksum when the source is not seekable, since the
+        // trailer to compare against is out of reach there
+        readonly bool trackChecksum;
+
+        byte[]? singleByteBuffer;
+
         const uint ChecksumModulus = 65521;
 
         // Most bytes that can be summed before the totals could overflow a uint. Chunking here is what
@@ -38,22 +44,44 @@ namespace fNbt {
         }
 
 
-        public ZLibStream(Stream stream, CompressionMode mode, bool leaveOpen)
-            : base(stream, mode, leaveOpen) { }
+        public ZLibStream(Stream stream, CompressionMode mode, bool leaveOpen, bool trackChecksum = true)
+            : base(stream, mode, leaveOpen) {
+            this.trackChecksum = trackChecksum;
+        }
 
 
         public override void Write(byte[] array, int offset, int count) {
-            UpdateChecksum(array, offset, count);
+            if (trackChecksum) {
+                UpdateChecksum(array, offset, count);
+            }
             base.Write(array, offset, count);
         }
 
 
         public override int Read(byte[] array, int offset, int count) {
             int bytesRead = base.Read(array, offset, count);
-            if (bytesRead > 0) {
+            if (bytesRead > 0 && trackChecksum) {
                 UpdateChecksum(array, offset, bytesRead);
             }
             return bytesRead;
+        }
+
+
+        // Single-byte reads and writes route through this type's own bulk methods, so the
+        // checksum sees every byte. Calling into the base instead would either skip the
+        // checksum (where DeflateStream has its own single-byte fast path) or count the byte
+        // twice (where the Stream default falls back to the bulk methods, which are virtual).
+        public override int ReadByte() {
+            byte[] buffer = singleByteBuffer ?? (singleByteBuffer = new byte[1]);
+            int bytesRead = Read(buffer, 0, 1);
+            return bytesRead == 0 ? -1 : buffer[0];
+        }
+
+
+        public override void WriteByte(byte value) {
+            byte[] buffer = singleByteBuffer ?? (singleByteBuffer = new byte[1]);
+            buffer[0] = value;
+            Write(buffer, 0, 1);
         }
     }
 }

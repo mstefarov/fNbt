@@ -55,20 +55,11 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtCodec(NbtOptions options) {
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            // Read each setting once, so a caller mutating the options concurrently cannot
-            // bypass validation. Options exposes the snapshot, not the caller's instance.
-            NbtFlavor snapshotFlavor = options.Flavor;
+            // Options exposes the snapshot, not the caller's instance
+            NbtFlavor snapshotFlavor = NbtOptions.SnapshotFlavor(options);
             bool validateOnRead = options.ValidateOnRead;
             bool snapshotValidateOnWrite = options.ValidateOnWrite;
-            long? snapshotMaxAllocation = options.MaxAllocation;
-            if (snapshotFlavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            if (snapshotMaxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), snapshotMaxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
+            long? snapshotMaxAllocation = NbtOptions.SnapshotMaxAllocation(options);
             Options = new NbtOptions {
                 Flavor = snapshotFlavor,
                 ValidateOnRead = validateOnRead,

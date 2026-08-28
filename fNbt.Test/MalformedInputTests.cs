@@ -92,8 +92,8 @@ namespace fNbt.Test {
         }
 
 
-#if NET6_0_OR_GREATER
-        // On net6+, a corrupt ZLib checksum must be caught and reported as InvalidDataException.
+        // A corrupt ZLib checksum must be caught and reported as InvalidDataException.
+        // The netstandard2.0 build validates the Adler-32 trailer itself on seekable streams.
         [TestMethod]
         public void CorruptZLibChecksumThrows() {
             var root = new NbtCompound("root") { new NbtInt("v", 1) };
@@ -105,7 +105,6 @@ namespace fNbt.Test {
             Assert.Throws<InvalidDataException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib));
         }
-#endif
 
 
         // Array tags used to allocate straight from the caller-controlled length prefix.
