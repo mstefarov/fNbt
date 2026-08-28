@@ -11,6 +11,11 @@ namespace fNbt.Test {
         public static readonly string BigGZip = Path.Combine(DirName, "bigtest.nbt.gz");
         public static readonly string BigZLib = Path.Combine(DirName, "bigtest.nbt.z");
 
+        // Real BedrockNetwork-encoded data generated from Minecraft: Bedrock Edition,
+        // from pmmp/BedrockData (CC0-1.0), commit bdb44a48fb6beffb6e9f6864f06d2232eb62b6a3
+        public static readonly string CanonicalBlockStates = Path.Combine(DirName, "canonical_block_states.nbt");
+        public static readonly string EntityIdentifiers = Path.Combine(DirName, "entity_identifiers.nbt");
+
 
         // Big-endian primitives for hand-building corrupt or exotic documents byte by byte
         public static void WriteBEShort(Stream s, short value) {

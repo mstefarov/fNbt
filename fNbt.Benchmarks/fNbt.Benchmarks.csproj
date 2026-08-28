@@ -36,5 +36,8 @@
     <None Update="TestFiles\cw-template.cw">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\fNbt.Test\TestFiles\canonical_block_states.nbt" Link="TestFiles\canonical_block_states.nbt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
