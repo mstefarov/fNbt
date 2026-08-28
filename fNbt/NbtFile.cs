@@ -661,6 +661,15 @@ namespace fNbt {
 
             switch (compression) {
                 case NbtCompression.ZLib:
+#if NET6_0_OR_GREATER
+                    // The framework stream writes the zlib header and Adler-32 trailer itself,
+                    // with the checksum computed in native code
+                    using (var compressStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Compress, true)) {
+                        var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8));
+                        bufferedStream.Flush();
+                    }
+#else
                     stream.WriteByte(0x78);
                     stream.WriteByte(0x01);
                     int checksum;
@@ -676,6 +685,7 @@ namespace fNbt {
                         Array.Reverse(checksumBytes);
                     }
                     stream.Write(checksumBytes, 0, checksumBytes.Length);
+#endif
                     break;
 
                 case NbtCompression.GZip:
