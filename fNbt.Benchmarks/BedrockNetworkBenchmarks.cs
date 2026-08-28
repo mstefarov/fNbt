@@ -36,9 +36,7 @@ public class BedrockNetworkBenchmarks {
     [Benchmark(Description = "Write block palette (NbtCodec)")]
     public long WritePalette() {
         using var ms = new MemoryStream(paletteBytes.Length);
-        foreach (NbtTag root in paletteRoots) {
-            codec.WriteTag(root, ms);
-        }
+        codec.WriteConcatenatedTags(paletteRoots, ms);
         return ms.Length;
     }
 

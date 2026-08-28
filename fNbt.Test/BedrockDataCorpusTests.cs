@@ -53,9 +53,7 @@ namespace fNbt.Test {
             byte[] doc = File.ReadAllBytes(TestFiles.CanonicalBlockStates);
             using (var input = new MemoryStream(doc))
             using (var output = new MemoryStream(doc.Length)) {
-                foreach (NbtTag root in Codec.ReadConcatenatedTags(input)) {
-                    Codec.WriteTag(root, output);
-                }
+                Codec.WriteConcatenatedTags(Codec.ReadConcatenatedTags(input), output);
                 AssertBytesEqual(doc, output.ToArray());
             }
         }

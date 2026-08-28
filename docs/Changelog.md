@@ -14,8 +14,8 @@
     framing: network packet payloads, LevelDB values, and NBT embedded inside
     other formats. Supports unnamed and non-compound roots (JavaNetwork),
     absent documents (a lone TAG_End byte), back-to-back documents via
-    ReadConcatenatedTags, and reads that stop exactly at the end of one
-    document, leaving trailing bytes in place. NbtCodec.For(flavor) returns
+    ReadConcatenatedTags and WriteConcatenatedTags, and reads that stop
+    exactly at the end of one document, leaving trailing bytes in place. NbtCodec.For(flavor) returns
     a cached default-options instance for one-off use.
 - Add NbtOptions, a settings object that NbtFile, NbtReader, NbtWriter,
     and NbtCodec all accept and snapshot at construction, so later changes

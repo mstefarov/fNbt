@@ -158,7 +158,7 @@ namespace fNbt {
                 tag = null;
                 return false;
             }
-            tag = ParseDocument(stream, firstByte, null);
+            tag = ParseDocument(CreateReader(stream), firstByte, null);
             return tag != null;
         }
 
@@ -230,6 +230,43 @@ namespace fNbt {
                 stream.WriteByte((byte)NbtTagType.End);
                 return;
             }
+            ValidateDocument(tag);
+            WriteDocument(tag, CreateWriter(stream));
+        }
+
+
+        /// <summary> Writes back-to-back NBT documents to the given stream, e.g. a Bedrock LevelDB
+        /// value holding several roots. Mirrors <see cref="ReadConcatenatedTags"/>, and is cheaper
+        /// than repeated <see cref="WriteTag(NbtTag?,Stream)"/> calls when documents are many. </summary>
+        /// <param name="tags"> Root tags to write, one document each. May not contain <c>null</c>:
+        /// absent documents cannot appear in a concatenated stream. </param>
+        /// <param name="stream"> Stream to write to. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="tags"/> or <paramref name="stream"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="tags"/> contains a <c>null</c> tag.
+        /// Documents before it are already written when this throws. </exception>
+        /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
+        /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
+        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// or if tags are nested more than 512 levels deep. Documents before the offending one
+        /// are already written when this throws. </exception>
+        public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, Stream stream) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            if (stream == null) throw new ArgumentNullException(nameof(stream));
+            NbtBinaryWriter? writer = null;
+            foreach (NbtTag tag in tags) {
+                if (tag == null) {
+                    throw new ArgumentException(
+                        "Sequence contains a null tag. Absent documents cannot appear in a concatenated stream.",
+                        nameof(tags));
+                }
+                ValidateDocument(tag);
+                if (writer == null) writer = CreateWriter(stream);
+                WriteDocument(tag, writer);
+            }
+        }
+
+
+        void ValidateDocument(NbtTag tag) {
             if (!flavor.AllowsNonCompoundRoot && tag.TagType != NbtTagType.Compound) {
                 throw new NbtFormatException(
                     flavor.Name + " requires a TAG_Compound root, but given tag is " +
@@ -238,12 +275,20 @@ namespace fNbt {
             if (validateOnWrite) {
                 flavor.ValidateTree(tag, 0);
             }
-            var writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
+        }
+
+
+        void WriteDocument(NbtTag tag, NbtBinaryWriter writer) {
             writer.Write(tag.TagType);
             if (flavor.HasRootName) {
                 writer.Write(tag.Name ?? "");
             }
             tag.WriteData(writer);
+        }
+
+
+        NbtBinaryWriter CreateWriter(Stream stream) {
+            return new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
         }
 
 
@@ -281,7 +326,7 @@ namespace fNbt {
             if (firstByte < 0) {
                 throw new EndOfStreamException();
             }
-            NbtTag? tag = ParseDocument(stream, firstByte, expectedRootType);
+            NbtTag? tag = ParseDocument(CreateReader(stream), firstByte, expectedRootType);
             if (tag == null) {
                 throw new NbtFormatException(
                     "Document contains no tag (a lone TAG_End byte). Use TryReadTag to accept absent documents.");
@@ -293,7 +338,7 @@ namespace fNbt {
         // Parses one document whose first (tag type) byte has already been consumed.
         // Returns null for an absent document: a lone TAG_End byte, valid only when the flavor
         // permits non-compound roots.
-        NbtTag? ParseDocument(Stream stream, int typeByte, NbtTagType? expectedRootType) {
+        NbtTag? ParseDocument(NbtBinaryReader reader, int typeByte, NbtTagType? expectedRootType) {
             if (typeByte == (int)NbtTagType.End) {
                 if (flavor.AllowsNonCompoundRoot) return null;
                 throw new NbtFormatException("Document may not start with a TAG_End byte.");
@@ -312,10 +357,6 @@ namespace fNbt {
                     NbtTag.GetCanonicalTagName(tagType) + " is not permitted by the " +
                     readValidationFlavor.Name + " flavor.");
             }
-            var reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
-            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
-                reader.SetLimits(maxAllocation, readValidationFlavor);
-            }
             NbtTag tag = CreateTag(tagType);
             if (flavor.HasRootName) {
                 tag.name = reader.ReadString();
@@ -325,11 +366,24 @@ namespace fNbt {
         }
 
 
+        NbtBinaryReader CreateReader(Stream stream) {
+            var reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
+            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
+                reader.SetLimits(maxAllocation, readValidationFlavor);
+            }
+            return reader;
+        }
+
+
         IEnumerable<NbtTag> ReadConcatenatedTagsIterator(Stream stream) {
+            // One reader serves the whole sequence; its depth counter is back to zero after
+            // every complete document
+            NbtBinaryReader? reader = null;
             while (true) {
                 int firstByte = stream.ReadByte();
                 if (firstByte < 0) yield break;
-                NbtTag? tag = ParseDocument(stream, firstByte, null);
+                if (reader == null) reader = CreateReader(stream);
+                NbtTag? tag = ParseDocument(reader, firstByte, null);
                 if (tag == null) {
                     throw new NbtFormatException("Absent document (a lone TAG_End byte) in a concatenated stream.");
                 }

@@ -230,6 +230,59 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void WriteConcatenatedTagsMatchesPerDocumentWrites() {
+            foreach (NbtFlavor flavor in new[] { NbtFlavor.Java, NbtFlavor.BedrockNetwork }) {
+                NbtCodec codec = NbtCodec.For(flavor);
+                var roots = new NbtTag[] {
+                    new NbtCompound("a") { new NbtInt("i", 300) },
+                    new NbtCompound("b") { new NbtString("s", "hi") },
+                    new NbtCompound("c") { new NbtLongArray("la", new[] { 1L, -2L }) }
+                };
+                if (flavor == NbtFlavor.BedrockNetwork) {
+                    // LongArray fails this flavor's write validation
+                    roots[2] = new NbtCompound("c") { new NbtIntArray("ia", new[] { 1, -2 }) };
+                }
+
+                using (var perDoc = new MemoryStream())
+                using (var concatenated = new MemoryStream()) {
+                    foreach (NbtTag root in roots) {
+                        codec.WriteTag(root, perDoc);
+                    }
+                    codec.WriteConcatenatedTags(roots, concatenated);
+                    CollectionAssert.AreEqual(perDoc.ToArray(), concatenated.ToArray(), flavor.Name);
+
+                    concatenated.Position = 0;
+                    List<NbtTag> readBack = codec.ReadConcatenatedTags(concatenated).ToList();
+                    Assert.AreEqual(roots.Length, readBack.Count);
+                    for (int i = 0; i < roots.Length; i++) {
+                        Assert.IsTrue(NbtComparer.Instance.Equals(roots[i], readBack[i]), flavor.Name);
+                    }
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void WriteConcatenatedTagsRejectsBadArguments() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
+            var root = new NbtCompound("r");
+            using (var ms = new MemoryStream()) {
+                Assert.Throws<ArgumentNullException>(() => codec.WriteConcatenatedTags(null, ms));
+                Assert.Throws<ArgumentNullException>(() => codec.WriteConcatenatedTags(new[] { root }, null));
+                // Absent documents cannot appear in a concatenated stream, so null elements are refused
+                Assert.Throws<ArgumentException>(
+                    () => codec.WriteConcatenatedTags(new NbtTag[] { root, null }, ms));
+                // Root rules and validation apply per document
+                Assert.Throws<NbtFormatException>(
+                    () => codec.WriteConcatenatedTags(new NbtTag[] { new NbtInt("i", 1) }, ms));
+                var over = new NbtCompound("r") { new NbtString("s", new string('x', 300)) };
+                Assert.Throws<NbtFormatException>(
+                    () => NbtCodec.For(NbtFlavor.ClassiCube).WriteConcatenatedTags(new NbtTag[] { root, over }, ms));
+            }
+        }
+
+
+        [TestMethod]
         public void ConcatenatedTagsThrowOnTruncatedDocument() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             using (var ms = new MemoryStream()) {
