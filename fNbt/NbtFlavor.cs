@@ -10,46 +10,53 @@ namespace fNbt {
         /// <summary> Java Edition 1.12 and later. Big-endian, named <c>TAG_Compound</c> root, all 13 tag types.
         /// Reads every older Java-flavor file. This is the default flavor. </summary>
         public static NbtFlavor Java { get; } =
-            new NbtFlavor("Java", true, NbtTagType.LongArray, ushort.MaxValue, NbtCompression.GZip);
+            new NbtFlavor("Java", bigEndian: true, modifiedUtf8: true,
+                          NbtTagType.LongArray, ushort.MaxValue, NbtCompression.GZip);
 
         /// <summary> Java Edition 1.2.1 through 1.11. Same as <see cref="Java"/>, but predates
         /// <c>TAG_Long_Array</c>. </summary>
         public static NbtFlavor JavaAnvil { get; } =
-            new NbtFlavor("JavaAnvil", true, NbtTagType.IntArray, ushort.MaxValue, NbtCompression.GZip);
+            new NbtFlavor("JavaAnvil", bigEndian: true, modifiedUtf8: true,
+                          NbtTagType.IntArray, ushort.MaxValue, NbtCompression.GZip);
 
         /// <summary> The original NBT format: Indev through Java Edition 1.1. Same as <see cref="Java"/>,
         /// but predates <c>TAG_Int_Array</c> and <c>TAG_Long_Array</c>. </summary>
         public static NbtFlavor JavaLegacy { get; } =
-            new NbtFlavor("JavaLegacy", true, NbtTagType.Compound, ushort.MaxValue, NbtCompression.GZip);
+            new NbtFlavor("JavaLegacy", bigEndian: true, modifiedUtf8: true,
+                          NbtTagType.Compound, ushort.MaxValue, NbtCompression.GZip);
 
         /// <summary> Java Edition network encoding, protocol 764 (1.20.2) and later. Big-endian like
         /// <see cref="Java"/>, but the root tag is unnamed and may be any tag type (e.g. <c>TAG_String</c>
         /// for text components), and a lone <c>TAG_End</c> byte means an absent document.
         /// Not a file format, though blobs of it may be embedded inside files. </summary>
         public static NbtFlavor JavaNetwork { get; } =
-            new NbtFlavor("JavaNetwork", true, NbtTagType.LongArray, ushort.MaxValue, NbtCompression.None,
-                          false, false, true);
+            new NbtFlavor("JavaNetwork", bigEndian: true, modifiedUtf8: true,
+                          NbtTagType.LongArray, ushort.MaxValue, NbtCompression.None,
+                          hasRootName: false, allowsNonCompoundRoot: true);
 
         /// <summary> Bedrock Edition disk format: <c>level.dat</c>, <c>.mcstructure</c>, and LevelDB values.
         /// Little-endian, named <c>TAG_Compound</c> root, no <c>TAG_Long_Array</c>. Strings are capped at
         /// 32,767 bytes: the length prefix is a signed 16-bit value. </summary>
         public static NbtFlavor Bedrock { get; } =
-            new NbtFlavor("Bedrock", false, NbtTagType.IntArray, short.MaxValue, NbtCompression.None);
+            new NbtFlavor("Bedrock", bigEndian: false, modifiedUtf8: false,
+                          NbtTagType.IntArray, short.MaxValue, NbtCompression.None);
 
         /// <summary> Bedrock Edition network encoding, 0.16 and later. Little-endian, with
         /// <c>TAG_Int</c>/<c>TAG_Long</c> values and container lengths as zigzag varints, and string
         /// lengths as unsigned varints. Not implemented yet: reading or writing currently throws
         /// <see cref="NotSupportedException"/>. </summary>
         public static NbtFlavor BedrockNetwork { get; } =
-            new NbtFlavor("BedrockNetwork", false, NbtTagType.IntArray, int.MaxValue, NbtCompression.None,
-                          true);
+            new NbtFlavor("BedrockNetwork", bigEndian: false, modifiedUtf8: false,
+                          NbtTagType.IntArray, int.MaxValue, NbtCompression.None,
+                          usesVarInts: true);
 
         /// <summary> The profile of ClassicWorld (<c>.cw</c>) maps that the ClassiCube client can load:
         /// big-endian with a named <c>TAG_Compound</c> root, GZip-compressed, tag types 0-10, strings up
         /// to 256 bytes. Spec-compliant ClassicWorld files that use <c>TAG_Int_Array</c> match
         /// <see cref="JavaAnvil"/> instead. </summary>
         public static NbtFlavor ClassiCube { get; } =
-            new NbtFlavor("ClassiCube", true, NbtTagType.Compound, 256, NbtCompression.GZip);
+            new NbtFlavor("ClassiCube", bigEndian: true, modifiedUtf8: true,
+                          NbtTagType.Compound, 256, NbtCompression.GZip);
 
 
         /// <summary> Short display name of this flavor, e.g. "Java" or "BedrockNetwork". </summary>
@@ -62,6 +69,12 @@ namespace fNbt {
         /// <summary> Whether <c>TAG_Int</c>/<c>TAG_Long</c> values and length prefixes use variable-length
         /// encoding. True only for <see cref="BedrockNetwork"/>. </summary>
         public bool UsesVarInts { get; }
+
+        /// <summary> Whether strings are written as Java's modified UTF-8 (CESU-8 pairs for
+        /// astral characters, the overlong <c>C0 80</c> form for NUL, lone surrogates preserved).
+        /// True for the Java flavors and ClassiCube; the Bedrock flavors write standard UTF-8.
+        /// Reads accept both encodings on every flavor. </summary>
+        public bool UsesModifiedUtf8 { get; }
 
         /// <summary> Whether a document's root tag carries a name. False only for
         /// <see cref="JavaNetwork"/>. </summary>
@@ -141,9 +154,9 @@ namespace fNbt {
 
 
         internal void ValidateString(string value) {
-            // UTF-8 needs at most 4 bytes per char, so short strings skip the exact count
+            // Neither encoding exceeds 4 bytes per char, so short strings skip the exact count
             if ((long)value.Length * 4 <= MaxStringBytes) return;
-            int byteCount = Encoding.UTF8.GetByteCount(value);
+            int byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {
                 throw new NbtFormatException(
                     "String is " + byteCount + " bytes, but the " + Name +
@@ -168,11 +181,12 @@ namespace fNbt {
         }
 
 
-        NbtFlavor(string name, bool bigEndian, NbtTagType maxTagType, int maxStringBytes,
-                  NbtCompression defaultCompression, bool usesVarInts = false,
+        NbtFlavor(string name, bool bigEndian, bool modifiedUtf8, NbtTagType maxTagType,
+                  int maxStringBytes, NbtCompression defaultCompression, bool usesVarInts = false,
                   bool hasRootName = true, bool allowsNonCompoundRoot = false) {
             Name = name;
             BigEndian = bigEndian;
+            UsesModifiedUtf8 = modifiedUtf8;
             MaxTagType = maxTagType;
             MaxStringBytes = maxStringBytes;
             DefaultCompression = defaultCompression;

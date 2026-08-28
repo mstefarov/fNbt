@@ -82,10 +82,8 @@ namespace fNbt {
 
 
         internal override bool ReadTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Int_Array");
-            }
+            // Negative lengths are tolerated as empty, exceeding vanilla on purpose
+            int length = Math.Max(0, readStream.ReadInt32());
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.Skip<int>(length);
@@ -98,10 +96,7 @@ namespace fNbt {
 
 
         internal override void SkipTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Int_Array");
-            }
+            int length = Math.Max(0, readStream.ReadInt32());
             readStream.Skip<int>(length);
         }
 

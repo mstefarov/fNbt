@@ -349,19 +349,28 @@ namespace fNbt {
                 case NbtTagType.IntArray:
                 case NbtTagType.ByteArray:
                 case NbtTagType.LongArray:
-                    TagLength = reader.ReadInt32();
-                    if (TagLength < 0) {
-                        throw new NbtFormatException("Negative array length given: " + TagLength);
-                    }
+                    // Negative lengths are tolerated as empty, exceeding vanilla on purpose
+                    TagLength = Math.Max(0, reader.ReadInt32());
                     atValue = true;
                     state = oldState;
                     break;
 
                 case NbtTagType.List:
-                    ListType = reader.ReadTagType();
+                    // Same tolerances as NbtList.ReadTag: the type byte is interpreted after
+                    // the length, and an empty list accepts any type byte
+                    byte rawListType = reader.ReadByte();
                     TagLength = reader.ReadInt32();
-                    if (TagLength < 0) {
-                        throw new NbtFormatException("Negative tag length given: " + TagLength);
+                    if (TagLength <= 0) {
+                        TagLength = 0;
+                        ListType = rawListType <= (byte)NbtTagType.LongArray
+                            ? (NbtTagType)rawListType
+                            : NbtTagType.End;
+                    } else {
+                        ListType = reader.RequireValidTagType(rawListType);
+                        if (ListType == NbtTagType.End) {
+                            throw new NbtFormatException(
+                                "A non-empty list may not have TAG_End as its element type.");
+                        }
                     }
                     state = NbtParseState.AtListBeginning;
                     break;

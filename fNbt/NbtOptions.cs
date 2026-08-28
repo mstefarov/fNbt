@@ -22,6 +22,12 @@ namespace fNbt {
         /// restrictions (like <see cref="NbtFlavor.Java"/>) pay no cost either way. </summary>
         public bool ValidateOnWrite { get; init; } = true;
 
+        /// <summary> Whether <see cref="NbtFile"/> loads require the document to end exactly where
+        /// the stream does. Applies to uncompressed loads only: compressed loads consume the stream
+        /// to its end regardless, because the document's extent is unknowable behind decompressor
+        /// read-ahead. Defaults to <c>false</c>: trailing data is ignored. </summary>
+        public bool DisallowTrailingData { get; init; }
+
         /// <summary> Maximum size, in bytes, of any single allocation made on behalf of a length
         /// declared in the input: array payloads, list-as-array reads, and strings. Guards against
         /// tiny corrupt or hostile documents declaring huge lengths, which matters most on

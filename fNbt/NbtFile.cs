@@ -88,6 +88,7 @@ namespace fNbt {
         // Validation and limit settings, fixed at construction (default options unless given)
         readonly bool validateOnRead;
         readonly bool validateOnWrite = true;
+        readonly bool disallowTrailingData;
         readonly long maxAllocation = long.MaxValue;
 
         /// <summary> Gets or sets the default value of <c>BufferSize</c> property. Default is 8192. 
@@ -153,6 +154,7 @@ namespace fNbt {
             flavor = options.Flavor;
             validateOnRead = options.ValidateOnRead;
             validateOnWrite = options.ValidateOnWrite;
+            disallowTrailingData = options.DisallowTrailingData;
             maxAllocation = options.MaxAllocation ?? long.MaxValue;
             BufferSize = DefaultBufferSize;
             rootTag = new NbtCompound("");
@@ -355,6 +357,9 @@ namespace fNbt {
 
                 case NbtCompression.None:
                     LoadFromStreamInternal(stream, selector);
+                    if (disallowTrailingData) {
+                        EnsureNoTrailingData(stream);
+                    }
                     break;
 
                 case NbtCompression.ZLib:
@@ -424,6 +429,18 @@ namespace fNbt {
         static void DrainToEnd(Stream stream) {
             byte[] buffer = new byte[4096];
             while (stream.Read(buffer, 0, buffer.Length) > 0) { }
+        }
+
+
+        // Opt-in strict check for uncompressed loads: the document must end exactly where the
+        // stream does. Compressed loads consume the stream regardless, so they have nothing to check.
+        static void EnsureNoTrailingData(Stream stream) {
+            bool hasTrailingData = stream.CanSeek
+                ? stream.Position < stream.Length
+                : stream.ReadByte() >= 0;
+            if (hasTrailingData) {
+                throw new NbtFormatException("Trailing data found after the NBT document.");
+            }
         }
 
 
@@ -660,7 +677,7 @@ namespace fNbt {
                     int checksum;
                     using (var compressStream = new ZLibStream(stream, CompressionMode.Compress, true)) {
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8));
                         bufferedStream.Flush();
                         checksum = compressStream.Checksum;
                     }
@@ -676,13 +693,13 @@ namespace fNbt {
                     using (var compressStream = new GZipStream(stream, CompressionMode.Compress, true)) {
                         // use a buffered stream to avoid GZipping in small increments (which has a lot of overhead)
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8));
                         bufferedStream.Flush();
                     }
                     break;
 
                 case NbtCompression.None:
-                    var writer = new NbtBinaryWriter(stream, flavor.BigEndian);
+                    var writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
                     RootTag.WriteTag(writer);
                     break;
 

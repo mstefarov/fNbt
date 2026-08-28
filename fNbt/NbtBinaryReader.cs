@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
 
 namespace fNbt {
     /// <summary> BinaryReader wrapper that takes care of reading primitives from an NBT stream,
@@ -71,7 +70,11 @@ namespace fNbt {
 
 
         public NbtTagType ReadTagType() {
-            byte type = ReadByte(); // Throws at end of stream
+            return RequireValidTagType(ReadByte()); // ReadByte throws at end of stream
+        }
+
+
+        public NbtTagType RequireValidTagType(byte type) {
             // maxTagType is LongArray unless read validation lowered it, so the common case
             // stays a single comparison
             if (type > (byte)maxTagType) {
@@ -190,13 +193,13 @@ namespace fNbt {
                     }
                     stringBytesRead += bytesReadThisTime;
                 }
-                return Encoding.UTF8.GetString(stringConversionBuffer, 0, length);
+                return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
             } else {
                 byte[] stringData = ReadBytes(length);
                 if (stringData.Length < length) {
                     throw new EndOfStreamException();
                 }
-                return Encoding.UTF8.GetString(stringData);
+                return NbtStringCodec.Decode(stringData, 0, length);
             }
         }
 

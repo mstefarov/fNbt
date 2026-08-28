@@ -81,7 +81,7 @@ namespace fNbt {
             }
             options.Flavor.EnsureUsableForFiles(nameof(options));
             flavor = options.Flavor;
-            writer = new NbtBinaryWriter(stream, flavor.BigEndian);
+            writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
             if (options.ValidateOnWrite && flavor.HasRestrictions) {
                 maxTagType = flavor.MaxTagType;
                 writer.SetMaxStringBytes(flavor.MaxStringBytes);

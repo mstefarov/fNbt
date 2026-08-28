@@ -38,6 +38,9 @@ namespace fNbt {
 
         readonly bool useVarInt;
 
+        // Java flavors use modified UTF-8; clean BMP strings still take the standard path
+        readonly bool modifiedUtf8;
+
         // Lowered by NbtWriter when write validation is on for a flavor with a smaller ceiling
         int maxStringBytes = ushort.MaxValue;
 
@@ -63,16 +66,13 @@ namespace fNbt {
         }
 
 
-        public NbtBinaryWriter(Stream input, bool bigEndian)
-            : this(input, bigEndian, false) { }
-
-
-        public NbtBinaryWriter(Stream input, bool bigEndian, bool useVarInt) {
+        public NbtBinaryWriter(Stream input, bool bigEndian, bool useVarInt = false, bool modifiedUtf8 = false) {
             if (input == null) throw new ArgumentNullException(nameof(input));
             if (!input.CanWrite) throw new ArgumentException("Given stream must be writable", nameof(input));
             stream = input;
             swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
             this.useVarInt = useVarInt;
+            this.modifiedUtf8 = modifiedUtf8;
         }
 
 
@@ -205,7 +205,20 @@ namespace fNbt {
                 throw new ArgumentNullException(nameof(value));
             }
 
-            int numBytes = Encoding.GetByteCount(value);
+            // Strings with NULs or surrogates encode differently in modified UTF-8; everything
+            // else is byte-identical in both encodings and stays on the standard path below.
+            if (modifiedUtf8 && NbtStringCodec.NeedsModifiedEncoding(value)) {
+                WriteModifiedUtf8(value);
+                return;
+            }
+
+            int numBytes;
+            try {
+                numBytes = Encoding.GetByteCount(value);
+            } catch (EncoderFallbackException ex) {
+                throw new NbtFormatException(
+                    "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+            }
             if (useVarInt) {
                 // BedrockNetwork length prefix is a plain unsigned varint
                 WriteUnsignedVarInt32((uint)numBytes);
@@ -244,6 +257,32 @@ namespace fNbt {
                     charStart += charCount;
                     numLeft -= charCount;
                 }
+            }
+        }
+
+
+        void WriteModifiedUtf8(string value) {
+            int numBytes = NbtStringCodec.GetModifiedByteCount(value);
+            if (useVarInt) {
+                WriteUnsignedVarInt32((uint)numBytes);
+            } else {
+                if (numBytes > maxStringBytes) {
+                    throw new NbtFormatException(
+                        "String is too long to write: " + numBytes + " bytes (maximum is " +
+                        maxStringBytes + ").");
+                }
+                Write((short)numBytes);
+            }
+            int pos = 0;
+            foreach (char c in value) {
+                if (pos > BufferSize - 3) {
+                    stream.Write(buffer, 0, pos);
+                    pos = 0;
+                }
+                pos = NbtStringCodec.EncodeModifiedChar(c, buffer, pos);
+            }
+            if (pos > 0) {
+                stream.Write(buffer, 0, pos);
             }
         }
 

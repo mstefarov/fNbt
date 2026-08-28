@@ -7,5 +7,8 @@ namespace fNbt {
     public sealed class NbtFormatException : Exception {
         internal NbtFormatException(string message)
             : base(message) { }
+
+        internal NbtFormatException(string message, Exception innerException)
+            : base(message, innerException) { }
     }
 }

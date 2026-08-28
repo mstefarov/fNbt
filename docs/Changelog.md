@@ -1,4 +1,21 @@
 ## 2.0.0 (fNbt, unreleased)
+- Java flavors now write modified UTF-8, byte-compatible with Minecraft Java:
+    astral characters as CESU-8 surrogate pairs, NUL as the overlong C0 80
+    form, and lone surrogates preserved. Bedrock flavors keep standard UTF-8,
+    and a lone surrogate there now throws NbtFormatException instead of an
+    undocumented EncoderFallbackException. String ceilings count the flavor's
+    own encoding, so an astral-heavy string that only fits as standard UTF-8
+    is now correctly rejected on the Java flavors.
+- String reads are lenient on every flavor: standard and modified UTF-8 both
+    decode, and malformed data throws NbtFormatException. Previously astral
+    characters written by Minecraft Java silently corrupted into U+FFFD
+    replacement characters on load, and fNbt-written astral characters
+    produced files Minecraft Java refuses to read.
+- Negative list and array lengths now read as empty instead of throwing, and
+    an empty list accepts any element-type byte. Both are deliberately more
+    tolerant than Minecraft's own readers.
+- Add NbtOptions.DisallowTrailingData: opt-in strict mode that makes NbtFile
+    reject uncompressed documents that end before the stream does.
 - Add NbtFlavor, naming the NBT wire encodings: Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube.
     BedrockNetwork (varint encoding) is declared but not implemented yet.

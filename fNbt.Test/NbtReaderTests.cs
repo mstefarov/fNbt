@@ -860,11 +860,26 @@ namespace fNbt.Test {
 
 
         void AssertBadFileFromBuffer(byte[] input) {
-            Assert.Throws<NbtFormatException>(() => TryReadBadFile(input));
-            Assert.Throws<NbtFormatException>(
+            // Corrupt input fails as a format error, or as a premature end of stream when a
+            // tolerated length (e.g. a negative array size read as empty) leaves the rest of
+            // the document truncated
+            AssertThrowsParseError(() => TryReadBadFile(input));
+            AssertThrowsParseError(
                 () => new NbtFile().LoadFromBuffer(input, 0, input.Length, NbtCompression.None));
-            Assert.Throws<NbtFormatException>(
+            AssertThrowsParseError(
                 () => new NbtFile().LoadFromBuffer(input, 0, input.Length, NbtCompression.None, tag => false));
+        }
+
+
+        static void AssertThrowsParseError(Action action) {
+            try {
+                action();
+            } catch (NbtFormatException) {
+                return;
+            } catch (EndOfStreamException) {
+                return;
+            }
+            Assert.Fail("Expected NbtFormatException or EndOfStreamException.");
         }
 
 

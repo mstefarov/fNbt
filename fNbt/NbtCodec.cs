@@ -232,7 +232,7 @@ namespace fNbt {
             if (validateOnWrite) {
                 flavor.ValidateTree(tag, 0);
             }
-            var writer = new NbtBinaryWriter(stream, flavor.BigEndian);
+            var writer = new NbtBinaryWriter(stream, flavor.BigEndian, modifiedUtf8: flavor.UsesModifiedUtf8);
             writer.Write(tag.TagType);
             if (flavor.HasRootName) {
                 writer.Write(tag.Name ?? "");
