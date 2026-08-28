@@ -28,7 +28,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="rootTagName"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable. </exception>
         public NbtWriter(Stream stream, string rootTagName)
-            : this(stream, rootTagName, NbtOptions.Default) { }
+            : this(stream, rootTagName, NbtFlavor.Java, true, null) { }
 
 
         /// <summary> Initializes a new instance of the NbtWriter class. </summary>
@@ -52,12 +52,36 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor)
-            : this(stream, rootTagName, MakeOptions(flavor)) { }
+            : this(stream, rootTagName, ValidFlavor(flavor), true, null) { }
 
 
-        static NbtOptions MakeOptions(NbtFlavor flavor) {
+        static NbtFlavor ValidFlavor(NbtFlavor flavor) {
             if (flavor == null) throw new ArgumentNullException(nameof(flavor));
-            return new NbtOptions { Flavor = flavor };
+            flavor.EnsureUsableForFiles(nameof(flavor));
+            return flavor;
+        }
+
+
+        // These two helpers snapshot and validate the options overload's settings, reading each
+        // option once so a concurrently-mutated instance cannot bypass validation.
+        static NbtFlavor ValidOptionsFlavor(NbtOptions options) {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            NbtFlavor flavor = options.Flavor;
+            if (flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            flavor.EnsureUsableForFiles(nameof(options));
+            return flavor;
+        }
+
+
+        static long? ValidMaxAllocation(NbtOptions options) {
+            long? maxAllocation = options.MaxAllocation;
+            if (maxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), maxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
+            return maxAllocation;
         }
 
 
@@ -71,20 +95,19 @@ namespace fNbt {
         /// <paramref name="options"/>, or the options' <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        public NbtWriter(Stream stream, string rootTagName, NbtOptions options) {
+        public NbtWriter(Stream stream, string rootTagName, NbtOptions options)
+            : this(stream, rootTagName, ValidOptionsFlavor(options), options.ValidateOnWrite,
+                   ValidMaxAllocation(options)) { }
+
+
+        // maxAllocation is validated by the callers and otherwise unused: writing allocates
+        // nothing based on input
+        NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor, bool validateOnWrite,
+                  long? maxAllocation) {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            if (options.Flavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            if (options.MaxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
-            options.Flavor.EnsureUsableForFiles(nameof(options));
-            flavor = options.Flavor;
+            this.flavor = flavor;
             writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
-            if (options.ValidateOnWrite && flavor.HasRestrictions) {
+            if (validateOnWrite && flavor.HasRestrictions) {
                 maxTagType = flavor.MaxTagType;
                 writer.SetMaxStringBytes(flavor.MaxStringBytes);
             }

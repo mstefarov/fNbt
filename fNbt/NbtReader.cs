@@ -23,7 +23,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable. </exception>
         public NbtReader(Stream stream)
-            : this(stream, NbtOptions.Default) { }
+            : this(stream, NbtFlavor.Java, false, null) { }
 
 
         /// <summary> Initializes a new instance of the NbtReader class. </summary>
@@ -44,12 +44,36 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         public NbtReader(Stream stream, NbtFlavor flavor)
-            : this(stream, MakeOptions(flavor)) { }
+            : this(stream, ValidFlavor(flavor), false, null) { }
 
 
-        static NbtOptions MakeOptions(NbtFlavor flavor) {
+        static NbtFlavor ValidFlavor(NbtFlavor flavor) {
             if (flavor == null) throw new ArgumentNullException(nameof(flavor));
-            return new NbtOptions { Flavor = flavor };
+            flavor.EnsureUsableForFiles(nameof(flavor));
+            return flavor;
+        }
+
+
+        // These two helpers snapshot and validate the options overload's settings, reading each
+        // option once so a concurrently-mutated instance cannot bypass validation.
+        static NbtFlavor ValidOptionsFlavor(NbtOptions options) {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            NbtFlavor flavor = options.Flavor;
+            if (flavor == null) {
+                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
+            }
+            flavor.EnsureUsableForFiles(nameof(options));
+            return flavor;
+        }
+
+
+        static long? ValidMaxAllocation(NbtOptions options) {
+            long? maxAllocation = options.MaxAllocation;
+            if (maxAllocation <= 0) {
+                throw new ArgumentOutOfRangeException(nameof(options), maxAllocation,
+                                                      "MaxAllocation must be positive.");
+            }
+            return maxAllocation;
         }
 
 
@@ -63,17 +87,12 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
-        public NbtReader(Stream stream, NbtOptions options) {
+        public NbtReader(Stream stream, NbtOptions options)
+            : this(stream, ValidOptionsFlavor(options), options.ValidateOnRead, ValidMaxAllocation(options)) { }
+
+
+        NbtReader(Stream stream, NbtFlavor flavor, bool validateOnRead, long? maxAllocationOption) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            if (options.Flavor == null) {
-                throw new ArgumentNullException(nameof(options), "Options must name a flavor.");
-            }
-            if (options.MaxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(nameof(options), options.MaxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
-            options.Flavor.EnsureUsableForFiles(nameof(options));
             SkipEndTags = true;
             CacheTagValues = false;
             ParentTagType = NbtTagType.Unknown;
@@ -84,10 +103,10 @@ namespace fNbt {
                 streamStartOffset = stream.Position;
             }
 
-            reader = new NbtBinaryReader(stream, options.Flavor.BigEndian, options.Flavor.UsesVarInts);
-            long maxAllocation = options.MaxAllocation ?? long.MaxValue;
+            reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
+            long maxAllocation = maxAllocationOption ?? long.MaxValue;
             NbtFlavor? readValidationFlavor =
-                (options.ValidateOnRead && options.Flavor.HasRestrictions) ? options.Flavor : null;
+                (validateOnRead && flavor.HasRestrictions) ? flavor : null;
             if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
                 reader.SetLimits(maxAllocation, readValidationFlavor);
             }
