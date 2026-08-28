@@ -626,8 +626,8 @@ namespace fNbt {
             CheckArray(data, offset, count);
             EnforceConstraints(null, NbtTagType.IntArray);
             writer.Write(count);
-            for (int i = offset; i < count; i++) {
-                writer.Write(data[i]);
+            for (int i = 0; i < count; i++) {
+                writer.Write(data[offset + i]);
             }
         }
 
@@ -664,8 +664,8 @@ namespace fNbt {
             writer.Write((byte)NbtTagType.IntArray);
             writer.Write(tagName);
             writer.Write(count);
-            for (int i = offset; i < count; i++) {
-                writer.Write(data[i]);
+            for (int i = 0; i < count; i++) {
+                writer.Write(data[offset + i]);
             }
         }
 
@@ -697,8 +697,8 @@ namespace fNbt {
             CheckArray(data, offset, count);
             EnforceConstraints(null, NbtTagType.LongArray);
             writer.Write(count);
-            for (int i = offset; i < count; i++) {
-                writer.Write(data[i]);
+            for (int i = 0; i < count; i++) {
+                writer.Write(data[offset + i]);
             }
         }
 
@@ -735,8 +735,8 @@ namespace fNbt {
             writer.Write((byte)NbtTagType.LongArray);
             writer.Write(tagName);
             writer.Write(count);
-            for (int i = offset; i < count; i++) {
-                writer.Write(data[i]);
+            for (int i = 0; i < count; i++) {
+                writer.Write(data[offset + i]);
             }
         }
 

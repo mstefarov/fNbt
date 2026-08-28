@@ -616,6 +616,34 @@ namespace fNbt.Test {
         }
 
 
+        [TestMethod]
+        public void ArraySegmentsHonorOffset() {
+            int[] ints = { 10, 11, 12, 13, 14 };
+            long[] longs = { 20, 21, 22, 23, 24 };
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                writer.WriteIntArray("ia", ints, 2, 3);
+                writer.WriteIntArray("iaTail", ints, 3, 2);
+                writer.WriteLongArray("la", longs, 2, 3);
+                writer.WriteLongArray("laTail", longs, 3, 2);
+                writer.BeginList("list", NbtTagType.IntArray, 1);
+                writer.WriteIntArray(ints, 1, 4);
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+
+                ms.Position = 0;
+                var file = new NbtFile();
+                file.LoadFromStream(ms, NbtCompression.None);
+                CollectionAssert.AreEqual(new[] { 12, 13, 14 }, file.RootTag["ia"].IntArrayValue);
+                CollectionAssert.AreEqual(new[] { 13, 14 }, file.RootTag["iaTail"].IntArrayValue);
+                CollectionAssert.AreEqual(new long[] { 22, 23, 24 }, file.RootTag["la"].LongArrayValue);
+                CollectionAssert.AreEqual(new long[] { 23, 24 }, file.RootTag["laTail"].LongArrayValue);
+                CollectionAssert.AreEqual(new[] { 11, 12, 13, 14 }, file.RootTag["list"][0].IntArrayValue);
+            }
+        }
+
+
         class NonReadableStream : MemoryStream {
             public override bool CanRead {
                 get { return false; }
