@@ -131,30 +131,39 @@ namespace fNbt {
 
         // BedrockNetwork varints, 7 bits per byte, least-significant group first.
         // TAG_Int/TAG_Long values and container lengths are zigzag-encoded on top of
-        // these; string lengths use the plain unsigned form.
+        // these; string lengths use the plain unsigned form. The last byte a width allows
+        // has room only for the leftover bits (4 and 1), so anything above them is an
+        // overflow: shifting it away would silently turn a length of 2^32 into 0.
         uint ReadUnsignedVarInt32() {
             uint result = 0;
-            int shift = 0;
-            while (true) {
+            for (int shift = 0; shift < 28; shift += 7) {
                 byte b = ReadByte();
                 result |= (uint)(b & 0x7F) << shift;
                 if ((b & 0x80) == 0) return result;
-                shift += 7;
-                if (shift >= 35) throw new NbtFormatException("VarInt32 is too long.");
             }
+            byte last = ReadByte();
+            if (last > 0x0F) throw VarIntError(32, last);
+            return result | ((uint)last << 28);
         }
 
 
         ulong ReadUnsignedVarInt64() {
             ulong result = 0;
-            int shift = 0;
-            while (true) {
+            for (int shift = 0; shift < 63; shift += 7) {
                 byte b = ReadByte();
                 result |= (ulong)(b & 0x7F) << shift;
                 if ((b & 0x80) == 0) return result;
-                shift += 7;
-                if (shift >= 70) throw new NbtFormatException("VarInt64 is too long.");
             }
+            byte last = ReadByte();
+            if (last > 0x01) throw VarIntError(64, last);
+            return result | ((ulong)last << 63);
+        }
+
+
+        static NbtFormatException VarIntError(int bits, byte last) {
+            return new NbtFormatException((last & 0x80) != 0
+                ? "VarInt" + bits + " is too long."
+                : "VarInt" + bits + " overflows " + bits + " bits.");
         }
 
 
@@ -267,25 +276,16 @@ namespace fNbt {
         // Converts element count to a byte count here, taking care not to overflow.
         public unsafe void Skip<T>(int elementCount) where T : unmanaged {
             if (useVarInt && (typeof(T) == typeof(int) || typeof(T) == typeof(long))) {
-                // Varint elements have no fixed width, so they are skipped one at a time,
-                // enforcing the same width limits as the read path
-                SkipVarInts(elementCount, typeof(T) == typeof(int) ? 5 : 10);
+                // Varint elements have no fixed width, so they are decoded one at a time and
+                // discarded, which applies the read path's width and overflow rules
+                if (typeof(T) == typeof(int)) {
+                    for (int i = 0; i < elementCount; i++) ReadUnsignedVarInt32();
+                } else {
+                    for (int i = 0; i < elementCount; i++) ReadUnsignedVarInt64();
+                }
                 return;
             }
             Skip((long)elementCount * sizeof(T));
-        }
-
-
-        void SkipVarInts(int elementCount, int maxBytesEach) {
-            for (int i = 0; i < elementCount; i++) {
-                int bytesRead = 0;
-                while ((ReadByte() & 0x80) != 0) {
-                    if (++bytesRead >= maxBytesEach) {
-                        throw new NbtFormatException(
-                            maxBytesEach == 5 ? "VarInt32 is too long." : "VarInt64 is too long.");
-                    }
-                }
-            }
         }
 
 

@@ -216,6 +216,42 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void OverflowingVarIntLengthIsRejected() {
+            // Declares a root-name length of 2^32. The bit that does not fit in the fifth byte
+            // used to shift away, leaving a length of zero and a document that parsed cleanly.
+            byte[] doc = { 0x0A, 0x80, 0x80, 0x80, 0x80, 0x10, 0x00 };
+            Assert.Throws<NbtFormatException>(
+                () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _));
+            var file = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            Assert.Throws<NbtFormatException>(
+                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(
+                    () => new NbtReader(ms, NbtFlavor.BedrockNetwork).ReadToFollowing());
+            }
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
+            }
+
+            // An int-array element with the same overflow is rejected when skipped, too
+            byte[] arrayDoc = {
+                0x0A, 0x00,
+                0x0B, 0x01, (byte)'x', 0x02, 0x80, 0x80, 0x80, 0x80, 0x10,
+                0x00
+            };
+            Assert.Throws<NbtFormatException>(
+                () => file.LoadFromBuffer(arrayDoc, 0, arrayDoc.Length, NbtCompression.None, tag => false));
+            using (var ms = new MemoryStream(arrayDoc)) {
+                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
+                reader.ReadToFollowing(); // root
+                reader.ReadToFollowing(); // "x"
+                Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
+            }
+        }
+
+
+        [TestMethod]
         public void SkippingFloatsAndDoublesStaysAligned() {
             // Floats and doubles stay fixed-width in the varint encoding; skipping them
             // through a varint-decoding path would desync the stream

@@ -122,6 +122,36 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void OverflowingVarIntThrows() {
+            // The fifth byte of a VarInt32 has room for 4 bits, and the tenth byte of a
+            // VarInt64 for 1. Bits above those used to shift away silently.
+            Assert.Throws<NbtFormatException>(
+                () => VarIntReader(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x10 }).ReadInt32());
+            Assert.Throws<NbtFormatException>(
+                () => VarIntReader(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x7F }).ReadInt32());
+            byte[] wide = Enumerable.Repeat((byte)0x80, 9).Concat(new byte[] { 0x02 }).ToArray();
+            Assert.Throws<NbtFormatException>(() => VarIntReader(wide).ReadInt64());
+
+            // String length prefixes go through the same decoder
+            Assert.Throws<NbtFormatException>(
+                () => VarIntReader(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x10 }).ReadString());
+
+            // The bits that do fit still count
+            Assert.AreEqual(int.MinValue, VarIntReader(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x0F }).ReadInt32());
+            byte[] max64 = Enumerable.Repeat((byte)0xFF, 9).Concat(new byte[] { 0x01 }).ToArray();
+            Assert.AreEqual(long.MinValue, VarIntReader(max64).ReadInt64());
+
+            // Skipping decodes the same way, so it rejects and accepts the same input
+            Assert.Throws<NbtFormatException>(
+                () => VarIntReader(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x10 }).Skip<int>(1));
+            Assert.Throws<NbtFormatException>(() => VarIntReader(wide).Skip<long>(1));
+            NbtBinaryReader reader = VarIntReader(max64);
+            reader.Skip<long>(1);
+            Assert.AreEqual(max64.Length, reader.BaseStream.Position);
+        }
+
+
+        [TestMethod]
         public void TruncatedVarIntThrows() {
             // Continuation bit set, then the stream ends
             Assert.Throws<EndOfStreamException>(() => VarIntReader(new byte[] { 0x80 }).ReadInt32());
