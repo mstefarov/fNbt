@@ -25,7 +25,9 @@
   <ItemGroup Condition="'$(FNbtNuGetVersion)' != ''">
     <PackageReference Include="fNbt" Version="$(FNbtNuGetVersion)" />
   </ItemGroup>
-  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != ''">
+  <!-- FNBT_BASELINE marks a build against a 1.x package, which lacks the 2.0 APIs some benchmarks use.
+       Later snapshots run the whole suite. -->
+  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != '' and $([MSBuild]::VersionLessThan('$(FNbtNuGetVersion)', '2.0'))">
     <DefineConstants>$(DefineConstants);FNBT_BASELINE</DefineConstants>
   </PropertyGroup>
   

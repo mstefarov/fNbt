@@ -28,9 +28,9 @@ class Program {
         if (!isSuccess)
             return;
 
-        // Benchmarks using newer APIs can't compile against the baseline package. Source #if
+        // Benchmarks using 2.0 APIs can't compile against a 1.x baseline package. Source #if
         // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
-        if (customArgs.BaselineVersion != null) {
+        if (customArgs.BaselineVersion != null && IsPre2(customArgs.BaselineVersion)) {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
         }
 
@@ -67,6 +67,11 @@ class Program {
         BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
             .Run(benchmarkArgs, initialConfig);
+    }
+
+    // Mirrors the FNBT_BASELINE condition in the csproj
+    static bool IsPre2(string version) {
+        return int.TryParse(version.Split('.')[0], out int major) && major < 2;
     }
 }
 
