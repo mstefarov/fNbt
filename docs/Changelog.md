@@ -17,7 +17,10 @@
     ReadConcatenatedTags and WriteConcatenatedTags, and reads that stop
     exactly at the end of one document, leaving trailing bytes in place.
     NbtCodec.For(flavor) returns a cached default-options instance for
-    one-off use.
+    one-off use. Reads take a Stream or a byte array segment, optionally
+    requiring a root tag type; writes go to a Stream or a new byte array.
+    On .NET 8, reads also take a ReadOnlySpan<byte> and writes an
+    IBufferWriter<byte>, for pooled buffers and pipelines.
 - Add NbtOptions, a settings object that NbtFile, NbtReader, NbtWriter,
     and NbtCodec all accept and snapshot at construction, so later changes
     to an options instance do not affect objects already created from it.

@@ -1,4 +1,7 @@
 using System;
+#if NETCOREAPP
+using System.Buffers;
+#endif
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -13,7 +16,8 @@ namespace fNbt {
     /// root tag type unless <see cref="NbtOptions.ValidateOnRead"/> is set. Writes enforce the
     /// flavor's root rules, and its conformance rules when <see cref="NbtOptions.ValidateOnWrite"/>
     /// is set. For one-off use with default options, <see cref="For"/> returns a cached
-    /// per-flavor instance. </remarks>
+    /// per-flavor instance. The .NET 8 build also reads from <c>ReadOnlySpan&lt;byte&gt;</c> and
+    /// writes to <c>IBufferWriter&lt;byte&gt;</c>, for pooled buffers and pipelines. </remarks>
     public sealed class NbtCodec {
         /// <summary> Returns a cached codec with default options for the given flavor,
         /// for one-off use: <c>NbtCodec.For(NbtFlavor.Bedrock).ReadTag(stream)</c>. </summary>
@@ -84,9 +88,7 @@ namespace fNbt {
         /// deep, exceeds a configured limit, fails enabled validation, or its root tag type does not match
         /// <paramref name="expectedRootType"/>. </exception>
         public NbtTag ReadTag(Stream stream, NbtTagType expectedRootType) {
-            if (expectedRootType <= NbtTagType.End || expectedRootType > NbtTagType.LongArray) {
-                throw new ArgumentOutOfRangeException(nameof(expectedRootType));
-            }
+            CheckExpectedRootType(expectedRootType);
             return ReadTagInternal(stream, expectedRootType);
         }
 
@@ -106,9 +108,38 @@ namespace fNbt {
         /// deep, exceeds a configured limit, fails enabled validation, or consists of a lone
         /// <c>TAG_End</c> byte. </exception>
         public NbtTag ReadTag(byte[] buffer, int index, int length, out int bytesConsumed) {
+            return ReadBuffer(buffer, index, length, null, out bytesConsumed);
+        }
+
+
+        /// <summary> Reads one NBT document from the given buffer, requiring a specific root tag type. </summary>
+        /// <param name="buffer"> Buffer to read from. </param>
+        /// <param name="index"> Index in <paramref name="buffer"/> at which the document begins. </param>
+        /// <param name="length"> Maximum number of bytes the document may occupy. Trailing bytes past the
+        /// document's actual end are ignored. </param>
+        /// <param name="expectedRootType"> Root tag type that the document must have. </param>
+        /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
+        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> or <paramref name="length"/>
+        /// do not describe a valid range within <paramref name="buffer"/>; or <paramref name="expectedRootType"/>
+        /// is not a concrete tag type. </exception>
+        /// <exception cref="EndOfStreamException"> If the document extends past the given <paramref name="length"/>. </exception>
+        /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
+        /// deep, exceeds a configured limit, fails enabled validation, or its root tag type does not match
+        /// <paramref name="expectedRootType"/>. </exception>
+        public NbtTag ReadTag(byte[] buffer, int index, int length, NbtTagType expectedRootType,
+                              out int bytesConsumed) {
+            CheckExpectedRootType(expectedRootType);
+            return ReadBuffer(buffer, index, length, expectedRootType, out bytesConsumed);
+        }
+
+
+        NbtTag ReadBuffer(byte[] buffer, int index, int length, NbtTagType? expectedRootType,
+                          out int bytesConsumed) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             using (var ms = new MemoryStream(buffer, index, length)) {
-                NbtTag tag = ReadTagInternal(ms, null);
+                NbtTag tag = ReadTagInternal(ms, expectedRootType);
                 bytesConsumed = (int)ms.Position;
                 return tag;
             }
@@ -162,6 +193,83 @@ namespace fNbt {
                 return result;
             }
         }
+
+
+#if NETCOREAPP
+        /// <summary> Reads one NBT document from the given span. The span is touched only during
+        /// the call, so pooled or stack memory is fine: the returned tags hold copies of their data. </summary>
+        /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
+        /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
+        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
+        /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
+        /// deep, exceeds a configured limit, fails enabled validation, or consists of a lone
+        /// <c>TAG_End</c> byte (use <see cref="TryReadTag(ReadOnlySpan{byte},out NbtTag,out int)"/> to accept
+        /// absent documents). </exception>
+        public NbtTag ReadTag(ReadOnlySpan<byte> buffer, out int bytesConsumed) {
+            return ReadSpan(buffer, null, out bytesConsumed);
+        }
+
+
+        /// <summary> Reads one NBT document from the given span, requiring a specific root tag type. </summary>
+        /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
+        /// <param name="expectedRootType"> Root tag type that the document must have. </param>
+        /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
+        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="expectedRootType"/> is not a concrete tag type. </exception>
+        /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
+        /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
+        /// deep, exceeds a configured limit, fails enabled validation, or its root tag type does not match
+        /// <paramref name="expectedRootType"/>. </exception>
+        public NbtTag ReadTag(ReadOnlySpan<byte> buffer, NbtTagType expectedRootType, out int bytesConsumed) {
+            CheckExpectedRootType(expectedRootType);
+            return ReadSpan(buffer, expectedRootType, out bytesConsumed);
+        }
+
+
+        /// <summary> Attempts to read one NBT document from the given span. Returns <c>false</c> when
+        /// the span is empty, or (for flavors that allow non-compound roots) when the document is a
+        /// lone <c>TAG_End</c> byte meaning "absent". </summary>
+        /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
+        /// <param name="tag"> Set to the root tag, or <c>null</c> if no tag was present. </param>
+        /// <param name="bytesConsumed"> Set to the exact number of bytes consumed. </param>
+        /// <returns> Whether a tag was read. </returns>
+        /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
+        /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
+        /// deep, exceeds a configured limit, or fails enabled validation. </exception>
+        public bool TryReadTag(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out NbtTag? tag,
+                               out int bytesConsumed) {
+            if (buffer.IsEmpty) {
+                tag = null;
+                bytesConsumed = 0;
+                return false;
+            }
+            unsafe {
+                fixed (byte* bytes = buffer) {
+                    using (var stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
+                        bool result = TryReadTag(stream, out tag);
+                        bytesConsumed = (int)stream.Position;
+                        return result;
+                    }
+                }
+            }
+        }
+
+
+        // Pins the span for the duration of the parse, so the stream-based reader can walk it
+        // in place. Nothing keeps the pointer past the call. An empty span pins to null, hence
+        // the early exit.
+        unsafe NbtTag ReadSpan(ReadOnlySpan<byte> buffer, NbtTagType? expectedRootType, out int bytesConsumed) {
+            if (buffer.IsEmpty) throw new EndOfStreamException();
+            fixed (byte* bytes = buffer) {
+                using (var stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
+                    NbtTag tag = ReadTagInternal(stream, expectedRootType);
+                    bytesConsumed = (int)stream.Position;
+                    return tag;
+                }
+            }
+        }
+#endif
 
 
         /// <summary> Lazily reads back-to-back NBT documents from the given stream until it ends,
@@ -241,6 +349,44 @@ namespace fNbt {
         }
 
 
+#if NETCOREAPP
+        /// <summary> Writes one NBT document to the given buffer writer, such as a pipe or an
+        /// <c>ArrayBufferWriter</c>. </summary>
+        /// <param name="tag"> Root tag to write. For flavors that allow non-compound roots, <c>null</c>
+        /// writes an absent document (a lone <c>TAG_End</c> byte); other flavors require an
+        /// <see cref="NbtCompound"/>. A <c>null</c> root name is written as an empty string. </param>
+        /// <param name="output"> Buffer writer to write to. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="output"/> is <c>null</c>;
+        /// or <paramref name="tag"/> is <c>null</c> and the flavor requires a compound root. </exception>
+        /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
+        /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
+        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// or if tags are nested more than 512 levels deep. </exception>
+        public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
+            if (output == null) throw new ArgumentNullException(nameof(output));
+            WriteTag(tag, new BufferWriterStream(output));
+        }
+
+
+        /// <summary> Writes back-to-back NBT documents to the given buffer writer. Behaves like
+        /// <see cref="WriteConcatenatedTags(IEnumerable{NbtTag},Stream)"/>. </summary>
+        /// <param name="tags"> Root tags to write, one document each. May not contain <c>null</c>. </param>
+        /// <param name="output"> Buffer writer to write to. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="tags"/> or <paramref name="output"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> <paramref name="tags"/> contains a <c>null</c> tag.
+        /// Documents before it are already written when this throws. </exception>
+        /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
+        /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
+        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// or if tags are nested more than 512 levels deep. Documents before the offending one
+        /// are already written when this throws. </exception>
+        public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, IBufferWriter<byte> output) {
+            if (output == null) throw new ArgumentNullException(nameof(output));
+            WriteConcatenatedTags(tags, new BufferWriterStream(output));
+        }
+#endif
+
+
         void ValidateDocument(NbtTag tag) {
             if (!flavor.AllowsNonCompoundRoot && tag.TagType != NbtTagType.Compound) {
                 throw new NbtFormatException(
@@ -293,6 +439,13 @@ namespace fNbt {
         }
 
         #endregion
+
+
+        static void CheckExpectedRootType(NbtTagType expectedRootType) {
+            if (expectedRootType <= NbtTagType.End || expectedRootType > NbtTagType.LongArray) {
+                throw new ArgumentOutOfRangeException(nameof(expectedRootType));
+            }
+        }
 
 
         NbtTag ReadTagInternal(Stream stream, NbtTagType? expectedRootType) {

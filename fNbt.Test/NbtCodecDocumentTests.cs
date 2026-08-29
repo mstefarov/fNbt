@@ -268,7 +268,7 @@ namespace fNbt.Test {
             var root = new NbtCompound("r");
             using (var ms = new MemoryStream()) {
                 Assert.Throws<ArgumentNullException>(() => codec.WriteConcatenatedTags(null, ms));
-                Assert.Throws<ArgumentNullException>(() => codec.WriteConcatenatedTags(new[] { root }, null));
+                Assert.Throws<ArgumentNullException>(() => codec.WriteConcatenatedTags(new[] { root }, (Stream)null));
                 // Absent documents cannot appear in a concatenated stream, so null elements are refused
                 Assert.Throws<ArgumentException>(
                     () => codec.WriteConcatenatedTags(new NbtTag[] { root, null }, ms));
@@ -336,6 +336,13 @@ namespace fNbt.Test {
                 NbtTag read = codec.ReadTag(ms, NbtTagType.Int);
                 Assert.AreEqual(42, read.IntValue);
             }
+
+            // The buffer overload takes the same argument
+            Assert.Throws<NbtFormatException>(() => codec.ReadTag(doc, 0, doc.Length, NbtTagType.Compound, out _));
+            Assert.AreEqual(42, codec.ReadTag(doc, 0, doc.Length, NbtTagType.Int, out int consumed).IntValue);
+            Assert.AreEqual(doc.Length, consumed);
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => codec.ReadTag(doc, 0, doc.Length, NbtTagType.End, out _));
         }
 
 
@@ -451,7 +458,7 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentNullException>(() => codec.ReadTag(null, 0, 0, out _));
             Assert.Throws<ArgumentNullException>(() => codec.TryReadTag((Stream)null, out _));
             Assert.Throws<ArgumentNullException>(() => codec.ReadConcatenatedTags(null));
-            Assert.Throws<ArgumentNullException>(() => codec.WriteTag(root, null));
+            Assert.Throws<ArgumentNullException>(() => codec.WriteTag(root, (Stream)null));
         }
     }
 }
