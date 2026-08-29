@@ -39,8 +39,9 @@
 - Add per-flavor conformance validation: on by default for writes, refusing
     tag types and string lengths the flavor's own readers reject, such as
     TAG_Int_Array or 300-byte strings under ClassiCube; opt-in for reads,
-    which stay generous by default. List element types are checked even
-    for empty lists, since the type byte is written either way.
+    which stay generous by default, and for NbtCodec also cover the root
+    tag type. List element types are checked even for empty lists, since
+    the type byte is written either way.
     Little-endian files that Bedrock itself cannot read, such as ones
     holding TAG_Long_Array, now fail to save under the Bedrock flavor;
     pass ValidateOnWrite = false to keep writing them.

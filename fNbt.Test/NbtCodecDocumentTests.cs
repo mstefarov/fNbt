@@ -324,6 +324,74 @@ namespace fNbt.Test {
         }
 
 
+        // TAG_String root named "s" with value "hi": parseable, but not a compound
+        static readonly byte[] StringRootDoc = {
+            0x08, 0x00, 0x01, (byte)'s',
+            0x00, 0x02, (byte)'h', (byte)'i'
+        };
+
+
+        static NbtCodec StrictCodec(NbtFlavor flavor) {
+            return new NbtCodec(new NbtOptions(flavor) { ValidateOnRead = true });
+        }
+
+
+        [TestMethod]
+        public void ReadValidationRequiresCompoundRoot() {
+            // Java has no tag-type or string restrictions, so the root rule is the only thing
+            // its strict reads enforce. Every entry point must apply it.
+            NbtCodec strict = StrictCodec(NbtFlavor.Java);
+            byte[] doc = StringRootDoc;
+            Assert.Throws<NbtFormatException>(() => strict.ReadTag(doc, 0, doc.Length, out _));
+            Assert.Throws<NbtFormatException>(() => strict.ReadTag(doc, 0, doc.Length, NbtTagType.String, out _));
+            Assert.Throws<NbtFormatException>(() => strict.TryReadTag(doc, 0, doc.Length, out _, out _));
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(() => strict.ReadTag(ms));
+            }
+            using (var ms = new MemoryStream(doc)) {
+                // Asking for that root type does not override the flavor's rule
+                Assert.Throws<NbtFormatException>(() => strict.ReadTag(ms, NbtTagType.String));
+            }
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(() => strict.TryReadTag(ms, out _));
+            }
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(() => strict.ReadConcatenatedTags(ms).ToList());
+            }
+#if NETCOREAPP
+            Assert.Throws<NbtFormatException>(() => strict.ReadTag((ReadOnlySpan<byte>)doc, out _));
+#endif
+
+            // Compound roots still pass, and reads stay generous without the option
+            byte[] compoundDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(new NbtCompound("r") { new NbtInt("i", 1) });
+            Assert.AreEqual(1, strict.ReadTag(compoundDoc, 0, compoundDoc.Length, out _)["i"].IntValue);
+            Assert.AreEqual("hi", NbtCodec.For(NbtFlavor.Java).ReadTag(doc, 0, doc.Length, out _).StringValue);
+        }
+
+
+        [TestMethod]
+        public void ReadValidationRootRuleFollowsEachFlavor() {
+            NbtFlavor[] compoundRootFlavors = {
+                NbtFlavor.Java, NbtFlavor.JavaAnvil, NbtFlavor.JavaLegacy,
+                NbtFlavor.Bedrock, NbtFlavor.BedrockNetwork, NbtFlavor.ClassiCube
+            };
+            foreach (NbtFlavor flavor in compoundRootFlavors) {
+                // TAG_Byte root with an empty name and value 7; the name prefix is one varint
+                // byte under BedrockNetwork and two bytes elsewhere
+                byte[] doc = flavor.UsesVarInts
+                    ? new byte[] { 0x01, 0x00, 0x07 }
+                    : new byte[] { 0x01, 0x00, 0x00, 0x07 };
+                Assert.AreEqual(7, new NbtCodec(flavor).ReadTag(doc, 0, doc.Length, out _).ByteValue, flavor.Name);
+                NbtCodec strict = StrictCodec(flavor);
+                Assert.Throws<NbtFormatException>(() => strict.ReadTag(doc, 0, doc.Length, out _));
+            }
+
+            // JavaNetwork allows any root, so its strict reads keep accepting one
+            byte[] unnamed = { 0x01, 0x07 };
+            Assert.AreEqual(7, StrictCodec(NbtFlavor.JavaNetwork).ReadTag(unnamed, 0, unnamed.Length, out _).ByteValue);
+        }
+
+
         [TestMethod]
         public void ExpectedRootTypeIsEnforced() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);

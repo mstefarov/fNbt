@@ -36,8 +36,10 @@ namespace fNbt {
         readonly NbtFlavor flavor;
         readonly long maxAllocation;
         readonly bool validateOnWrite;
-        // Set only when read validation is on and the flavor restricts something
+        // Set only when read validation is on and the flavor restricts something inside a
+        // document. Root shape is not among those, so it gets its own flag.
         readonly NbtFlavor? readValidationFlavor;
+        readonly bool requireCompoundRootOnRead;
 
 
         /// <summary> Creates a codec for the given flavor with default options
@@ -58,6 +60,7 @@ namespace fNbt {
             maxAllocation = NbtOptions.SnapshotMaxAllocation(options) ?? long.MaxValue;
             validateOnWrite = options.ValidateOnWrite && flavor.HasRestrictions;
             readValidationFlavor = (options.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
+            requireCompoundRootOnRead = options.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
         }
 
 
@@ -479,6 +482,11 @@ namespace fNbt {
                 throw new NbtFormatException(
                     "Expected a root tag of type " + NbtTag.GetCanonicalTagName(expectedRootType.Value) +
                     ", but found " + NbtTag.GetCanonicalTagName(tagType));
+            }
+            if (requireCompoundRootOnRead && tagType != NbtTagType.Compound) {
+                throw new NbtFormatException(
+                    flavor.Name + " requires a TAG_Compound root, but found " +
+                    NbtTag.GetCanonicalTagName(tagType) + ".");
             }
             if (readValidationFlavor != null && tagType > readValidationFlavor.MaxTagType) {
                 throw new NbtFormatException(

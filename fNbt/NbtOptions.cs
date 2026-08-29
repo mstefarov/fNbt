@@ -21,9 +21,10 @@ namespace fNbt {
         /// <summary> The wire encoding to read and write. Defaults to <see cref="NbtFlavor.Java"/>. </summary>
         public NbtFlavor Flavor { get; set; } = NbtFlavor.Java;
 
-        /// <summary> Whether reads enforce the flavor's conformance rules (permitted tag types and
-        /// string ceilings) in addition to parsing. Defaults to <c>false</c>: reads accept anything
-        /// parseable, so files that merely bend the rules still load. </summary>
+        /// <summary> Whether reads enforce the flavor's conformance rules (permitted tag types,
+        /// string ceilings, and for <see cref="NbtCodec"/> the root tag type) in addition to parsing.
+        /// Defaults to <c>false</c>: reads accept anything parseable, so files that merely bend the
+        /// rules still load. </summary>
         public bool ValidateOnRead { get; set; }
 
         /// <summary> Whether writes enforce the flavor's conformance rules, refusing to produce a

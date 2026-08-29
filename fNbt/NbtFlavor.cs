@@ -96,8 +96,9 @@ namespace fNbt {
         /// prefix). Ceilings below 65,535 are enforced only when validation is enabled. </summary>
         public int MaxStringBytes { get; }
 
-        // Whether validation with this flavor can reject anything the wire format itself allows.
-        // Flavors without restrictions skip validation entirely.
+        // Whether validation with this flavor can reject anything inside a document that the
+        // wire format itself allows. Root shape is not counted: the named-root entry points only
+        // ever handle compound roots, and NbtCodec checks it on its own.
         internal bool HasRestrictions {
             get { return MaxTagType < NbtTagType.LongArray || MaxStringBytes < ushort.MaxValue; }
         }
