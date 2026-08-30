@@ -607,10 +607,19 @@ namespace fNbt {
                 return buffer;
             }
 
+#if NETCOREAPP
+            // Compressed size is unknowable up front. Pooled segments avoid MemoryStream's
+            // doubling garbage, and the exact result is assembled once.
+            using (var pooled = new PooledSegmentStream()) {
+                SaveToStream(pooled, compression);
+                return pooled.ToArray();
+            }
+#else
             using (var ms = new MemoryStream()) {
                 SaveToStream(ms, compression);
                 return ms.ToArray();
             }
+#endif
         }
 
 
