@@ -425,8 +425,13 @@ namespace fNbt {
         // Reading a decompressor to its end forces it to process the container's trailer, so
         // checksum validation cannot depend on how the input happened to be chunked.
         static void DrainToEnd(Stream stream) {
+#if NETCOREAPP
+            Span<byte> buffer = stackalloc byte[4096];
+            while (stream.Read(buffer) > 0) { }
+#else
             byte[] buffer = new byte[4096];
             while (stream.Read(buffer, 0, buffer.Length) > 0) { }
+#endif
         }
 
 

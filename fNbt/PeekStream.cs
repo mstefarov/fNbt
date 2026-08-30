@@ -23,6 +23,13 @@ namespace fNbt {
         }
 
 
+#if NETCOREAPP
+        public override int Read(Span<byte> buffer) {
+            return baseStream.Read(buffer.Slice(0, Math.Min(buffer.Length, ReadChunk)));
+        }
+#endif
+
+
         public override void Flush() { }
 
         public override bool CanRead {

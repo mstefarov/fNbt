@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace fNbt {
@@ -38,6 +39,23 @@ namespace fNbt {
             baseStream.Write(buffer, offset, count);
             BytesWritten += count;
         }
+
+
+#if NETCOREAPP
+        // Without these, framework span calls fall through Stream's compatibility shim,
+        // which rents and copies a temporary array per call
+        public override int Read(Span<byte> buffer) {
+            int bytesActuallyRead = baseStream.Read(buffer);
+            BytesRead += bytesActuallyRead;
+            return bytesActuallyRead;
+        }
+
+
+        public override void Write(ReadOnlySpan<byte> buffer) {
+            baseStream.Write(buffer);
+            BytesWritten += buffer.Length;
+        }
+#endif
 
 
         // Straight to baseStream instead of base to avoid re-entering Read/Write.
