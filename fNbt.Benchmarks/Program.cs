@@ -1,9 +1,11 @@
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.ConsoleArguments;
+using BenchmarkDotNet.ConsoleArguments.ListBenchmarks;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Filters;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
+using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 
 namespace fNbt.Benchmarks;
@@ -11,7 +13,7 @@ namespace fNbt.Benchmarks;
 class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
 
-    static void Main(string[] args) {
+    static int Main(string[] args) {
         var customArgs = new CustomArguments(args);
         var benchmarkArgs = customArgs.GetRemainingArgs();
 
@@ -21,12 +23,13 @@ class Program {
 
         if (customArgs.BaselineSource != null && customArgs.BaselineVersion == null) {
             logger.WriteLineError("// --baseline-source has no effect without --baseline");
+            return 1;
         }
 
         // Parse the BenchmarkDotNet options up front, to get at the parsed jobs below
-        (bool isSuccess, IConfig parsedConfig, _) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
+        (bool isSuccess, IConfig parsedConfig, CommandLineOptions parsedOptions) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
         if (!isSuccess)
-            return;
+            return IsHelpOrVersion(benchmarkArgs) ? 0 : 1;
 
         // Benchmarks using 2.0 APIs can't compile against a 1.x baseline package. Source #if
         // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
@@ -34,21 +37,21 @@ class Program {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
         }
 
-        // When "--baseline" is specified, add a baseline for each job
+        // When "--baseline" is specified, add the package comparison job.
         if (customArgs.BaselineVersion is string version) {
             // With no --job or --runtimes, the parsed config has no jobs yet. The switcher only
             // adds the default job if the config still has none, so add the local job here too.
             // Otherwise a plain --baseline run would silently skip the comparison.
             Job[] jobs = parsedConfig.GetJobs().ToArray();
+            if (jobs.Length > 1) {
+                logger.WriteLineError("// --baseline cannot be combined with multiple jobs or runtimes; run each comparison separately");
+                return 1;
+            }
             if (jobs.Length == 0) {
                 jobs = new[] { Job.Default };
                 initialConfig.AddJob(Job.Default);
             }
-            bool isFirst = true;
             foreach (Job job in jobs) {
-                // With several --runtimes, BenchmarkDotNet already makes the first one the baseline, and
-                // a group may only have one.
-                bool makeBaseline = isFirst && !job.Meta.Baseline;
                 var msBuildArgs = new List<string> { $"/p:FNbtNuGetVersion={version}" };
                 if (customArgs.BaselineSource is string source) {
                     msBuildArgs.Add($"/p:RestoreAdditionalProjectSources={source}");
@@ -56,17 +59,39 @@ class Program {
                 initialConfig.AddJob(job
                     .WithId($"{job.Id}-NuGet")
                     .WithMsBuildArguments(msBuildArgs.ToArray())
-                    .WithBaseline(makeBaseline));
+                    .WithBaseline(true));
                 logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
-                isFirst = false;
             }
         }
 
         // Args go to the switcher itself, not into the config. Given an empty array, it ignores
         // --filter and drops into interactive selection.
-        BenchmarkSwitcher
+        Summary[] summaries = BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
-            .Run(benchmarkArgs, initialConfig);
+            .Run(benchmarkArgs, initialConfig)
+            .ToArray();
+
+        if (parsedOptions.PrintInformation || parsedOptions.ListBenchmarkCaseMode != ListBenchmarkCaseMode.Disabled)
+            return 0;
+
+        if (summaries.Any(summary => summary.HasCriticalValidationErrors)) {
+            logger.WriteLineError("// Benchmark run failed validation");
+            return 1;
+        }
+        if (summaries.SelectMany(summary => summary.Reports).Any(report => !report.Success)) {
+            logger.WriteLineError("// One or more benchmark reports failed");
+            return 1;
+        }
+        if (summaries.Sum(summary => summary.GetNumberOfExecutedBenchmarks()) == 0) {
+            logger.WriteLineError("// No benchmarks were executed");
+            return 1;
+        }
+        return 0;
+    }
+
+    static bool IsHelpOrVersion(string[] args) {
+        return args.Any(arg => arg.Equals("--help", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--version", StringComparison.OrdinalIgnoreCase));
     }
 
     // Mirrors the FNBT_BASELINE condition in the csproj
