@@ -7,13 +7,10 @@ namespace fNbt {
     /// Each instance of NbtWriter writes one complete file.
     /// NbtWriter enforces all constraints of the NBT file format
     /// EXCEPT checking for duplicate tag names within a compound. </summary>
-    /// <remarks> Every check the writer can make up front (tag type, list slot, name and string
-    /// length and encoding, nesting depth) runs before any byte is written or a list slot
-    /// consumed, so a refused call leaves the writer as it was. A write that fails after
-    /// committing bytes, such as an I/O error or a tree that runs past the depth limit under a
-    /// flavor without validation restrictions, leaves the writer in a failed state where every
-    /// later call throws <see cref="NbtFormatException"/>, since the document cannot be
-    /// completed. </remarks>
+    /// <remarks> Every check the writer can make up front runs before any byte is written or a
+    /// list slot consumed, so a refused call leaves the writer as it was. A write that fails after
+    /// committing bytes, an I/O error for example, leaves the writer in a failed state where every
+    /// later call throws <see cref="NbtFormatException"/>. </remarks>
     public sealed class NbtWriter {
         const int MaxStreamCopyBufferSize = 8 * 1024;
 
@@ -814,9 +811,8 @@ namespace fNbt {
         /// If you already have lots of NbtTag objects, you might as well use NbtFile to write them all at once. </summary>
         /// <param name="tag"> Tag to write. Must not be null. </param>
         /// <remarks> With write validation on for a flavor with restrictions, the whole tree is
-        /// checked before anything is written, so a rejected tag leaves the writer's state and
-        /// output untouched. Otherwise a tree that is too deep or holds an overlong string fails
-        /// partway through, and the writer then refuses every further call. </remarks>
+        /// checked before anything is written. Otherwise a tree that is too deep or holds an
+        /// overlong string fails partway through and leaves the writer failed. </remarks>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// given tag is unacceptable at this time -OR- its tree, together with the containers
         /// currently open, is nested more than 512 levels deep -OR-
@@ -827,24 +823,21 @@ namespace fNbt {
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             ValidateConstraints(tag.Name, tag.TagType);
-            // What the tag layer would refuse before writing a byte is refused here instead,
-            // ahead of the emission window, so the writer stays usable. A tree's own depth
-            // failure comes after some of it is out, and that one does fail the writer.
+            // Refusals the tag layer would make before writing a byte happen here instead, ahead
+            // of the emission window, so they leave the writer usable
             if (tag.TagType == NbtTagType.Compound || tag.TagType == NbtTagType.List) {
                 EnsureCanGoDown();
             }
             if (tag is NbtList list && list.ListType == NbtTagType.Unknown) {
                 throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
             }
-            // The direct name and value are measured either way: with validation off nothing
-            // else checks them before emission, and two strings cost nothing next to the walk
+            // Measured either way: with validation off nothing else checks them before emission
             if (tag.Name != null) MeasureString(tag.Name, nameof(tag), out _);
             if (tag is NbtString stringTag) MeasureString(stringTag.Value, nameof(tag), out _);
             int depthBudget = NbtTag.MaxDepth - OpenContainerCount;
             if (validates) {
-                // Restricting flavors need the whole-tree pass anyway, and it checks depth from
-                // the budget the open containers leave. Walking an unrestricted tree twice is
-                // too expensive, so there its own walk enforces the budget.
+                // Walking an unrestricted tree twice is too expensive, so only restricting
+                // flavors get the pre-walk; elsewhere the tree's own walk enforces the budget
                 flavor.ValidateTree(tag, depthBudget);
             }
             NbtTagType parentType = BeginEmission();

@@ -115,9 +115,8 @@ namespace fNbt {
 
 
         // Conformance pre-walk for write validation, run only for flavors with restrictions:
-        // every tag type within the flavor's range, every name and string value within its ceiling.
-        // Containers consume one unit from the same remaining-depth budget as the write walk,
-        // so a maximally deep tree that writes cleanly also validates.
+        // tag types within the flavor's range, names and strings within its ceiling. Containers
+        // spend the same depth budget as the write walk, so what writes cleanly also validates.
         internal void ValidateTree(NbtTag tag, int depthBudget) {
             if (tag.TagType > MaxTagType) {
                 throw new NbtFormatException(

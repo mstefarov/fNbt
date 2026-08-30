@@ -124,7 +124,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void OverflowingVarIntThrows() {
             // The fifth byte of a VarInt32 has room for 4 bits, and the tenth byte of a
-            // VarInt64 for 1. Bits above those used to shift away silently.
+            // VarInt64 for 1. Bits above those are an overflow, not something to shift away.
             Assert.Throws<NbtFormatException>(
                 () => VarIntReader(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x10 }).ReadInt32());
             Assert.Throws<NbtFormatException>(

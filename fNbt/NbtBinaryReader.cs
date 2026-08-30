@@ -116,8 +116,7 @@ namespace fNbt {
         // BedrockNetwork varints, 7 bits per byte, least-significant group first.
         // TAG_Int/TAG_Long values and container lengths are zigzag-encoded on top of
         // these; string lengths use the plain unsigned form. The last byte a width allows
-        // has room only for the leftover bits (4 and 1), so anything above them is an
-        // overflow: shifting it away would silently turn a length of 2^32 into 0.
+        // has room only for the leftover bits (4 and 1); anything above them is an overflow.
         uint ReadUnsignedVarInt32() {
             uint result = 0;
             for (int shift = 0; shift < 28; shift += 7) {
