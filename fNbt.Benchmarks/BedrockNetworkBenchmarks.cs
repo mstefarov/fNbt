@@ -89,6 +89,20 @@ public class BedrockNetworkBenchmarks {
         codec.WriteConcatenatedTags(paletteRoots, output);
         return output.WrittenCount;
     }
+
+    // One pinned span parse per root, against the stream-based ParsePalette
+    [AverageBenchmark]
+    [Benchmark(Description = "Parse block palette (spans)")]
+    public int ParsePaletteSpans() {
+        ReadOnlySpan<byte> remaining = paletteBytes;
+        int count = 0;
+        while (!remaining.IsEmpty) {
+            codec.ReadTag(remaining, out int bytesConsumed);
+            remaining = remaining.Slice(bytesConsumed);
+            count++;
+        }
+        return count;
+    }
 #endif
 }
 #endif

@@ -142,7 +142,23 @@ namespace fNbt {
         // Accepts the union of standard UTF-8 and Java's modified UTF-8: 4-byte astral
         // sequences, CESU-8 surrogate pairs, the overlong NUL, and lone surrogates all decode.
         static string DecodeLenient(byte[] buffer, int offset, int count) {
+#if NET8_0_OR_GREATER
+            // charCount never exceeds count, so a rented buffer avoids a second full-size
+            // allocation; a huge string would otherwise put a throwaway char[] on the LOH
+            char[] chars = System.Buffers.ArrayPool<char>.Shared.Rent(count);
+            try {
+                return new string(chars, 0, DecodeLenientCore(buffer, offset, count, chars));
+            } finally {
+                System.Buffers.ArrayPool<char>.Shared.Return(chars);
+            }
+#else
             var chars = new char[count];
+            return new string(chars, 0, DecodeLenientCore(buffer, offset, count, chars));
+#endif
+        }
+
+
+        static int DecodeLenientCore(byte[] buffer, int offset, int count, char[] chars) {
             int charCount = 0;
             int i = offset;
             int end = offset + count;
@@ -183,7 +199,7 @@ namespace fNbt {
                     throw Malformed();
                 }
             }
-            return new string(chars, 0, charCount);
+            return charCount;
         }
 
 
