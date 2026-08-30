@@ -374,5 +374,67 @@ namespace fNbt {
                 written += toWrite;
             }
         }
+
+
+        public void Write(int[] data, int offset, int count) {
+#if NET8_0_OR_GREATER
+            if (!useVarInt) {
+                ReadOnlySpan<int> source = data.AsSpan(offset, count);
+                if (!swapNeeded) {
+                    WriteSpanChunked(System.Runtime.InteropServices.MemoryMarshal.AsBytes(source));
+                } else {
+                    // Reverse chunks into the scratch buffer, leaving the caller's array untouched
+                    Span<int> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(buffer);
+                    while (!source.IsEmpty) {
+                        int n = Math.Min(chunk.Length, source.Length);
+                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
+                            source.Slice(0, n), chunk.Slice(0, n));
+                        stream.Write(buffer, 0, n * sizeof(int));
+                        source = source.Slice(n);
+                    }
+                }
+                return;
+            }
+#endif
+            for (int i = 0; i < count; i++) {
+                Write(data[offset + i]);
+            }
+        }
+
+
+        public void Write(long[] data, int offset, int count) {
+#if NET8_0_OR_GREATER
+            if (!useVarInt) {
+                ReadOnlySpan<long> source = data.AsSpan(offset, count);
+                if (!swapNeeded) {
+                    WriteSpanChunked(System.Runtime.InteropServices.MemoryMarshal.AsBytes(source));
+                } else {
+                    Span<long> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(buffer);
+                    while (!source.IsEmpty) {
+                        int n = Math.Min(chunk.Length, source.Length);
+                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
+                            source.Slice(0, n), chunk.Slice(0, n));
+                        stream.Write(buffer, 0, n * sizeof(long));
+                        source = source.Slice(n);
+                    }
+                }
+                return;
+            }
+#endif
+            for (int i = 0; i < count; i++) {
+                Write(data[offset + i]);
+            }
+        }
+
+
+#if NET8_0_OR_GREATER
+        void WriteSpanChunked(ReadOnlySpan<byte> data) {
+            while (data.Length > MaxWriteChunk) {
+                stream.Write(data.Slice(0, MaxWriteChunk));
+                data = data.Slice(MaxWriteChunk);
+            }
+            stream.Write(data);
+        }
+#endif
     }
 }

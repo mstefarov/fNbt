@@ -104,10 +104,9 @@ namespace fNbt {
 
 
         internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
-            writeStream.Write(Value.Length);
-            for (int i = 0; i < Value.Length; i++) {
-                writeStream.Write(Value[i]);
-            }
+            int[] data = Value;
+            writeStream.Write(data.Length);
+            writeStream.Write(data, 0, data.Length);
         }
 
 

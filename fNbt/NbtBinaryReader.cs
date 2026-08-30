@@ -577,6 +577,15 @@ namespace fNbt {
             // Varint elements are at least one byte each; fixed-width math would over-estimate
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
             int[] result = new int[length];
+#if NET8_0_OR_GREATER
+            if (!useVarInt) {
+                BaseStream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
+                if (swapNeeded) {
+                    System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
+                }
+                return result;
+            }
+#endif
             for (int i = 0; i < length; i++) result[i] = ReadInt32();
             return result;
         }
@@ -588,6 +597,15 @@ namespace fNbt {
             EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
             long[] result = new long[length];
+#if NET8_0_OR_GREATER
+            if (!useVarInt) {
+                BaseStream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
+                if (swapNeeded) {
+                    System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
+                }
+                return result;
+            }
+#endif
             for (int i = 0; i < length; i++) result[i] = ReadInt64();
             return result;
         }

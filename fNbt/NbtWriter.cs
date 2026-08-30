@@ -676,9 +676,7 @@ namespace fNbt {
             ValidateConstraints(null, NbtTagType.IntArray);
             NbtTagType parentType = BeginEmission();
             writer.Write(count);
-            for (int i = 0; i < count; i++) {
-                writer.Write(data[offset + i]);
-            }
+            writer.Write(data, offset, count);
             CommitEmission(parentType);
         }
 
@@ -718,9 +716,7 @@ namespace fNbt {
             NbtTagType parentType = BeginEmission();
             WriteHeader(NbtTagType.IntArray, tagName, nameBytes, nameModified);
             writer.Write(count);
-            for (int i = 0; i < count; i++) {
-                writer.Write(data[offset + i]);
-            }
+            writer.Write(data, offset, count);
             CommitEmission(parentType);
         }
 
@@ -755,9 +751,7 @@ namespace fNbt {
             ValidateConstraints(null, NbtTagType.LongArray);
             NbtTagType parentType = BeginEmission();
             writer.Write(count);
-            for (int i = 0; i < count; i++) {
-                writer.Write(data[offset + i]);
-            }
+            writer.Write(data, offset, count);
             CommitEmission(parentType);
         }
 
@@ -797,9 +791,7 @@ namespace fNbt {
             NbtTagType parentType = BeginEmission();
             WriteHeader(NbtTagType.LongArray, tagName, nameBytes, nameModified);
             writer.Write(count);
-            for (int i = 0; i < count; i++) {
-                writer.Write(data[offset + i]);
-            }
+            writer.Write(data, offset, count);
             CommitEmission(parentType);
         }
 
