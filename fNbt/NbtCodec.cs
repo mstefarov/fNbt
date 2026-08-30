@@ -441,14 +441,14 @@ namespace fNbt {
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
-            // Size is measured with a counting stream first, so the returned array is exact
-            // and nothing is copied. Same trick as NbtFile.SaveToBuffer.
-            var counter = new ByteCountingStream(Stream.Null);
-            WriteTag(tag, counter);
-            if (counter.BytesWritten > int.MaxValue) {
+            // Size is computed structurally, so the document is serialized once into an exact
+            // array. An absent document is a single TAG_End byte; WriteTag makes the
+            // flavor-allows-it check either way.
+            long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor);
+            if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
-            var result = new byte[counter.BytesWritten];
+            var result = new byte[size];
             WriteTag(tag, new MemoryStream(result, 0, result.Length, true));
             return result;
         }

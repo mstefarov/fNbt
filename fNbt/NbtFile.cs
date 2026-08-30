@@ -595,14 +595,13 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
-                // Uncompressed size can be measured up front, since counting writes copies nothing. Growing
-                // a MemoryStream and copying it out instead costs about five times the payload.
-                var counter = new ByteCountingStream(Stream.Null);
-                SaveToStream(counter, NbtCompression.None);
-                if (counter.BytesWritten > int.MaxValue) {
+                // Uncompressed size is computed structurally, so the document is serialized once
+                // into an exact array instead of twice. Validation runs once, in the write.
+                long size = NbtSizer.SizeDocument(rootTag, withName: true, flavor);
+                if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
                 }
-                var buffer = new byte[counter.BytesWritten];
+                var buffer = new byte[size];
                 SaveToStream(new MemoryStream(buffer, 0, buffer.Length, true, true), NbtCompression.None);
                 return buffer;
             }
