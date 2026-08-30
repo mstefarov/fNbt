@@ -18,6 +18,7 @@ namespace fNbt {
         private NbtComparer() { }
 
         /// <inheritdoc/>
+        /// <exception cref="ArgumentException"> Either tag is nested more than 512 levels deep. </exception>
         public bool Equals(NbtTag? x, NbtTag? y) {
             return Equals(x, y, MaxDepth);
         }

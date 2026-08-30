@@ -687,6 +687,7 @@ namespace fNbt.Test {
             Assert.Throws<InvalidReaderStateException>(() => reader.ReadToNextSibling());
             Assert.Throws<InvalidReaderStateException>(() => reader.ReadToDescendant("derp"));
             Assert.Throws<InvalidReaderStateException>(() => reader.ReadAsTag());
+            Assert.Throws<InvalidReaderStateException>(() => reader.ReadValue());
             Assert.Throws<InvalidReaderStateException>(() => reader.Skip());
         }
 
@@ -717,6 +718,34 @@ namespace fNbt.Test {
                 Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
                 Assert.IsTrue(reader.IsInErrorState);
                 Assert.Throws<InvalidReaderStateException>(() => reader.ReadToFollowing());
+            }
+        }
+
+
+        [TestMethod]
+        public void FailedListArrayReadPoisonsReadValue() {
+            byte[] doc = new NbtFile(new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2), new NbtInt(3) }
+            }).SaveToBuffer(NbtCompression.None);
+            var options = new NbtOptions { MaxAllocation = 5 };
+
+            // The current payload is still unread when the bulk allocation is refused
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, options);
+                Assert.IsTrue(reader.ReadToFollowing("i"));
+                Assert.IsTrue(reader.ReadToFollowing());
+                Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<int>());
+                Assert.Throws<InvalidReaderStateException>(() => reader.ReadValue());
+            }
+
+            // A cached value must not leak back out after the reader is poisoned either
+            using (var ms = new MemoryStream(doc)) {
+                var reader = new NbtReader(ms, options) { CacheTagValues = true };
+                Assert.IsTrue(reader.ReadToFollowing("i"));
+                Assert.IsTrue(reader.ReadToFollowing());
+                Assert.AreEqual(1, reader.ReadValue());
+                Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<int>());
+                Assert.Throws<InvalidReaderStateException>(() => reader.ReadValue());
             }
         }
 

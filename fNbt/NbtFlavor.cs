@@ -141,6 +141,9 @@ namespace fNbt {
                     int listChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     var list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
+                    if (list.ListType == NbtTagType.Unknown) {
+                        throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+                    }
                     if (list.ListType > MaxTagType) {
                         throw new NbtFormatException(
                             NbtTag.GetCanonicalTagName(list.ListType) + " is not permitted by the " +

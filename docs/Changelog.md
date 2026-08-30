@@ -64,7 +64,8 @@
     elements between offset and count, corrupting output whenever offset
     was not zero.
 - NbtReader now enters its error state when a value read fails partway
-    through, instead of trying to continue from the middle of a payload.
+    through, instead of trying to continue from the middle of a payload,
+    and every later call reports it, ReadValue included.
 - NbtWriter.WriteTag now counts nesting from the containers currently
     open, so streaming and tree writes together can no longer exceed the
     512-level limit by one and produce a document that fNbt itself refuses

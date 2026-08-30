@@ -729,6 +729,9 @@ namespace fNbt {
         /// <exception cref="InvalidOperationException"> Value has already been read, or there is no value to read. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         public object ReadValue() {
+            if (state == NbtParseState.Error) {
+                throw new InvalidReaderStateException(ErroneousStateError);
+            }
             if (state == NbtParseState.AtStreamEnd) {
                 throw new EndOfStreamException();
             }
@@ -803,6 +806,9 @@ namespace fNbt {
         /// included; one whose value was already read is not. The element type must be byte, short,
         /// int, long, float, double, or string. Stops reading after the last list element; an
         /// empty list is not entered, so the reader stays on the list tag. </summary>
+        /// <remarks> A failure of any kind, a conversion included, leaves the reader in its error
+        /// state, since the stream position is then unknown. After the call no value is available
+        /// to <see cref="ReadValue"/>, even with <see cref="CacheTagValues"/>. </remarks>
         /// <typeparam name="T"> Element type of the array to be returned.
         /// Tag contents should be convertible to this type. </typeparam>
         /// <returns> List contents converted to an array of the requested type. </returns>
@@ -810,6 +816,8 @@ namespace fNbt {
         /// declared length does not fit in the remaining stream. </exception>
         /// <exception cref="InvalidOperationException"> The reader is not on a List or one of its
         /// value elements, or the list's element type is not supported by this method. </exception>
+        /// <exception cref="FormatException"> A value could not be converted to <typeparamref name="T"/>. </exception>
+        /// <exception cref="OverflowException"> A value does not fit in <typeparamref name="T"/>. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public T[] ReadListAsArray<T>() {

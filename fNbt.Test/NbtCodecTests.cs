@@ -198,6 +198,12 @@ namespace fNbt.Test {
             // The element type is written even when no elements follow it
             var root = new NbtCompound("r") { new NbtList("l", NbtTagType.LongArray) };
             Assert.Throws<NbtFormatException>(() => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(root));
+
+            // An unset element type gets the list's own message, not an empty type name
+            var unset = new NbtCompound("r") { new NbtList("l") };
+            NbtFormatException ex = Assert.Throws<NbtFormatException>(
+                () => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(unset));
+            StringAssert.Contains(ex.Message, "Unknown ListType");
             new NbtCodec(NbtFlavor.Java).WriteTag(root);
             new NbtCodec(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnWrite = false }).WriteTag(root);
 
