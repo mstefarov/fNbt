@@ -5,7 +5,6 @@ namespace fNbt.Benchmarks;
 
 // Reading ClassicWorld maps. Mostly block data, so these measure bulk throughput and GZip cost
 // rather than per-tag overhead.
-[MemoryDiagnoser]
 public class ClassicWorldReadBenchmarks {
     [Params(CwSize.Small, CwSize.Medium)]
     public CwSize Size;
@@ -29,6 +28,7 @@ public class ClassicWorldReadBenchmarks {
 
     // No Baseline=true here: with --baseline runs, the NuGet job is the baseline, and a method
     // baseline on top would make every ratio compare against this method instead of per-method.
+    [AverageBenchmark]
     [Benchmark(Description = "Load map from file (GZip)")]
     public NbtFile LoadFromFile() {
         var file = new NbtFile();
@@ -37,6 +37,7 @@ public class ClassicWorldReadBenchmarks {
     }
 
 
+    [AverageBenchmark]
     [Benchmark(Description = "Load map from buffer (GZip)")]
     public NbtFile LoadFromBufferGZip() {
         var file = new NbtFile();
@@ -45,6 +46,7 @@ public class ClassicWorldReadBenchmarks {
     }
 
 
+    [UnstableBenchmark]
     [Benchmark(Description = "Load map from buffer (uncompressed)")]
     public NbtFile LoadFromBufferUncompressed() {
         var file = new NbtFile();
@@ -60,6 +62,7 @@ public class ClassicWorldReadBenchmarks {
     }
 
 
+    [VeryStableBenchmark]
     [Benchmark(Description = "Load header only, selector (GZip)")]
     public NbtFile LoadHeaderOnlyGZip() {
         var file = new NbtFile();
@@ -69,6 +72,7 @@ public class ClassicWorldReadBenchmarks {
 
 
     // Skipping an array is a seek here, but an inflate-and-discard in the GZip case above.
+    [VeryStableBenchmark]
     [Benchmark(Description = "Load header only, selector (uncompressed)")]
     public NbtFile LoadHeaderOnlyUncompressed() {
         var file = new NbtFile();
@@ -78,6 +82,7 @@ public class ClassicWorldReadBenchmarks {
 
 
     // X/Y/Z sit near the front, so the reader stops before reaching the block arrays.
+    [VeryStableBenchmark]
     [Benchmark(Description = "Read dimensions only (NbtReader, GZip)")]
     public int ReadDimensions() {
         using var ms = new MemoryStream(gzipBytes);
@@ -101,6 +106,7 @@ public class ClassicWorldReadBenchmarks {
 
     // Bulk Array Access
 
+    [UnstableBenchmark]
     [Benchmark(Description = "Read BlockArray (NbtReader)")]
     public byte[] ReadBlockArray() {
         using var ms = new MemoryStream(rawBytes);
@@ -112,6 +118,7 @@ public class ClassicWorldReadBenchmarks {
 
 
     // The parser's floor cost.
+    [VeryStableBenchmark]
     [Benchmark(Description = "Skip whole map (NbtReader)")]
     public int SkipWholeMap() {
         using var ms = new MemoryStream(rawBytes);

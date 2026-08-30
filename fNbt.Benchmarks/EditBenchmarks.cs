@@ -12,11 +12,13 @@ public class EditBenchmarks {
         bigFileRoot = BenchmarkTestFiles.GetBigFile().RootTag;
     }
 
+    [AverageBenchmark]
     [Benchmark(Description = "Create Complex Compound")]
     public NbtCompound InMemoryCreation() {
         return BenchmarkTestFiles.MakeComplexCompound();
     }
 
+    [AverageBenchmark]
     [Benchmark(Description = "Lookup Nested Tag")]
     public NbtTag? LookupNestedTag() {
         return bigFileRoot["nested compound test"]!["ham"]!["name"];

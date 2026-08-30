@@ -8,7 +8,6 @@ namespace fNbt.Benchmarks;
 // This is the shape a Bedrock server serializes into StartGame, so it is the realistic
 // workload for varint throughput. NbtCodec and NbtFlavor postdate 1.1.1, so this cannot
 // build or run against a released baseline.
-[MemoryDiagnoser]
 [BenchmarkCategory(Program.BaselineIncompatible)]
 public class BedrockNetworkBenchmarks {
     private byte[] paletteBytes = null!;
@@ -24,6 +23,7 @@ public class BedrockNetworkBenchmarks {
     }
 
     // Block Palette Throughput
+    [AverageBenchmark]
     [Benchmark(Description = "Parse block palette (NbtCodec)")]
     public int ParsePalette() {
         using var ms = new MemoryStream(paletteBytes);
@@ -34,6 +34,7 @@ public class BedrockNetworkBenchmarks {
         return count;
     }
 
+    [AverageBenchmark]
     [Benchmark(Description = "Write block palette (NbtCodec)")]
     public long WritePalette() {
         using var ms = new MemoryStream(paletteBytes.Length);
@@ -41,6 +42,7 @@ public class BedrockNetworkBenchmarks {
         return ms.Length;
     }
 
+    [AverageBenchmark]
     [Benchmark(Description = "Skip block palette (NbtReader)")]
     public long SkipPalette() {
         using var ms = new MemoryStream(paletteBytes);

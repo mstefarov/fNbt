@@ -2,7 +2,6 @@
 
 namespace fNbt.Benchmarks;
 
-[MemoryDiagnoser]
 public class ReadBenchmarks {
     private byte[] serializedLargeByteArrayNbt = null!;
 
@@ -18,6 +17,7 @@ public class ReadBenchmarks {
     }
 
     // Raw Byte Array Reading Performance
+    [AverageBenchmark]
     [Benchmark(Description = "Reader: ByteArray")]
     public byte[] RawByteArray_Read() {
         using (var ms = new MemoryStream(serializedLargeByteArrayNbt)) {

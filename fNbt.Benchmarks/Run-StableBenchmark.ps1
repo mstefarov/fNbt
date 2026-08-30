@@ -1,10 +1,13 @@
 <#
 .SYNOPSIS
-Runs an fNbt benchmark with stable Windows-oriented defaults.
+Runs a balanced pair of fNbt benchmark comparisons.
 
 .DESCRIPTION
-Samples process CPU use for five seconds, rejects nested copies of the benchmark
-project, then runs BenchmarkDotNet with fixed affinity and multiple process launches.
+Rejects overlapping runner instances, samples process CPU use for five seconds,
+rejects nested copies of the benchmark project, then runs BenchmarkDotNet twice on
+logical CPU 8. The controller stays off CPU 8 and its SMT sibling. The second pass
+reverses benchmark-case order so package and method ratios are not trusted from one
+order. Per-method attributes select launch, warmup, iteration, and outlier settings.
 
 .PARAMETER Filter
 BenchmarkDotNet method-name filter. This parameter is required.
@@ -18,23 +21,17 @@ Optional directory containing the baseline package.
 .PARAMETER ArtifactsRoot
 Directory under which a timestamped artifact directory is created.
 
-.PARAMETER AffinityMask
-Benchmark process affinity mask. The default, 256, selects logical CPU 8.
-
-.PARAMETER LaunchCount
-Number of benchmark process launches. The default is 5.
-
 .PARAMETER ForceBusy
-Continues when the CPU preflight finds a busy process.
+Continues when the CPU or one-time machine-setup preflight fails.
 
 .PARAMETER AdditionalArguments
 Additional arguments passed to BenchmarkDotNet.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-StableBenchmark.ps1 -Filter '*SaveZLib*'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\fNbt.Benchmarks\Run-StableBenchmark.ps1 -Filter '*SaveZLib*'
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-StableBenchmark.ps1 -Filter '*SaveZLib*' -Baseline 1.1.0 -BaselineSource ..\bin\baseline -AdditionalArguments '--statisticalTest', '5%'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\fNbt.Benchmarks\Run-StableBenchmark.ps1 -Filter '*SaveZLib*' -Baseline 1.1.1 -BaselineSource .\bin\baseline
 #>
 [CmdletBinding()]
 param(
@@ -47,12 +44,6 @@ param(
     [string] $BaselineSource,
 
     [string] $ArtifactsRoot,
-
-    [ValidateScript({ $_ -gt 0 })]
-    [uint64] $AffinityMask = 256,
-
-    [ValidateScript({ $_ -gt 0 })]
-    [int] $LaunchCount = 5,
 
     [switch] $ForceBusy,
 
@@ -125,12 +116,18 @@ if ($BaselineSource -and -not $Baseline) {
     throw '-BaselineSource requires -Baseline.'
 }
 
+$affinityMask = [uint64] 256
+$reservedProcessorMask = [int64] 0x300
 $logicalProcessorCount = [Environment]::ProcessorCount
-if ($logicalProcessorCount -lt 64) {
-    $firstUnavailableMask = [uint64] [math]::Pow(2, $logicalProcessorCount)
-    if ($AffinityMask -ge $firstUnavailableMask) {
-        throw "Affinity mask $AffinityMask selects a logical CPU that is not available on this $logicalProcessorCount-processor host."
-    }
+if ($logicalProcessorCount -le 8) {
+    throw "This machine-specific runner requires logical CPU 8, but only $logicalProcessorCount logical processors are available."
+}
+$runnerProcess = [Diagnostics.Process]::GetCurrentProcess()
+$originalRunnerAffinity = [int64] $runnerProcess.ProcessorAffinity
+$controllerAffinity = $originalRunnerAffinity -band (-bnot $reservedProcessorMask)
+if ($controllerAffinity -eq 0) {
+    $runnerProcess.Dispose()
+    throw 'The runner process has no available logical processor outside CPUs 8 and 9.'
 }
 
 $scriptRoot = Split-Path -Parent $PSCommandPath
@@ -154,6 +151,23 @@ if (-not $ArtifactsRoot) {
 }
 $artifactsPath = Join-Path $ArtifactsRoot (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
 
+$benchmarkMutex = [Threading.Mutex]::new($false, 'Global\fNbtBenchmarkRunner')
+$ownsBenchmarkMutex = $false
+try {
+    $ownsBenchmarkMutex = $benchmarkMutex.WaitOne(0)
+} catch [Threading.AbandonedMutexException] {
+    $ownsBenchmarkMutex = $true
+}
+if (-not $ownsBenchmarkMutex) {
+    $benchmarkMutex.Dispose()
+    $runnerProcess.Dispose()
+    throw 'Another fNbt benchmark runner is already active on this machine.'
+}
+
+$scriptExitCode = 1
+$locationChanged = $false
+$runnerAffinityChanged = $false
+try {
 Write-Host 'Sampling per-process CPU activity for five seconds...'
 $activity = @(Measure-ProcessCpuActivity)
 $topProcesses = @($activity | Select-Object -First 10)
@@ -180,6 +194,48 @@ if ($busyProcesses.Count -gt 0) {
     Write-Host "CPU preflight passed; no sampled readable process averaged $busyThreshold% of one logical CPU."
 }
 
+$quietingProblems = New-Object 'Collections.Generic.List[string]'
+$highPerformanceScheme = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
+$activeScheme = (& powercfg.exe /getactivescheme) -join ' '
+if ($LASTEXITCODE -ne 0 -or $activeScheme -notmatch [regex]::Escape($highPerformanceScheme)) {
+    $quietingProblems.Add('the High Performance power plan is not active')
+}
+$expectedStoppedServices = @('WSearch', 'SysMain', 'bzserv', 'AdobeARMservice', 'AdobeUpdateService')
+$runningServices = @(
+    Get-Service -Name $expectedStoppedServices -ErrorAction SilentlyContinue |
+        Where-Object Status -eq 'Running'
+)
+if ($runningServices.Count -gt 0) {
+    $quietingProblems.Add("background services are running: $(($runningServices.Name | Sort-Object) -join ', ')")
+}
+$servicingProcesses = @(Get-Process -Name TiWorker, MoUsoCoreWorker, TrustedInstaller -ErrorAction SilentlyContinue)
+if ($servicingProcesses.Count -gt 0) {
+    $quietingProblems.Add("Windows servicing is active: $(($servicingProcesses.ProcessName | Sort-Object -Unique) -join ', ')")
+}
+$interactiveProcessesOnReservedProcessors = foreach ($process in Get-Process -Name Code, codex, node -ErrorAction SilentlyContinue) {
+    try {
+        if (([int64] $process.ProcessorAffinity -band [int64] 0x300) -ne 0) {
+            "$($process.ProcessName) PID $($process.Id)"
+        }
+    } catch {
+        # If affinity cannot be read, the CPU activity check remains the fallback.
+    }
+}
+if (@($interactiveProcessesOnReservedProcessors).Count -gt 0) {
+    $quietingProblems.Add("interactive agent processes can run on logical CPUs 8/9: $($interactiveProcessesOnReservedProcessors -join ', ')")
+}
+if ($quietingProblems.Count -gt 0) {
+    $message = $quietingProblems -join '; '
+    if ($ForceBusy) {
+        Write-Warning "Machine-setup preflight overridden: $message"
+    } else {
+        [Console]::Error.WriteLine("Machine-setup preflight failed: $message")
+        [Console]::Error.WriteLine("Run '$scriptRoot\Quiet-BenchmarkMachine.ps1' once from an elevated prompt.")
+    }
+} else {
+    Write-Host 'Machine-setup preflight passed.'
+}
+
 $benchmarkProjects = @(
     Get-ChildItem -LiteralPath $repoRoot -Recurse -Force -File -Filter 'fNbt.Benchmarks.csproj' -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty FullName -Unique |
@@ -194,57 +250,106 @@ if ($duplicateProjects) {
     [Console]::Error.WriteLine("Relocate nested worktrees such as '$repoRoot\bin\perf-worktrees' outside the repository, or run from a clean clone.")
 }
 
-if (($busyProcesses.Count -gt 0 -and -not $ForceBusy) -or $duplicateProjects) {
-    exit 2
-}
+$preflightFailed = (($busyProcesses.Count -gt 0 -or $quietingProblems.Count -gt 0) -and -not $ForceBusy) -or $duplicateProjects
+if ($preflightFailed) {
+    $scriptExitCode = 2
+} else {
+    $dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
 
-$benchmarkArguments = @(
-    '--filter', $Filter,
-    '--launchCount', $LaunchCount.ToString([Globalization.CultureInfo]::InvariantCulture),
-    '--affinity', $AffinityMask.ToString([Globalization.CultureInfo]::InvariantCulture),
-    '--allStats',
-    '--outliers', 'DontRemove',
-    '--artifacts', $artifactsPath
-)
+    function Invoke-BenchmarkPass {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string] $Name,
 
-if ($Baseline) {
-    $benchmarkArguments += '--baseline', $Baseline
-}
-if ($BaselineSource) {
-    $benchmarkArguments += '--baseline-source', $BaselineSource
-}
-if ($AdditionalArguments) {
-    $benchmarkArguments += $AdditionalArguments
-}
+            [switch] $ReverseOrder
+        )
 
-$dotnetArguments = @(
-    'run',
-    '--configuration', 'Release',
-    '--framework', 'net8.0',
-    '--project', $projectPath,
-    '--no-launch-profile',
-    '--'
-) + $benchmarkArguments
+        $passArtifactsPath = Join-Path $artifactsPath $Name
+        $benchmarkArguments = @(
+            '--filter', $Filter,
+            '--affinity', $affinityMask.ToString([Globalization.CultureInfo]::InvariantCulture),
+            '--allStats',
+            '--artifacts', $passArtifactsPath
+        )
+        if ($Baseline) {
+            $benchmarkArguments += '--baseline', $Baseline
+            $benchmarkArguments += '--statisticalTest', '5%'
+        }
+        if ($BaselineSource) {
+            $benchmarkArguments += '--baseline-source', $BaselineSource
+        }
+        if ($ReverseOrder) {
+            $benchmarkArguments += '--reverse-order'
+        }
+        if ($AdditionalArguments) {
+            $benchmarkArguments += $AdditionalArguments
+        }
 
-$dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
-$benchmarkExitCode = 1
-$locationChanged = $false
+        $dotnetArguments = @(
+            'run',
+            '--configuration', 'Release',
+            '--framework', 'net8.0',
+            '--project', $projectPath,
+            '--no-launch-profile',
+            '--'
+        ) + $benchmarkArguments
 
-Write-Host "Artifacts: $artifactsPath"
-Write-Host "Affinity: $AffinityMask; launches: $LaunchCount"
+        Write-Host ''
+        Write-Host "Starting $Name pass. Artifacts: $passArtifactsPath"
+        & $dotnet @dotnetArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "$Name benchmark pass failed with exit code $LASTEXITCODE."
+        }
+    }
 
-try {
-    Push-Location -LiteralPath $repoRoot
-    $locationChanged = $true
-    & $dotnet @dotnetArguments
-    $benchmarkExitCode = $LASTEXITCODE
-} catch {
-    [Console]::Error.WriteLine("Benchmark launch failed: $($_.Exception.Message)")
-    $benchmarkExitCode = 1
-} finally {
-    if ($locationChanged) {
-        Pop-Location
+    Write-Host "Balanced artifacts root: $artifactsPath"
+    Write-Host "Affinity: $affinityMask (logical CPU 8); launch counts come from each benchmark profile."
+
+    try {
+        if ($controllerAffinity -ne $originalRunnerAffinity) {
+            $runnerProcess.ProcessorAffinity = [IntPtr] $controllerAffinity
+            $runnerAffinityChanged = $true
+        }
+        Push-Location -LiteralPath $repoRoot
+        $locationChanged = $true
+        Invoke-BenchmarkPass -Name 'forward-order'
+        Invoke-BenchmarkPass -Name 'reverse-order' -ReverseOrder
+        $scriptExitCode = 0
+    } catch {
+        [Console]::Error.WriteLine("Benchmark launch failed: $($_.Exception.Message)")
+        $scriptExitCode = 1
+    }
+
+    if ($scriptExitCode -eq 0) {
+        Write-Host ''
+        Write-Host 'Decision rule: require both orders to agree; use 5%/RatioSD<=0.03 for VeryStable and 10%/RatioSD<=0.05 for Average.'
+        Write-Host 'Do not gate on multimodal/Unstable timing. Compare exact Allocated_Bytes values in *-measurements.csv.'
     }
 }
+} finally {
+    if ($locationChanged) {
+        try {
+            Pop-Location
+        } catch {
+            Write-Warning "Could not restore the working directory: $($_.Exception.Message)"
+        }
+    }
+    if ($runnerAffinityChanged) {
+        try {
+            $runnerProcess.ProcessorAffinity = [IntPtr] $originalRunnerAffinity
+        } catch {
+            Write-Warning "Could not restore runner affinity: $($_.Exception.Message)"
+        }
+    }
+    if ($ownsBenchmarkMutex) {
+        try {
+            $benchmarkMutex.ReleaseMutex()
+        } catch {
+            Write-Warning "Could not release the benchmark mutex: $($_.Exception.Message)"
+        }
+    }
+    $benchmarkMutex.Dispose()
+    $runnerProcess.Dispose()
+}
 
-exit $benchmarkExitCode
+exit $scriptExitCode
