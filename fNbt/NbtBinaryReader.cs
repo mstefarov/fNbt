@@ -3,14 +3,16 @@ using System.Diagnostics;
 using System.IO;
 
 namespace fNbt {
-    /// <summary> BinaryReader wrapper that takes care of reading primitives from an NBT stream,
-    /// while taking care of endianness, string encoding, and skipping. </summary>
-    internal sealed class NbtBinaryReader : BinaryReader {
+    /// <summary> Standalone reader for NBT primitives from a stream, taking care of endianness,
+    /// string encoding, and skipping. Multi-byte values compose directly in wire order, so
+    /// big-endian reads don't pay for a little-endian read plus a swap. </summary>
+    internal sealed unsafe class NbtBinaryReader {
+        readonly Stream stream;
         readonly byte[] buffer = new byte[sizeof(double)];
 
         byte[]? seekBuffer;
         const int SeekBufferSize = 8 * 1024;
-        readonly bool swapNeeded;
+        readonly bool bigEndian;
         readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
 
@@ -64,15 +66,29 @@ namespace fNbt {
             }
         }
 
-        public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt)
-            : base(input) {
-            swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
+        public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt) {
+            if (input == null) throw new ArgumentNullException(nameof(input));
+            if (!input.CanRead) throw new ArgumentException("Given stream must be readable.", nameof(input));
+            stream = input;
+            this.bigEndian = bigEndian;
             this.useVarInt = useVarInt;
+        }
+
+
+        public Stream BaseStream {
+            get { return stream; }
         }
 
 
         public bool UsesVarInt {
             get { return useVarInt; }
+        }
+
+
+        public byte ReadByte() {
+            int value = stream.ReadByte();
+            if (value < 0) throw new EndOfStreamException();
+            return (byte)value;
         }
 
 
@@ -96,37 +112,48 @@ namespace fNbt {
         }
 
 
-        public override short ReadInt16() {
-            if (swapNeeded) {
-                return Swap(base.ReadInt16());
-            } else {
-                return base.ReadInt16();
+        public short ReadInt16() {
+            FillBuffer(sizeof(short));
+            unchecked {
+                if (bigEndian) {
+                    return (short)((buffer[0] << 8) | buffer[1]);
+                }
+                return (short)(buffer[0] | (buffer[1] << 8));
             }
         }
 
 
-        public override int ReadInt32() {
+        public int ReadInt32() {
             if (useVarInt) {
                 uint raw = ReadUnsignedVarInt32();
                 return (int)(raw >> 1) ^ -(int)(raw & 1);
             }
-            if (swapNeeded) {
-                return Swap(base.ReadInt32());
-            } else {
-                return base.ReadInt32();
+            FillBuffer(sizeof(int));
+            unchecked {
+                if (bigEndian) {
+                    return (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+                }
+                return buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24);
             }
         }
 
 
-        public override long ReadInt64() {
+        public long ReadInt64() {
             if (useVarInt) {
                 ulong raw = ReadUnsignedVarInt64();
                 return (long)(raw >> 1) ^ -(long)(raw & 1);
             }
-            if (swapNeeded) {
-                return Swap(base.ReadInt64());
-            } else {
-                return base.ReadInt64();
+            FillBuffer(sizeof(long));
+            unchecked {
+                uint high, low;
+                if (bigEndian) {
+                    high = (uint)((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]);
+                    low = (uint)((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]);
+                } else {
+                    low = (uint)(buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24));
+                    high = (uint)(buffer[4] | (buffer[5] << 8) | (buffer[6] << 16) | (buffer[7] << 24));
+                }
+                return (long)(((ulong)high << 32) | low);
             }
         }
 
@@ -168,24 +195,33 @@ namespace fNbt {
         }
 
 
-        public override float ReadSingle() {
-            if (swapNeeded) {
-                FillBuffer(sizeof(float));
-                Array.Reverse(buffer, 0, sizeof(float));
-                return BitConverter.ToSingle(buffer, 0);
-            } else {
-                return base.ReadSingle();
+        public float ReadSingle() {
+            FillBuffer(sizeof(float));
+            uint bits;
+            unchecked {
+                if (bigEndian) {
+                    bits = (uint)((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]);
+                } else {
+                    bits = (uint)(buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24));
+                }
             }
+            return *(float*)&bits;
         }
 
 
-        public override double ReadDouble() {
-            if (swapNeeded) {
-                FillBuffer(sizeof(double));
-                Array.Reverse(buffer);
-                return BitConverter.ToDouble(buffer, 0);
+        public double ReadDouble() {
+            FillBuffer(sizeof(double));
+            unchecked {
+                uint high, low;
+                if (bigEndian) {
+                    high = (uint)((buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3]);
+                    low = (uint)((buffer[4] << 24) | (buffer[5] << 16) | (buffer[6] << 8) | buffer[7]);
+                } else {
+                    low = (uint)(buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24));
+                    high = (uint)(buffer[4] | (buffer[5] << 8) | (buffer[6] << 16) | (buffer[7] << 24));
+                }
+                return BitConverter.Int64BitsToDouble((long)(((ulong)high << 32) | low));
             }
-            return base.ReadDouble();
         }
 
 
@@ -203,7 +239,7 @@ namespace fNbt {
         }
 
 
-        public override string ReadString() {
+        public string ReadString() {
             int length = ReadStringLength(maxStringBytes);
             if (length < stringConversionBuffer.Length) {
                 FillStringConversionBuffer(length);
@@ -230,11 +266,19 @@ namespace fNbt {
             // Varint prefixes can declare huge lengths, so check plausibility before
             // allocating. Small strings skip the check: they read at most 64 bytes.
             EnsureCanRead(length);
-            byte[] stringData = ReadBytes(length);
-            if (stringData.Length < length) {
-                throw new EndOfStreamException();
-            }
+            var stringData = new byte[length];
+            ReadExactly(stringData, length);
             return NbtStringCodec.Decode(stringData, 0, length);
+        }
+
+
+        void ReadExactly(byte[] destination, int count) {
+            int totalRead = 0;
+            while (totalRead < count) {
+                int bytesRead = stream.Read(destination, totalRead, count - totalRead);
+                if (bytesRead == 0) throw new EndOfStreamException();
+                totalRead += bytesRead;
+            }
         }
 
 
@@ -389,10 +433,10 @@ namespace fNbt {
         }
 
 
-        new void FillBuffer(int numBytes) {
+        void FillBuffer(int numBytes) {
             int offset = 0;
             do {
-                int num = BaseStream.Read(buffer, offset, numBytes - offset);
+                int num = stream.Read(buffer, offset, numBytes - offset);
                 if (num == 0) throw new EndOfStreamException();
                 offset += num;
             } while (offset < numBytes);
@@ -564,8 +608,8 @@ namespace fNbt {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
-            byte[] result = ReadBytes(length);
-            if (result.Length < length) throw new EndOfStreamException();
+            var result = new byte[length];
+            ReadExactly(result, length);
             return result;
         }
 
@@ -579,8 +623,8 @@ namespace fNbt {
             int[] result = new int[length];
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
-                BaseStream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
-                if (swapNeeded) {
+                stream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
+                if (bigEndian == BitConverter.IsLittleEndian) {
                     System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
                 }
                 return result;
@@ -599,8 +643,8 @@ namespace fNbt {
             long[] result = new long[length];
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
-                BaseStream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
-                if (swapNeeded) {
+                stream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
+                if (bigEndian == BitConverter.IsLittleEndian) {
                     System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
                 }
                 return result;
@@ -608,36 +652,6 @@ namespace fNbt {
 #endif
             for (int i = 0; i < length; i++) result[i] = ReadInt64();
             return result;
-        }
-
-
-        [DebuggerStepThrough]
-        static short Swap(short v) {
-            unchecked {
-                return (short)((v >> 8) & 0x00FF |
-                               (v << 8) & 0xFF00);
-            }
-        }
-
-
-        [DebuggerStepThrough]
-        static int Swap(int v) {
-            unchecked {
-                var v2 = (uint)v;
-                return (int)((v2 >> 24) & 0x000000FF |
-                             (v2 >> 8) & 0x0000FF00 |
-                             (v2 << 8) & 0x00FF0000 |
-                             (v2 << 24) & 0xFF000000);
-            }
-        }
-
-
-        [DebuggerStepThrough]
-        static long Swap(long v) {
-            unchecked {
-                return (Swap((int)v) & uint.MaxValue) << 32 |
-                       Swap((int)(v >> 32)) & uint.MaxValue;
-            }
         }
 
 
