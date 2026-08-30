@@ -71,6 +71,16 @@
     to load. NbtComparer now counts only containers against that limit,
     like every other walk, so a value inside the 512th container no longer
     makes Equals throw.
+- NbtWriter now checks names, strings, and nesting depth before
+    committing a tag, so a rejected call leaves its output and list
+    bookkeeping untouched. Previously a string over the limit inside a
+    list still used up the element slot, letting EndList and Finish
+    succeed on a truncated document. A write that does fail partway
+    through, such as an I/O error or a tree that runs past the depth limit
+    under a flavor without validation restrictions, now stops the writer:
+    every later call throws, since the document can no longer be
+    completed. Write validation under the Bedrock flavors now catches a
+    lone surrogate before anything is written.
 - ZLib saves on .NET 6 and later now run through the framework's ZLibStream,
     which computes the Adler-32 checksum in native code. Saving a map-sized
     document with ZLib compression gets about 1.3x faster.

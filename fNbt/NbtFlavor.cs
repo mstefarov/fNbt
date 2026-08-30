@@ -156,8 +156,12 @@ namespace fNbt {
 
         internal void ValidateString(string value) {
             // Neither encoding exceeds 4 bytes per char, so short strings skip the exact count.
-            // Encoding errors are still reported by NbtBinaryWriter when the string is emitted.
-            if ((long)value.Length * 4 <= MaxStringBytes) return;
+            // Standard UTF-8 cannot encode a lone surrogate, so under those flavors a string
+            // holding any surrogate takes the exact count, which throws for an unpaired one.
+            if ((long)value.Length * 4 <= MaxStringBytes &&
+                (UsesModifiedUtf8 || !NbtStringCodec.HasSurrogates(value))) {
+                return;
+            }
             long byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {
                 throw new NbtFormatException(

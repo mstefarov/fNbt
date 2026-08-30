@@ -1,9 +1,20 @@
 ﻿namespace fNbt {
-    // Represents state of a node in the NBT file tree, used by NbtWriter
-    internal sealed class NbtWriterNode {
-        public NbtTagType ParentType;
-        public NbtTagType ListType;
-        public int ListSize;
-        public int ListIndex;
+    // Traversal state for one entered compound or list. NbtWriter keeps the hot parent
+    // context in a field and stacks only its ancestors, without per-level object allocations.
+    internal struct NbtWriterNode {
+        public NbtTagType Type;
+        public NbtTagType ElementType;
+        public int Length;
+        // Index of the next list element to be committed.
+        public int NextIndex;
+
+
+        public NbtWriterNode(NbtTagType type, NbtTagType elementType = NbtTagType.Unknown,
+                             int length = 0) {
+            Type = type;
+            ElementType = elementType;
+            Length = length;
+            NextIndex = 0;
+        }
     }
 }

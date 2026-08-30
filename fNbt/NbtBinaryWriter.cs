@@ -44,7 +44,6 @@ namespace fNbt {
         // Lowered by NbtWriter when write validation is on for a flavor with a smaller ceiling
         int maxStringBytes = ushort.MaxValue;
 
-
         internal void SetMaxStringBytes(int value) {
             maxStringBytes = Math.Min(ushort.MaxValue, value);
         }
@@ -57,6 +56,41 @@ namespace fNbt {
             swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
             this.useVarInt = useVarInt;
             this.modifiedUtf8 = modifiedUtf8;
+        }
+
+
+        // Byte count of value in this writer's encoding, and whether it takes the modified
+        // UTF-8 path. Throws for anything Write would refuse, so NbtWriter can measure a
+        // string before committing any bytes and hand that result to the overload below.
+        public int Measure(string value, out bool modified) {
+            if (value == null) throw new ArgumentNullException(nameof(value));
+
+            long numBytes;
+            if (NbtStringCodec.IsAsciiNoNul(value)) {
+                numBytes = value.Length;
+                modified = false;
+            } else if (modifiedUtf8 && NbtStringCodec.NeedsModifiedEncoding(value)) {
+                numBytes = NbtStringCodec.GetModifiedByteCount(value);
+                modified = true;
+            } else {
+                numBytes = GetStandardByteCount(value);
+                modified = false;
+            }
+            if (numBytes > (useVarInt ? int.MaxValue : maxStringBytes)) {
+                throw StringTooLong(numBytes);
+            }
+            return (int)numBytes;
+        }
+
+
+        // Writes a string whose encoding was already checked and counted by Measure.
+        public void Write(string value, int numBytes, bool modified) {
+            WritePrefix(numBytes);
+            if (modified) {
+                WriteModifiedBody(value);
+            } else {
+                WriteStandardBody(value, numBytes);
+            }
         }
 
 
@@ -183,7 +217,8 @@ namespace fNbt {
         }
 
 
-        // Based on BinaryWriter.Write(String)
+        // Based on BinaryWriter.Write(String). This is the tag-tree hot path, so the common
+        // small-string case stays inline instead of going through the measured handoff.
         public void Write(string value) {
             if (value == null) {
                 throw new ArgumentNullException(nameof(value));
@@ -196,15 +231,11 @@ namespace fNbt {
             } else if (modifiedUtf8 && NbtStringCodec.NeedsModifiedEncoding(value)) {
                 // NULs and surrogates encode differently in modified UTF-8; everything else
                 // is byte-identical in both encodings and stays on the standard path below
-                WriteModifiedUtf8(value);
+                WritePrefix(NbtStringCodec.GetModifiedByteCount(value));
+                WriteModifiedBody(value);
                 return;
             } else {
-                try {
-                    numBytes = Encoding.GetByteCount(value);
-                } catch (EncoderFallbackException ex) {
-                    throw new NbtFormatException(
-                        "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
-                }
+                numBytes = GetStandardByteCount(value);
             }
             if (useVarInt) {
                 // BedrockNetwork length prefix is a plain unsigned varint
@@ -212,11 +243,7 @@ namespace fNbt {
             } else {
                 // The length prefix is an unsigned 16-bit byte count.
                 // Refuse anything past the ceiling to avoid corrupting the stream.
-                if (numBytes > maxStringBytes) {
-                    throw new NbtFormatException(
-                        "String is too long to write: " + numBytes + " bytes (maximum is " +
-                        maxStringBytes + ").");
-                }
+                if (numBytes > maxStringBytes) throw StringTooLong(numBytes);
                 Write((short)numBytes);
             }
 
@@ -225,41 +252,64 @@ namespace fNbt {
                 Encoding.GetBytes(value, 0, value.Length, buffer, 0);
                 stream.Write(buffer, 0, numBytes);
             } else {
-                // Aggressively try to not allocate memory in this loop for runtime performance reasons.
-                // Use an Encoder to write out the string correctly (handling surrogates crossing buffer
-                // boundaries properly).  
-                int charStart = 0;
-                int numLeft = value.Length;
-                while (numLeft > 0) {
-                    // Figure out how many chars to process this round.
-                    int charCount = (numLeft > MaxBufferedStringLength) ? MaxBufferedStringLength : numLeft;
-                    int byteLen;
-                    fixed (char* pChars = value) {
-                        fixed (byte* pBytes = buffer) {
-                            byteLen = encoder.GetBytes(pChars + charStart, charCount, pBytes, BufferSize,
-                                                       charCount == numLeft);
-                        }
-                    }
-                    stream.Write(buffer, 0, byteLen);
-                    charStart += charCount;
-                    numLeft -= charCount;
-                }
+                WriteChunked(value);
             }
         }
 
 
-        void WriteModifiedUtf8(string value) {
-            long numBytes = NbtStringCodec.GetModifiedByteCount(value);
+        static int GetStandardByteCount(string value) {
+            try {
+                return Encoding.GetByteCount(value);
+            } catch (EncoderFallbackException ex) {
+                throw new NbtFormatException(
+                    "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+            }
+        }
+
+
+        void WritePrefix(long numBytes) {
             if (useVarInt) {
+                if (numBytes > int.MaxValue) throw StringTooLong(numBytes);
                 WriteUnsignedVarInt32((uint)numBytes);
             } else {
-                if (numBytes > maxStringBytes) {
-                    throw new NbtFormatException(
-                        "String is too long to write: " + numBytes + " bytes (maximum is " +
-                        maxStringBytes + ").");
-                }
+                if (numBytes > maxStringBytes) throw StringTooLong(numBytes);
                 Write((short)numBytes);
             }
+        }
+
+
+        void WriteStandardBody(string value, int numBytes) {
+            if (numBytes <= BufferSize) {
+                Encoding.GetBytes(value, 0, value.Length, buffer, 0);
+                stream.Write(buffer, 0, numBytes);
+            } else {
+                WriteChunked(value);
+            }
+        }
+
+
+        void WriteChunked(string value) {
+            // Aggressively try to avoid allocations in this loop. Use an Encoder to handle
+            // surrogate pairs that cross buffer boundaries correctly.
+            int charStart = 0;
+            int numLeft = value.Length;
+            while (numLeft > 0) {
+                int charCount = (numLeft > MaxBufferedStringLength) ? MaxBufferedStringLength : numLeft;
+                int byteLen;
+                fixed (char* pChars = value) {
+                    fixed (byte* pBytes = buffer) {
+                        byteLen = encoder.GetBytes(pChars + charStart, charCount, pBytes, BufferSize,
+                                                   charCount == numLeft);
+                    }
+                }
+                stream.Write(buffer, 0, byteLen);
+                charStart += charCount;
+                numLeft -= charCount;
+            }
+        }
+
+
+        void WriteModifiedBody(string value) {
             int pos = 0;
             foreach (char c in value) {
                 if (pos > BufferSize - 3) {
@@ -271,6 +321,13 @@ namespace fNbt {
             if (pos > 0) {
                 stream.Write(buffer, 0, pos);
             }
+        }
+
+
+        NbtFormatException StringTooLong(long numBytes) {
+            long maximum = useVarInt ? int.MaxValue : maxStringBytes;
+            return new NbtFormatException(
+                "String is too long to write: " + numBytes + " bytes (maximum is " + maximum + ").");
         }
 
 

@@ -36,6 +36,19 @@ namespace fNbt {
         }
 
 
+        // True if any surrogate code unit is present, paired or not
+        public static bool HasSurrogates(string value) {
+#if NET8_0_OR_GREATER
+            return value.AsSpan().IndexOfAnyInRange('\uD800', '\uDFFF') >= 0;
+#else
+            foreach (char c in value) {
+                if (c >= '\uD800' && c <= '\uDFFF') return true;
+            }
+            return false;
+#endif
+        }
+
+
         // True if the string encodes differently in modified UTF-8 than in standard UTF-8:
         // an embedded NUL or anything in the surrogate range.
         public static bool NeedsModifiedEncoding(string value) {

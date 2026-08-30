@@ -283,12 +283,56 @@ namespace fNbt.Test {
                 new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
             }
 
-            // Java avoids a second whole-tree walk, so its recursive write detects the same
-            // limit partway through
+            // Java avoids a second whole-tree walk. Its recursive write detects the same limit,
+            // and the partial output leaves the writer permanently failed.
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
+                long before = ms.Length;
                 Assert.Throws<NbtFormatException>(
                     () => writer.WriteTag(MakeNestedCompoundTree(MaxDepth)));
+                Assert.IsTrue(ms.Length > before);
+                Assert.Throws<NbtFormatException>(writer.EndCompound);
+                Assert.Throws<NbtFormatException>(writer.Finish);
+            }
+        }
+
+
+        [TestMethod]
+        public void NbtWriterDepthRefusalDoesNotConsumeListSlot() {
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                for (int i = 2; i < MaxDepth; i++) {
+                    writer.BeginCompound("c");
+                }
+                // The list is the 512th open container, leaving no room for its compound element
+                writer.BeginList("l", NbtTagType.Compound, 1);
+                Assert.Throws<NbtFormatException>(() => writer.BeginCompound());
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtCompound()));
+                Assert.Throws<NbtFormatException>(() => writer.EndList());
+            }
+        }
+
+
+        [TestMethod]
+        public void NbtWriterContainerRefusedAtLimitLeavesWriterUsable() {
+            // A container tag handed to WriteTag at the limit is refused like BeginCompound is:
+            // before the emission window, with nothing written and the writer still usable
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                for (int i = 1; i < MaxDepth; i++) {
+                    writer.BeginCompound("c");
+                }
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtCompound("x")));
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtList("x", NbtTagType.Int)));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteByte("leaf", 1);
+                for (int i = 0; i < MaxDepth; i++) {
+                    writer.EndCompound();
+                }
+                writer.Finish();
+                byte[] doc = ms.ToArray();
+                new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
             }
         }
 

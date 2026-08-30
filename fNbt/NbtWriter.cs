@@ -4,21 +4,27 @@ using System.IO;
 
 namespace fNbt {
     /// <summary> An efficient writer for writing NBT data directly to streams.
-    /// Each instance of NbtWriter writes one complete file. 
+    /// Each instance of NbtWriter writes one complete file.
     /// NbtWriter enforces all constraints of the NBT file format
     /// EXCEPT checking for duplicate tag names within a compound. </summary>
+    /// <remarks> Every check the writer can make up front (tag type, list slot, name and string
+    /// length and encoding, nesting depth) runs before any byte is written or a list slot
+    /// consumed, so a refused call leaves the writer as it was. A write that fails after
+    /// committing bytes, such as an I/O error or a tree that runs past the depth limit under a
+    /// flavor without validation restrictions, leaves the writer in a failed state where every
+    /// later call throws <see cref="NbtFormatException"/>, since the document cannot be
+    /// completed. </remarks>
     public sealed class NbtWriter {
         const int MaxStreamCopyBufferSize = 8 * 1024;
 
         readonly NbtBinaryWriter writer;
         readonly NbtFlavor flavor;
+        // True only when this writer enforces a flavor's optional conformance restrictions.
+        readonly bool validates;
         // Lowered from LongArray only when write validation is on for a restricting flavor
         readonly NbtTagType maxTagType = NbtTagType.LongArray;
-        NbtTagType listType;
-        NbtTagType parentType;
-        int listIndex;
-        int listSize;
-        Stack<NbtWriterNode>? nodes;
+        NbtWriterNode container;
+        Stack<NbtWriterNode>? ancestors;
 
 
         /// <summary> Initializes a new instance of the NbtWriter class, with default options
@@ -85,13 +91,15 @@ namespace fNbt {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
             this.flavor = flavor;
             writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
-            if (validateOnWrite && flavor.HasRestrictions) {
+            validates = validateOnWrite && flavor.HasRestrictions;
+            if (validates) {
                 maxTagType = flavor.MaxTagType;
                 writer.SetMaxStringBytes(flavor.MaxStringBytes);
             }
+            int nameBytes = MeasureString(rootTagName, nameof(rootTagName), out bool nameModified);
             writer.Write((byte)NbtTagType.Compound);
-            writer.Write(rootTagName);
-            parentType = NbtTagType.Compound;
+            writer.Write(rootTagName, nameBytes, nameModified);
+            container = new NbtWriterNode(NbtTagType.Compound);
         }
 
 
@@ -102,11 +110,19 @@ namespace fNbt {
 
         /// <summary> Gets whether the root tag has been closed.
         /// No more tags may be written after the root tag has been closed. </summary>
-        public bool IsDone { get; private set; }
+        public bool IsDone {
+            get { return container.Type == NbtTagType.End; }
+        }
 
-        /// <summary> Gets the underlying stream of the NbtWriter. </summary>
+        /// <summary> Gets the underlying stream of the NbtWriter, flushing buffered output first. </summary>
+        /// <exception cref="IOException"> Flushing the stream failed. </exception>
         public Stream BaseStream {
-            get { return writer.BaseStream; }
+            get {
+                // Deliberately not part of the state machine: a stream that reads this property
+                // from its own Write, or a thread polling it, would otherwise see the in-flight
+                // sentinel as a failure
+                return writer.BaseStream;
+            }
         }
 
 
@@ -118,8 +134,10 @@ namespace fNbt {
         /// the size of a parent list has been exceeded -OR-
         /// tags are nested more than 512 levels deep. </exception>
         public void BeginCompound() {
-            EnforceConstraints(null, NbtTagType.Compound);
-            GoDown(NbtTagType.Compound);
+            ValidateConstraints(null, NbtTagType.Compound);
+            EnsureCanGoDown();
+            CommitTag();
+            GoDown(new NbtWriterNode(NbtTagType.Compound));
         }
 
 
@@ -129,22 +147,28 @@ namespace fNbt {
         /// an unnamed compound tag was expected -OR- a tag of a different type was expected -OR-
         /// tags are nested more than 512 levels deep. </exception>
         public void BeginCompound(string tagName) {
-            EnforceConstraints(tagName, NbtTagType.Compound);
-            GoDown(NbtTagType.Compound);
-
-            writer.Write((byte)NbtTagType.Compound);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Compound);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            EnsureCanGoDown();
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Compound, tagName, nameBytes, nameModified);
+            CommitEmission(parentType);
+            GoDown(new NbtWriterNode(NbtTagType.Compound));
         }
 
 
         /// <summary> Ends a compound tag. </summary>
-        /// <exception cref="NbtFormatException"> Not currently in a compound. </exception>
+        /// <exception cref="NbtFormatException"> Not currently in a compound -OR-
+        /// an earlier write failed partway through. </exception>
         public void EndCompound() {
-            if (IsDone || parentType != NbtTagType.Compound) {
+            ThrowIfFailed();
+            if (IsDone || container.Type != NbtTagType.Compound) {
                 throw new NbtFormatException("Not currently in a compound.");
             }
-            GoUp();
+            NbtTagType compoundType = BeginEmission();
             writer.Write(NbtTagType.End);
+            RestoreAfterEmission(compoundType);
+            GoUp();
         }
 
 
@@ -173,13 +197,13 @@ namespace fNbt {
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
             }
-            EnforceConstraints(null, NbtTagType.List);
-            GoDown(NbtTagType.List);
-            listType = elementType;
-            listSize = size;
-
+            ValidateConstraints(null, NbtTagType.List);
+            EnsureCanGoDown();
+            NbtTagType parentType = BeginEmission();
             writer.Write((byte)elementType);
             writer.Write(size);
+            CommitEmission(parentType);
+            GoDown(new NbtWriterNode(NbtTagType.List, elementType, size));
         }
 
 
@@ -208,27 +232,30 @@ namespace fNbt {
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
             }
-            EnforceConstraints(tagName, NbtTagType.List);
-            GoDown(NbtTagType.List);
-            listType = elementType;
-            listSize = size;
-
-            writer.Write((byte)NbtTagType.List);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.List);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            EnsureCanGoDown();
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.List, tagName, nameBytes, nameModified);
             writer.Write((byte)elementType);
             writer.Write(size);
+            CommitEmission(parentType);
+            GoDown(new NbtWriterNode(NbtTagType.List, elementType, size));
         }
 
 
         /// <summary> Ends a list tag. </summary>
         /// <exception cref="NbtFormatException"> Not currently in a list -OR-
-        /// not all list elements have been written yet. </exception>
+        /// not all list elements have been written yet -OR-
+        /// an earlier write failed partway through. </exception>
         public void EndList() {
-            if (parentType != NbtTagType.List || IsDone) {
+            ThrowIfFailed();
+            if (container.Type != NbtTagType.List || IsDone) {
                 throw new NbtFormatException("Not currently in a list.");
-            } else if (listIndex < listSize) {
+            } else if (container.NextIndex < container.Length) {
                 throw new NbtFormatException("Cannot end list: not all list elements have been written yet. " +
-                                             "Expected: " + listSize + ", written: " + listIndex);
+                                             "Expected: " + container.Length + ", written: " +
+                                             container.NextIndex);
             }
             GoUp();
         }
@@ -244,8 +271,10 @@ namespace fNbt {
         /// a named byte tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteByte(byte value) {
-            EnforceConstraints(null, NbtTagType.Byte);
+            ValidateConstraints(null, NbtTagType.Byte);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -255,10 +284,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed byte tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteByte(string tagName, byte value) {
-            EnforceConstraints(tagName, NbtTagType.Byte);
-            writer.Write((byte)NbtTagType.Byte);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Byte);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Byte, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -268,8 +299,10 @@ namespace fNbt {
         /// a named double tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteDouble(double value) {
-            EnforceConstraints(null, NbtTagType.Double);
+            ValidateConstraints(null, NbtTagType.Double);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -279,10 +312,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed byte tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteDouble(string tagName, double value) {
-            EnforceConstraints(tagName, NbtTagType.Double);
-            writer.Write((byte)NbtTagType.Double);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Double);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Double, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -292,8 +327,10 @@ namespace fNbt {
         /// a named float tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteFloat(float value) {
-            EnforceConstraints(null, NbtTagType.Float);
+            ValidateConstraints(null, NbtTagType.Float);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -303,10 +340,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed float tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteFloat(string tagName, float value) {
-            EnforceConstraints(tagName, NbtTagType.Float);
-            writer.Write((byte)NbtTagType.Float);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Float);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Float, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -316,8 +355,10 @@ namespace fNbt {
         /// a named int tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteInt(int value) {
-            EnforceConstraints(null, NbtTagType.Int);
+            ValidateConstraints(null, NbtTagType.Int);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -327,10 +368,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed int tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteInt(string tagName, int value) {
-            EnforceConstraints(tagName, NbtTagType.Int);
-            writer.Write((byte)NbtTagType.Int);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Int);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Int, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -340,8 +383,10 @@ namespace fNbt {
         /// a named long tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteLong(long value) {
-            EnforceConstraints(null, NbtTagType.Long);
+            ValidateConstraints(null, NbtTagType.Long);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -351,10 +396,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed long tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteLong(string tagName, long value) {
-            EnforceConstraints(tagName, NbtTagType.Long);
-            writer.Write((byte)NbtTagType.Long);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Long);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Long, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -364,8 +411,10 @@ namespace fNbt {
         /// a named short tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteShort(short value) {
-            EnforceConstraints(null, NbtTagType.Short);
+            ValidateConstraints(null, NbtTagType.Short);
+            NbtTagType parentType = BeginEmission();
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -375,10 +424,12 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed short tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteShort(string tagName, short value) {
-            EnforceConstraints(tagName, NbtTagType.Short);
-            writer.Write((byte)NbtTagType.Short);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.Short);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.Short, tagName, nameBytes, nameModified);
             writer.Write(value);
+            CommitEmission(parentType);
         }
 
 
@@ -390,8 +441,11 @@ namespace fNbt {
         /// <paramref name="value"/> is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
         public void WriteString(string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
-            EnforceConstraints(null, NbtTagType.String);
-            writer.Write(value);
+            ValidateConstraints(null, NbtTagType.String);
+            int valueBytes = MeasureString(value, nameof(value), out bool valueModified);
+            NbtTagType parentType = BeginEmission();
+            writer.Write(value, valueBytes, valueModified);
+            CommitEmission(parentType);
         }
 
 
@@ -403,10 +457,13 @@ namespace fNbt {
         /// <paramref name="value"/> is longer than the flavor's limit (65,535 bytes for the Java flavors). </exception>
         public void WriteString(string tagName, string value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
-            EnforceConstraints(tagName, NbtTagType.String);
-            writer.Write((byte)NbtTagType.String);
-            writer.Write(tagName);
-            writer.Write(value);
+            ValidateConstraints(tagName, NbtTagType.String);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            int valueBytes = MeasureString(value, nameof(value), out bool valueModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.String, tagName, nameBytes, nameModified);
+            writer.Write(value, valueBytes, valueModified);
+            CommitEmission(parentType);
         }
 
         #endregion
@@ -440,9 +497,11 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteByteArray(byte[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(null, NbtTagType.ByteArray);
+            ValidateConstraints(null, NbtTagType.ByteArray);
+            NbtTagType parentType = BeginEmission();
             writer.Write(count);
             writer.Write(data, offset, count);
+            CommitEmission(parentType);
         }
 
 
@@ -474,11 +533,13 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteByteArray(string tagName, byte[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(tagName, NbtTagType.ByteArray);
-            writer.Write((byte)NbtTagType.ByteArray);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.ByteArray);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
             writer.Write(count);
             writer.Write(data, offset, count);
+            CommitEmission(parentType);
         }
 
 
@@ -527,8 +588,10 @@ namespace fNbt {
             } else if (buffer.Length == 0 && count > 0) {
                 throw new ArgumentException("buffer size must be greater than 0 when count is greater than 0", nameof(buffer));
             }
-            EnforceConstraints(null, NbtTagType.ByteArray);
+            ValidateConstraints(null, NbtTagType.ByteArray);
+            NbtTagType parentType = BeginEmission();
             WriteByteArrayFromStreamImpl(dataSource, count, buffer);
+            CommitEmission(parentType);
         }
 
 
@@ -576,10 +639,12 @@ namespace fNbt {
             } else if (buffer.Length == 0 && count > 0) {
                 throw new ArgumentException("buffer size must be greater than 0 when count is greater than 0", nameof(buffer));
             }
-            EnforceConstraints(tagName, NbtTagType.ByteArray);
-            writer.Write((byte)NbtTagType.ByteArray);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.ByteArray);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
             WriteByteArrayFromStreamImpl(dataSource, count, buffer);
+            CommitEmission(parentType);
         }
 
 
@@ -611,11 +676,13 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteIntArray(int[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(null, NbtTagType.IntArray);
+            ValidateConstraints(null, NbtTagType.IntArray);
+            NbtTagType parentType = BeginEmission();
             writer.Write(count);
             for (int i = 0; i < count; i++) {
                 writer.Write(data[offset + i]);
             }
+            CommitEmission(parentType);
         }
 
 
@@ -649,13 +716,15 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteIntArray(string tagName, int[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(tagName, NbtTagType.IntArray);
-            writer.Write((byte)NbtTagType.IntArray);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.IntArray);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.IntArray, tagName, nameBytes, nameModified);
             writer.Write(count);
             for (int i = 0; i < count; i++) {
                 writer.Write(data[offset + i]);
             }
+            CommitEmission(parentType);
         }
 
         /// <summary> Writes an unnamed long array tag, copying data from an array. </summary>
@@ -686,11 +755,13 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteLongArray(long[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(null, NbtTagType.LongArray);
+            ValidateConstraints(null, NbtTagType.LongArray);
+            NbtTagType parentType = BeginEmission();
             writer.Write(count);
             for (int i = 0; i < count; i++) {
                 writer.Write(data[offset + i]);
             }
+            CommitEmission(parentType);
         }
 
 
@@ -724,13 +795,15 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteLongArray(string tagName, long[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            EnforceConstraints(tagName, NbtTagType.LongArray);
-            writer.Write((byte)NbtTagType.LongArray);
-            writer.Write(tagName);
+            ValidateConstraints(tagName, NbtTagType.LongArray);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.LongArray, tagName, nameBytes, nameModified);
             writer.Write(count);
             for (int i = 0; i < count; i++) {
                 writer.Write(data[offset + i]);
             }
+            CommitEmission(parentType);
         }
 
         #endregion
@@ -740,84 +813,104 @@ namespace fNbt {
         /// Use this method sparingly with NbtWriter -- constructing NbtTag objects defeats the purpose of this class.
         /// If you already have lots of NbtTag objects, you might as well use NbtFile to write them all at once. </summary>
         /// <param name="tag"> Tag to write. Must not be null. </param>
+        /// <remarks> With write validation on for a flavor with restrictions, the whole tree is
+        /// checked before anything is written, so a rejected tag leaves the writer's state and
+        /// output untouched. Otherwise a tree that is too deep or holds an overlong string fails
+        /// partway through, and the writer then refuses every further call. </remarks>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// given tag is unacceptable at this time -OR- its tree, together with the containers
         /// currently open, is nested more than 512 levels deep -OR-
         /// a string inside it is longer than the flavor's limit (65,535 bytes for the Java flavors) -OR-
-        /// enabled validation rejects a tag type or string length inside it for the flavor. </exception>
+        /// enabled validation rejects a tag type or string length inside it for the flavor -OR-
+        /// an earlier write failed partway through. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
-            // The tree may use whatever depth the open containers leave, so streaming and
-            // tree nesting share one limit
+            ValidateConstraints(tag.Name, tag.TagType);
+            // What the tag layer would refuse before writing a byte is refused here instead,
+            // ahead of the emission window, so the writer stays usable. A tree's own depth
+            // failure comes after some of it is out, and that one does fail the writer.
+            if (tag.TagType == NbtTagType.Compound || tag.TagType == NbtTagType.List) {
+                EnsureCanGoDown();
+            }
+            if (tag is NbtList list && list.ListType == NbtTagType.Unknown) {
+                throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+            }
+            // The direct name and value are measured either way: with validation off nothing
+            // else checks them before emission, and two strings cost nothing next to the walk
+            if (tag.Name != null) MeasureString(tag.Name, nameof(tag), out _);
+            if (tag is NbtString stringTag) MeasureString(stringTag.Value, nameof(tag), out _);
             int depthBudget = NbtTag.MaxDepth - OpenContainerCount;
-            if (maxTagType < NbtTagType.LongArray) {
-                // Only the subtree needs the pre-walk; per-call writes are checked inline.
-                // Validate before EnforceConstraints, which counts the tag against its list.
+            if (validates) {
+                // Restricting flavors need the whole-tree pass anyway, and it checks depth from
+                // the budget the open containers leave. Walking an unrestricted tree twice is
+                // too expensive, so there its own walk enforces the budget.
                 flavor.ValidateTree(tag, depthBudget);
             }
-            EnforceConstraints(tag.Name, tag.TagType);
+            NbtTagType parentType = BeginEmission();
             if (tag.Name != null) {
                 tag.WriteTag(writer, depthBudget);
             } else {
                 tag.WriteData(writer, depthBudget);
             }
+            CommitEmission(parentType);
         }
 
 
         /// <summary> Ensures that file has been written in its entirety, with no tags left open.
         /// This method is for verification only, and does not actually write any data. 
         /// Calling this method is optional (but probably a good idea, to catch any usage errors). </summary>
-        /// <exception cref="NbtFormatException"> Not all tags have been closed yet. </exception>
+        /// <exception cref="NbtFormatException"> Not all tags have been closed yet -OR-
+        /// an earlier write failed partway through. </exception>
         public void Finish() {
+            ThrowIfFailed();
             if (!IsDone) {
                 throw new NbtFormatException("Cannot finish: not all tags have been closed yet.");
             }
         }
 
 
-        // The stack holds every open container except the root
         int OpenContainerCount {
-            get { return (nodes == null ? 0 : nodes.Count) + 1; }
+            get {
+                if (IsDone || IsFailed) return 0;
+                return 1 + (ancestors?.Count ?? 0);
+            }
         }
 
 
-        void GoDown(NbtTagType thisType) {
-            if (nodes == null) {
-                nodes = new Stack<NbtWriterNode>();
-            }
+        bool IsFailed {
+            get { return container.Type == NbtTagType.Unknown; }
+        }
+
+
+        void EnsureCanGoDown() {
             if (OpenContainerCount >= NbtTag.MaxDepth) {
                 throw new NbtFormatException(NbtTag.DepthLimitMessage);
             }
-            var newNode = new NbtWriterNode {
-                ParentType = parentType,
-                ListType = listType,
-                ListSize = listSize,
-                ListIndex = listIndex
-            };
-            nodes.Push(newNode);
+        }
 
-            parentType = thisType;
-            listType = NbtTagType.Unknown;
-            listSize = 0;
-            listIndex = 0;
+
+        void GoDown(NbtWriterNode newNode) {
+            if (ancestors == null) {
+                ancestors = new Stack<NbtWriterNode>();
+            }
+            ancestors.Push(container);
+            container = newNode;
         }
 
 
         void GoUp() {
-            if (nodes == null || nodes.Count == 0) {
-                IsDone = true;
+            if (ancestors == null || ancestors.Count == 0) {
+                // default(NbtWriterNode).Type is TAG_End, our closed sentinel.
+                container = default;
             } else {
-                NbtWriterNode oldNode = nodes.Pop();
-                parentType = oldNode.ParentType;
-                listType = oldNode.ListType;
-                listSize = oldNode.ListSize;
-                listIndex = oldNode.ListIndex;
+                container = ancestors.Pop();
             }
         }
 
 
-        void EnforceConstraints(string? name, NbtTagType desiredType) {
+        void ValidateConstraints(string? name, NbtTagType desiredType) {
+            ThrowIfFailed();
             if (IsDone) {
                 throw new NbtFormatException("Cannot write any more tags: root tag has been closed.");
             }
@@ -825,18 +918,64 @@ namespace fNbt {
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName(desiredType) + " is not permitted by the " + flavor.Name + " flavor.");
             }
-            if (parentType == NbtTagType.List) {
+            if (container.Type == NbtTagType.List) {
                 if (name != null) {
                     throw new NbtFormatException("Expecting an unnamed tag.");
-                } else if (listType != desiredType) {
-                    throw new NbtFormatException("Unexpected tag type (expected: " + listType + ", given: " +
-                                                 desiredType);
-                } else if (listIndex >= listSize) {
+                } else if (container.ElementType != desiredType) {
+                    throw new NbtFormatException("Unexpected tag type (expected: " + container.ElementType +
+                                                 ", given: " + desiredType);
+                } else if (container.NextIndex >= container.Length) {
                     throw new NbtFormatException("Given list size exceeded.");
                 }
-                listIndex++;
             } else if (name == null) {
                 throw new NbtFormatException("Expecting a named tag.");
+            }
+        }
+
+
+        void CommitTag() {
+            if (container.Type == NbtTagType.List) {
+                container.NextIndex++;
+            }
+        }
+
+
+        NbtTagType BeginEmission() {
+            NbtTagType parentType = container.Type;
+            // Unknown is both the in-flight and failed sentinel. Successful writes restore the
+            // type below; any exception naturally leaves every later operation disabled.
+            container.Type = NbtTagType.Unknown;
+            return parentType;
+        }
+
+
+        void RestoreAfterEmission(NbtTagType parentType) {
+            container.Type = parentType;
+        }
+
+
+        void CommitEmission(NbtTagType parentType) {
+            RestoreAfterEmission(parentType);
+            CommitTag();
+        }
+
+
+        int MeasureString(string value, string paramName, out bool modified) {
+            if (value == null) throw new ArgumentNullException(paramName);
+            return writer.Measure(value, out modified);
+        }
+
+
+        void WriteHeader(NbtTagType type, string name, int nameBytes, bool nameModified) {
+            writer.Write((byte)type);
+            writer.Write(name, nameBytes, nameModified);
+        }
+
+
+        void ThrowIfFailed() {
+            if (IsFailed) {
+                throw new NbtFormatException(
+                    "Cannot write any more tags: a previous write may have partially written data.");
             }
         }
 
@@ -871,5 +1010,7 @@ namespace fNbt {
                 bytesWritten += bytesRead;
             }
         }
+
+
     }
 }

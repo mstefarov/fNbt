@@ -507,12 +507,212 @@ namespace fNbt.Test {
                 var writer = new NbtWriter(ms, "root");
                 Assert.Throws<EndOfStreamException>(
                     () => writer.WriteByteArray("arr", new MemoryStream(new byte[5]), 10));
+                Assert.Throws<NbtFormatException>(() => writer.WriteInt("afterFailure", 1));
             }
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
                 writer.BeginList("list", NbtTagType.ByteArray, 1);
                 Assert.Throws<EndOfStreamException>(
                     () => writer.WriteByteArray(new MemoryStream(new byte[5]), 10));
+                Assert.Throws<NbtFormatException>(() => writer.WriteByteArray(new byte[0]));
+            }
+        }
+
+
+        [TestMethod]
+        public void RejectedDirectStringsAndNamesDoNotCommitState() {
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", NbtFlavor.ClassiCube);
+                writer.BeginList("strings", NbtTagType.String, 1);
+                long beforeValue = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteString(new string('x', 300)));
+                Assert.AreEqual(beforeValue, ms.Length);
+                writer.WriteString("ok");
+                writer.EndList();
+
+                long beforeName = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.BeginCompound(new string('n', 300)));
+                Assert.AreEqual(beforeName, ms.Length);
+                writer.WriteInt("stillInRoot", 1);
+                writer.EndCompound();
+                writer.Finish();
+            }
+        }
+
+
+        [TestMethod]
+        public void StandardUtf8StringsAreValidatedBeforeOutput() {
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", NbtFlavor.Bedrock);
+                writer.BeginList("strings", NbtTagType.String, 1);
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteString("\uD800"));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteString("ok");
+                writer.EndList();
+
+                before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteInt("\uD800", 1));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteInt("ok", 1);
+                writer.EndCompound();
+                writer.Finish();
+            }
+
+            using (var ms = new MemoryStream()) {
+                Assert.Throws<NbtFormatException>(() => new NbtWriter(ms, "\uD800", NbtFlavor.Bedrock));
+                Assert.AreEqual(0, ms.Length);
+            }
+        }
+
+
+        [TestMethod]
+        public void StandardUtf8TreeIsValidatedBeforeOutput() {
+            const string loneSurrogate = "\uD800";
+
+            // With tree validation disabled, a direct name is still measured before its type
+            // byte is emitted, so rejection does not damage the writer.
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", new NbtOptions(NbtFlavor.Bedrock) {
+                    ValidateOnWrite = false
+                });
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(
+                    () => writer.WriteTag(new NbtInt(loneSurrogate, 1)));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteInt("ok", 1);
+                writer.EndCompound();
+                writer.Finish();
+            }
+
+            // With validation on, the pre-walk counts the exact bytes under standard UTF-8, so
+            // a nested lone surrogate is refused before anything is written
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", NbtFlavor.Bedrock);
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(
+                    () => writer.WriteTag(new NbtCompound("nested") {
+                        new NbtString("value", loneSurrogate)
+                    }));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteInt("afterRefusal", 1);
+                writer.EndCompound();
+                writer.Finish();
+            }
+
+            // NbtFile and NbtCodec share the validation walk
+            var doc = new NbtCompound("root") { new NbtString("value", loneSurrogate) };
+            using (var ms = new MemoryStream()) {
+                var file = new NbtFile(doc) { Flavor = NbtFlavor.Bedrock };
+                Assert.Throws<NbtFormatException>(() => file.SaveToStream(ms, NbtCompression.None));
+                Assert.AreEqual(0, ms.Length);
+            }
+            Assert.Throws<NbtFormatException>(() => NbtCodec.For(NbtFlavor.Bedrock).WriteTag(doc));
+        }
+
+
+        [TestMethod]
+        public void WriteTagRefusedUpFrontLeavesWriterUsable() {
+            // A list with no element type is refused before the emission window opens, like
+            // the tag layer would refuse it, so nothing is written and the writer goes on
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtList("l")));
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteInt("i", 1);
+                writer.EndCompound();
+                writer.Finish();
+            }
+        }
+
+
+        [TestMethod]
+        public void PartialTreeFailurePoisonsWriter() {
+            var partialTree = new NbtCompound("partial") {
+                new NbtString("tooLong", new string('x', ushort.MaxValue + 1))
+            };
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(partialTree));
+                Assert.IsTrue(ms.Length > before);
+                Assert.Throws<NbtFormatException>(() => writer.WriteInt("afterFailure", 1));
+                Assert.Throws<NbtFormatException>(writer.EndCompound);
+                Assert.Throws<NbtFormatException>(writer.Finish);
+            }
+        }
+
+
+        [TestMethod]
+        public void DirectOutputFailurePoisonsWriter() {
+            using (var stream = new FailAfterBytesStream()) {
+                var writer = new NbtWriter(stream, "root");
+                writer.BeginList("ints", NbtTagType.Int, 1);
+                stream.FailAfter(2);
+
+                // The int payload is four bytes, so the stream writes a prefix before throwing.
+                Assert.Throws<IOException>(() => writer.WriteInt(123));
+                Assert.Throws<NbtFormatException>(() => writer.WriteInt(456));
+                Assert.Throws<NbtFormatException>(writer.EndList);
+                Assert.Throws<NbtFormatException>(writer.EndCompound);
+                Assert.Throws<NbtFormatException>(writer.Finish);
+                // The stream itself stays reachable, so the caller can inspect or discard it
+                Assert.IsNotNull(writer.BaseStream);
+            }
+
+            // A constructor failure cannot leak a usable writer instance.
+            using (var stream = new FailAfterBytesStream()) {
+                stream.FailAfter(0);
+                Assert.Throws<IOException>(() => new NbtWriter(stream, "root"));
+                Assert.AreEqual(0, stream.Length);
+            }
+        }
+
+
+        [TestMethod]
+        public void BaseStreamFlushFailureLeavesWriterUsable() {
+            using (var stream = new FlushFailingStream()) {
+                var writer = new NbtWriter(stream, "root");
+                writer.WriteInt("before", 1);
+                stream.FailFlush();
+
+                // The getter flushes, so the failure surfaces there, but reading the property
+                // is not a write: the writer stays usable, and a monitoring read cannot fail it
+                Assert.Throws<IOException>(() => { _ = writer.BaseStream; });
+                writer.WriteInt("after", 2);
+                writer.EndCompound();
+                writer.Finish();
+            }
+        }
+
+
+        [TestMethod]
+        public void BaseStreamReadFromInsideAWriteIsHarmless() {
+            // A stream that logs the writer's position from its own Write must not fail the writer
+            using (var stream = new PositionLoggingStream()) {
+                var writer = new NbtWriter(stream, "root");
+                stream.Writer = writer;
+                writer.WriteInt("a", 1);
+                writer.WriteString("b", "two");
+                writer.EndCompound();
+                writer.Finish();
+                Assert.IsTrue(stream.Logged > 0);
+            }
+        }
+
+
+        sealed class PositionLoggingStream : MemoryStream {
+            public NbtWriter Writer;
+            public int Logged;
+
+
+            public override void Write(byte[] buffer, int offset, int count) {
+                base.Write(buffer, offset, count);
+                if (Writer != null) {
+                    _ = Writer.BaseStream.Position;
+                    Logged++;
+                }
             }
         }
 
@@ -616,6 +816,53 @@ namespace fNbt.Test {
         }
 
 
+        sealed class FailAfterBytesStream : MemoryStream {
+            int bytesBeforeFailure = int.MaxValue;
+
+
+            public void FailAfter(int byteCount) {
+                bytesBeforeFailure = byteCount;
+            }
+
+
+            public override void WriteByte(byte value) {
+                if (bytesBeforeFailure == 0) throw new IOException("Injected write failure.");
+                base.WriteByte(value);
+                bytesBeforeFailure--;
+            }
+
+
+            public override void Write(byte[] buffer, int offset, int count) {
+                if (count <= bytesBeforeFailure) {
+                    base.Write(buffer, offset, count);
+                    bytesBeforeFailure -= count;
+                    return;
+                }
+                if (bytesBeforeFailure > 0) {
+                    base.Write(buffer, offset, bytesBeforeFailure);
+                    bytesBeforeFailure = 0;
+                }
+                throw new IOException("Injected write failure.");
+            }
+        }
+
+
+        sealed class FlushFailingStream : MemoryStream {
+            bool failFlush;
+
+
+            public void FailFlush() {
+                failFlush = true;
+            }
+
+
+            public override void Flush() {
+                if (failFlush) throw new IOException("Injected flush failure.");
+                base.Flush();
+            }
+        }
+
+
         [TestMethod]
         public void RejectedWriteTagDoesNotConsumeAListSlot() {
             using (var ms = new MemoryStream()) {
@@ -626,6 +873,82 @@ namespace fNbt.Test {
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(over));
                 writer.WriteString("a");
                 writer.WriteString("b");
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+            }
+        }
+
+
+        [TestMethod]
+        public void RejectedStringDoesNotConsumeAListSlot() {
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
+                writer.BeginList("l", NbtTagType.String, 1);
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteString(new string('x', 300)));
+                Assert.AreEqual(before, ms.Length);
+                // The slot is still open, so the list cannot close short
+                Assert.Throws<NbtFormatException>(() => writer.EndList());
+                writer.WriteString("ok");
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+
+                byte[] doc = ms.ToArray();
+                var file = new NbtFile();
+                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+                Assert.AreEqual("ok", file.RootTag["l"][0].StringValue);
+            }
+
+            // The Java wire limit gets the same treatment
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r");
+                writer.BeginList("l", NbtTagType.String, 1);
+                Assert.Throws<NbtFormatException>(() => writer.WriteString(new string('x', 65_536)));
+                Assert.Throws<NbtFormatException>(() => writer.EndList());
+            }
+        }
+
+
+        [TestMethod]
+        public void RejectedStringsAndNamesWriteNothing() {
+            string over = new string('x', 300);
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(() => writer.WriteString("s", over));
+                Assert.Throws<NbtFormatException>(() => writer.WriteInt(over, 1));
+                Assert.Throws<NbtFormatException>(() => writer.BeginCompound(over));
+                Assert.Throws<NbtFormatException>(() => writer.BeginList(over, NbtTagType.Int, 0));
+                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtInt(over, 1)));
+                // No type byte or name reached the stream, and no container was left open
+                Assert.AreEqual(before, ms.Length);
+                writer.WriteInt("i", 1);
+                writer.EndCompound();
+                writer.Finish();
+
+                byte[] doc = ms.ToArray();
+                var file = new NbtFile();
+                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+                Assert.AreEqual(1, file.RootTag["i"].IntValue);
+            }
+
+            // A root name over the limit writes nothing at all
+            using (var ms = new MemoryStream()) {
+                Assert.Throws<NbtFormatException>(() => new NbtWriter(ms, over, NbtFlavor.ClassiCube));
+                Assert.AreEqual(0, ms.Length);
+            }
+
+            // A null name on a named overload is an argument error, not an unnamed element
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r");
+                writer.BeginList("l", NbtTagType.Int, 1);
+                long before = ms.Length;
+                Assert.Throws<ArgumentNullException>(() => writer.WriteInt(null, 5));
+                Assert.AreEqual(before, ms.Length);
+                Assert.Throws<NbtFormatException>(() => writer.EndList());
+                writer.WriteInt(5);
                 writer.EndList();
                 writer.EndCompound();
                 writer.Finish();
