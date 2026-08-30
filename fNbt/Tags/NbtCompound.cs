@@ -352,7 +352,7 @@ namespace fNbt {
                 }
                 newTag.Parent = this;
                 // Assigned to the field: the tag has no name yet, so the property's rename path is dead weight.
-                string tagName = readStream.ReadString();
+                string tagName = readStream.ReadTagName();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
                     try {

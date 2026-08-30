@@ -326,7 +326,7 @@ namespace fNbt {
             NbtParseState oldState = state;
             state = NbtParseState.Error;
             TagsRead++;
-            TagName = (readName ? reader.ReadString() : null);
+            TagName = (readName ? reader.ReadTagName() : null);
 
             valueCache = null;
             TagLength = 0;

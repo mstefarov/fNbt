@@ -14,6 +14,24 @@ namespace fNbt {
         readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
 
+        // Bounded name cache backing ReadTagName, activated lazily and capped so a hostile
+        // all-unique document cannot grow an unbounded secondary index. Activation waits until
+        // the names read could plausibly repay the table itself: a reader that only ever sees a
+        // few dozen names (one small document per reader) must not pay for a table per document.
+        NameCacheEntry[]? nameCache;
+        int nameCacheCount;
+        int namesRead;
+        const int NameCacheActivation = 64;
+        const int NameCacheInitialSlots = 128;
+        const int NameCacheMaxSlots = 2048;
+        const int NameCacheMaxProbe = 8;
+
+        struct NameCacheEntry {
+            public uint Hash;
+            public byte[]? Bytes;
+            public string Value;
+        }
+
         // Opt-in limits, set at most once by whichever entry point owns this reader, before
         // any parsing. Defaults keep every check a single always-false comparison.
         // maxStringBytes folds MaxAllocation in and guards reads, which allocate; skipped
@@ -188,26 +206,125 @@ namespace fNbt {
         public override string ReadString() {
             int length = ReadStringLength(maxStringBytes);
             if (length < stringConversionBuffer.Length) {
-                int stringBytesRead = 0;
-                while (stringBytesRead < length) {
-                    int bytesToRead = length - stringBytesRead;
-                    int bytesReadThisTime = BaseStream.Read(stringConversionBuffer, stringBytesRead, bytesToRead);
-                    if (bytesReadThisTime == 0) {
-                        throw new EndOfStreamException();
-                    }
-                    stringBytesRead += bytesReadThisTime;
-                }
+                FillStringConversionBuffer(length);
                 return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
-            } else {
-                // Varint prefixes can declare huge lengths, so check plausibility before
-                // allocating. Small strings skip the check: they read at most 64 bytes.
-                EnsureCanRead(length);
-                byte[] stringData = ReadBytes(length);
-                if (stringData.Length < length) {
+            }
+            return ReadLongString(length);
+        }
+
+
+        void FillStringConversionBuffer(int length) {
+            int stringBytesRead = 0;
+            while (stringBytesRead < length) {
+                int bytesToRead = length - stringBytesRead;
+                int bytesReadThisTime = BaseStream.Read(stringConversionBuffer, stringBytesRead, bytesToRead);
+                if (bytesReadThisTime == 0) {
                     throw new EndOfStreamException();
                 }
-                return NbtStringCodec.Decode(stringData, 0, length);
+                stringBytesRead += bytesReadThisTime;
             }
+        }
+
+
+        string ReadLongString(int length) {
+            // Varint prefixes can declare huge lengths, so check plausibility before
+            // allocating. Small strings skip the check: they read at most 64 bytes.
+            EnsureCanRead(length);
+            byte[] stringData = ReadBytes(length);
+            if (stringData.Length < length) {
+                throw new EndOfStreamException();
+            }
+            return NbtStringCodec.Decode(stringData, 0, length);
+        }
+
+
+        /// <summary> Reads a length-prefixed string like <see cref="ReadString"/>, canonicalizing
+        /// repeated names through a bounded per-reader cache. Real documents draw tag names from a
+        /// small set (schemas, palettes), so most reads return an existing string instead of
+        /// allocating. Cached entries are keyed by encoded bytes; alternate encodings of the same
+        /// name simply occupy separate entries that decode to equal strings. </summary>
+        public string ReadTagName() {
+            int length = ReadStringLength(maxStringBytes);
+            if (length == 0) return "";
+            if (length >= stringConversionBuffer.Length) {
+                return ReadLongString(length);
+            }
+            FillStringConversionBuffer(length);
+            if (nameCache == null) {
+                // Tiny documents never repay a table
+                if (++namesRead < NameCacheActivation) {
+                    return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
+                }
+                nameCache = new NameCacheEntry[NameCacheInitialSlots];
+            }
+            return LookUpName(length);
+        }
+
+
+        string LookUpName(int length) {
+            byte[] buffer = stringConversionBuffer;
+            uint hash = 2166136261u;
+            for (int i = 0; i < length; i++) {
+                hash = (hash ^ buffer[i]) * 16777619u;
+            }
+            NameCacheEntry[] cache = nameCache!;
+            int mask = cache.Length - 1;
+            int index = (int)hash & mask;
+            for (int probe = 0; probe < NameCacheMaxProbe; probe++) {
+                ref NameCacheEntry entry = ref cache[index];
+                byte[]? entryBytes = entry.Bytes;
+                if (entryBytes == null) {
+                    string value = NbtStringCodec.Decode(buffer, 0, length);
+                    // Insertion stops at half load once the table cannot grow further;
+                    // lookups keep working for what was already cached
+                    if (nameCacheCount * 2 < cache.Length) {
+                        var keyCopy = new byte[length];
+                        Buffer.BlockCopy(buffer, 0, keyCopy, 0, length);
+                        entry.Hash = hash;
+                        entry.Bytes = keyCopy;
+                        entry.Value = value;
+                        if (++nameCacheCount * 2 >= cache.Length && cache.Length < NameCacheMaxSlots) {
+                            GrowNameCache();
+                        }
+                    }
+                    return value;
+                }
+                if (entry.Hash == hash && entryBytes.Length == length &&
+                    NameBytesEqual(entryBytes, buffer, length)) {
+                    return entry.Value;
+                }
+                index = (index + 1) & mask;
+            }
+            // A probe run this long means dense collisions; don't make the cluster worse
+            return NbtStringCodec.Decode(buffer, 0, length);
+        }
+
+
+        static bool NameBytesEqual(byte[] entryBytes, byte[] buffer, int length) {
+#if NET8_0_OR_GREATER
+            return entryBytes.AsSpan().SequenceEqual(buffer.AsSpan(0, length));
+#else
+            for (int i = 0; i < length; i++) {
+                if (entryBytes[i] != buffer[i]) return false;
+            }
+            return true;
+#endif
+        }
+
+
+        void GrowNameCache() {
+            NameCacheEntry[] oldCache = nameCache!;
+            var newCache = new NameCacheEntry[oldCache.Length * 4];
+            int mask = newCache.Length - 1;
+            foreach (NameCacheEntry entry in oldCache) {
+                if (entry.Bytes == null) continue;
+                int index = (int)entry.Hash & mask;
+                while (newCache[index].Bytes != null) {
+                    index = (index + 1) & mask;
+                }
+                newCache[index] = entry;
+            }
+            nameCache = newCache;
         }
 
 
