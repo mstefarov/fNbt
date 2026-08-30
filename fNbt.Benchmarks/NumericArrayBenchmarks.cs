@@ -17,10 +17,8 @@ public class NumericArrayBenchmarks {
 
     NbtCodec codec = null!;
     byte[] intDoc = null!;
-    byte[] longDoc = null!;
     byte[] intListDoc = null!;
     NbtCompound intRoot = null!;
-    NbtCompound longRoot = null!;
     MemoryStream sink = null!;
 
     [GlobalSetup]
@@ -28,19 +26,15 @@ public class NumericArrayBenchmarks {
         codec = NbtCodec.For(Flavor);
         var rng = new Random(42);
         var ints = new int[Length];
-        var longs = new long[Length];
         for (int i = 0; i < Length; i++) {
             ints[i] = rng.Next(int.MinValue, int.MaxValue);
-            longs[i] = (long)rng.Next() << 32 | (uint)rng.Next();
         }
         intRoot = new NbtCompound("r") { new NbtIntArray("a", ints) };
-        longRoot = new NbtCompound("r") { new NbtLongArray("a", longs) };
         intDoc = codec.WriteTag(intRoot);
-        longDoc = codec.WriteTag(longRoot);
         var intList = new NbtList("a");
         foreach (int value in ints) intList.Add(new NbtInt(value));
         intListDoc = codec.WriteTag(new NbtCompound("r") { intList });
-        sink = new MemoryStream(longDoc.Length + 1024);
+        sink = new MemoryStream(intDoc.Length + 1024);
     }
 
     // Fixed-Width Array Throughput
@@ -52,24 +46,10 @@ public class NumericArrayBenchmarks {
     }
 
     [AverageBenchmark]
-    [Benchmark(Description = "Parse long array doc")]
-    public NbtTag ReadLongArray() {
-        return codec.ReadTag(longDoc, 0, longDoc.Length, out _);
-    }
-
-    [AverageBenchmark]
     [Benchmark(Description = "Write int array doc")]
     public long WriteIntArray() {
         sink.Position = 0;
         codec.WriteTag(intRoot, sink);
-        return sink.Position;
-    }
-
-    [AverageBenchmark]
-    [Benchmark(Description = "Write long array doc")]
-    public long WriteLongArray() {
-        sink.Position = 0;
-        codec.WriteTag(longRoot, sink);
         return sink.Position;
     }
 
@@ -81,6 +61,47 @@ public class NumericArrayBenchmarks {
         reader.ReadToFollowing();
         reader.ReadToFollowing();
         return reader.ReadListAsArray<int>();
+    }
+}
+
+
+// TAG_Long_Array is a Java-only reality: both Bedrock flavors predate it and their
+// validation rejects it, so long-array throughput measures Java alone.
+[BenchmarkCategory(Program.BaselineIncompatible)]
+public class LongArrayBenchmarks {
+    [Params(4096, 1048576)]
+    public int Length;
+
+    NbtCodec codec = null!;
+    byte[] longDoc = null!;
+    NbtCompound longRoot = null!;
+    MemoryStream sink = null!;
+
+    [GlobalSetup]
+    public void GlobalSetup() {
+        codec = NbtCodec.For(NbtFlavor.Java);
+        var rng = new Random(42);
+        var longs = new long[Length];
+        for (int i = 0; i < Length; i++) {
+            longs[i] = (long)rng.Next() << 32 | (uint)rng.Next();
+        }
+        longRoot = new NbtCompound("r") { new NbtLongArray("a", longs) };
+        longDoc = codec.WriteTag(longRoot);
+        sink = new MemoryStream(longDoc.Length + 1024);
+    }
+
+    [AverageBenchmark]
+    [Benchmark(Description = "Parse long array doc")]
+    public NbtTag ReadLongArray() {
+        return codec.ReadTag(longDoc, 0, longDoc.Length, out _);
+    }
+
+    [AverageBenchmark]
+    [Benchmark(Description = "Write long array doc")]
+    public long WriteLongArray() {
+        sink.Position = 0;
+        codec.WriteTag(longRoot, sink);
+        return sink.Position;
     }
 }
 #endif

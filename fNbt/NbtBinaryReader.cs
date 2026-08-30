@@ -12,6 +12,9 @@ namespace fNbt {
 
         byte[]? seekBuffer;
         const int SeekBufferSize = 8 * 1024;
+        // Byte-swapped bulk reads work this many bytes at a time, so the reversal pass runs
+        // over data still in cache. 64 KiB divides evenly by every element size.
+        const int ReverseChunkBytes = 64 * 1024;
         readonly bool bigEndian;
         readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
@@ -23,6 +26,9 @@ namespace fNbt {
         NameCacheEntry[]? nameCache;
         int nameCacheCount;
         int namesRead;
+        int nameLookups;
+        int nameHits;
+        bool nameCacheDisabled;
         const int NameCacheActivation = 64;
         const int NameCacheInitialSlots = 128;
         const int NameCacheMaxSlots = 2048;
@@ -295,8 +301,8 @@ namespace fNbt {
             }
             FillStringConversionBuffer(length);
             if (nameCache == null) {
-                // Tiny documents never repay a table
-                if (++namesRead < NameCacheActivation) {
+                // Tiny documents never repay a table, and one that proved useless stays off
+                if (nameCacheDisabled || ++namesRead < NameCacheActivation) {
                     return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
                 }
                 nameCache = new NameCacheEntry[NameCacheInitialSlots];
@@ -306,6 +312,13 @@ namespace fNbt {
 
 
         string LookUpName(int length) {
+            // A document that keeps missing (unique names everywhere) drops the cache so it
+            // stops paying for hashing and probes
+            if ((++nameLookups & 1023) == 0 && nameHits * 4 < nameLookups) {
+                nameCache = null;
+                nameCacheDisabled = true;
+                return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
+            }
             byte[] buffer = stringConversionBuffer;
             uint hash = 2166136261u;
             for (int i = 0; i < length; i++) {
@@ -335,6 +348,7 @@ namespace fNbt {
                 }
                 if (entry.Hash == hash && entryBytes.Length == length &&
                     NameBytesEqual(entryBytes, buffer, length)) {
+                    nameHits++;
                     return entry.Value;
                 }
                 index = (index + 1) & mask;
@@ -623,9 +637,19 @@ namespace fNbt {
             int[] result = new int[length];
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
-                stream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
-                if (bigEndian == BitConverter.IsLittleEndian) {
-                    System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
+                Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
+                if (bigEndian != BitConverter.IsLittleEndian) {
+                    stream.ReadExactly(bytes);
+                } else {
+                    // Read and reverse in chunks that stay cache-hot, instead of two
+                    // whole-array passes
+                    while (!bytes.IsEmpty) {
+                        Span<byte> chunk = bytes.Slice(0, Math.Min(ReverseChunkBytes, bytes.Length));
+                        stream.ReadExactly(chunk);
+                        Span<int> elements = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(chunk);
+                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(elements, elements);
+                        bytes = bytes.Slice(chunk.Length);
+                    }
                 }
                 return result;
             }
@@ -643,9 +667,17 @@ namespace fNbt {
             long[] result = new long[length];
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
-                stream.ReadExactly(System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan()));
-                if (bigEndian == BitConverter.IsLittleEndian) {
-                    System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(result, result);
+                Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
+                if (bigEndian != BitConverter.IsLittleEndian) {
+                    stream.ReadExactly(bytes);
+                } else {
+                    while (!bytes.IsEmpty) {
+                        Span<byte> chunk = bytes.Slice(0, Math.Min(ReverseChunkBytes, bytes.Length));
+                        stream.ReadExactly(chunk);
+                        Span<long> elements = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(chunk);
+                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(elements, elements);
+                        bytes = bytes.Slice(chunk.Length);
+                    }
                 }
                 return result;
             }

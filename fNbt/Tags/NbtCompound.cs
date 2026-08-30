@@ -101,6 +101,11 @@ namespace fNbt {
                 index.TryGetValue(tagName, out NbtTag? found);
                 return found;
             }
+            return FindLinear(tagName);
+        }
+
+
+        NbtTag? FindLinear(string tagName) {
             NbtTag[]? local = items;
             for (int i = 0; i < count; i++) {
                 NbtTag child = local![i];
@@ -108,6 +113,27 @@ namespace fNbt {
                 if (child.name == tagName) return child;
             }
             return null;
+        }
+
+
+        // Inserts unless the name is taken, hashing once on modern targets. Callers set Parent.
+        bool TryInsert(NbtTag tag) {
+            string tagName = tag.name!;
+            if (index != null) {
+#if NET8_0_OR_GREATER
+                if (!index.TryAdd(tagName, tag)) return false;
+#else
+                if (index.ContainsKey(tagName)) return false;
+                index.Add(tagName, tag);
+#endif
+                EnsureCapacity(count + 1);
+                items![count++] = tag;
+                version++;
+                return true;
+            }
+            if (FindLinear(tagName) != null) return false;
+            AppendVerified(tag);
+            return true;
         }
 
 
@@ -441,10 +467,9 @@ namespace fNbt {
                 string tagName = readStream.ReadTagName();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
-                    if (Find(tagName) != null) {
+                    if (!TryInsert(newTag)) {
                         throw new NbtFormatException("Duplicate tag name in compound: " + tagName);
                     }
-                    AppendVerified(newTag);
                 }
             }
         }
@@ -522,10 +547,10 @@ namespace fNbt {
                 throw new ArgumentException("A tag may only be added to one compound/list at a time.");
             } else if (IsDescendantOf(newTag)) {
                 throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            } else if (Find(newTag.Name) != null) {
+            }
+            if (!TryInsert(newTag)) {
                 throw new ArgumentException("A tag with the name '" + newTag.Name + "' already exists.");
             }
-            AppendVerified(newTag);
             newTag.Parent = this;
         }
 
