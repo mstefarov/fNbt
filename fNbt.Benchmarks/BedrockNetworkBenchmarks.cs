@@ -55,5 +55,40 @@ public class BedrockNetworkBenchmarks {
         }
         return tags;
     }
+
+    // The real Skip operation, which discards whole subtrees instead of visiting each tag.
+    [AverageBenchmark]
+    [Benchmark(Description = "Skip palette roots (NbtReader.Skip)")]
+    public long SkipPaletteRoots() {
+        using var ms = new MemoryStream(paletteBytes);
+        long tags = 0;
+        while (ms.Position < ms.Length) {
+            var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
+            reader.ReadToFollowing();
+            tags += reader.Skip();
+        }
+        return tags;
+    }
+
+    // The measure-then-write double walk, 16,913 small exact buffers.
+    [AverageBenchmark]
+    [Benchmark(Description = "Write palette roots to exact buffers")]
+    public long WritePaletteExactBuffers() {
+        long total = 0;
+        foreach (NbtTag root in paletteRoots) {
+            total += codec.WriteTag(root).Length;
+        }
+        return total;
+    }
+
+#if NET8_0_OR_GREATER
+    [AverageBenchmark]
+    [Benchmark(Description = "Write block palette (IBufferWriter)")]
+    public long WritePaletteBufferWriter() {
+        var output = new System.Buffers.ArrayBufferWriter<byte>(paletteBytes.Length);
+        codec.WriteConcatenatedTags(paletteRoots, output);
+        return output.WrittenCount;
+    }
+#endif
 }
 #endif

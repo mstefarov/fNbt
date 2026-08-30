@@ -81,6 +81,21 @@ public class ClassicWorldReadBenchmarks {
     }
 
 
+    static bool BlocksOnly(NbtTag tag) {
+        return tag.Name != "Metadata";
+    }
+
+
+    // The inverse of the header-only rows: block arrays load, the ~9.3k-tag subtree is skipped.
+    [UnstableBenchmark]
+    [Benchmark(Description = "Load blocks only, selector (uncompressed)")]
+    public NbtFile LoadBlocksOnlyUncompressed() {
+        var file = new NbtFile();
+        file.LoadFromBuffer(rawBytes, 0, rawBytes.Length, NbtCompression.None, BlocksOnly);
+        return file;
+    }
+
+
     // X/Y/Z sit near the front, so the reader stops before reaching the block arrays.
     [VeryStableBenchmark]
     [Benchmark(Description = "Read dimensions only (NbtReader, GZip)")]

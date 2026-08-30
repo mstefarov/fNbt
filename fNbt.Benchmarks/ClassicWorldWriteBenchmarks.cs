@@ -59,6 +59,21 @@ public class ClassicWorldWriteBenchmarks {
     }
 
 
+    // Compressed output size is unknowable up front, so these exercise the grow-and-copy path.
+    [AverageBenchmark]
+    [Benchmark(Description = "Save map to buffer (GZip)")]
+    public byte[] SaveToBufferGZip() {
+        return mapFile.SaveToBuffer(NbtCompression.GZip);
+    }
+
+
+    [AverageBenchmark]
+    [Benchmark(Description = "Save map to buffer (ZLib)")]
+    public byte[] SaveToBufferZLib() {
+        return mapFile.SaveToBuffer(NbtCompression.ZLib);
+    }
+
+
     // Full Save vs. NbtWriter for Streaming a Map Out
 
     [UnstableBenchmark]

@@ -10,7 +10,9 @@ reverses benchmark-case order so package and method ratios are not trusted from 
 order. Per-method attributes select launch, warmup, iteration, and outlier settings.
 
 .PARAMETER Filter
-BenchmarkDotNet method-name filter. This parameter is required.
+One or more BenchmarkDotNet method-name filter patterns. This parameter is required.
+Comma-separated values are split into separate patterns, since the powershell -File
+boundary flattens arrays into one comma-joined argument.
 
 .PARAMETER Baseline
 Optional fNbt package version used by the comparison job.
@@ -37,7 +39,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\fNbt.Benchmarks\Run-Stable
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateNotNullOrEmpty()]
-    [string] $Filter,
+    [string[]] $Filter,
 
     [string] $Baseline,
 
@@ -111,6 +113,8 @@ function Measure-ProcessCpuActivity {
 if ($env:OS -ne 'Windows_NT') {
     throw 'Run-StableBenchmark.ps1 supports Windows only.'
 }
+
+$Filter = @($Filter | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 
 if ($BaselineSource -and -not $Baseline) {
     throw '-BaselineSource requires -Baseline.'
@@ -254,7 +258,7 @@ $preflightFailed = (($busyProcesses.Count -gt 0 -or $quietingProblems.Count -gt 
 if ($preflightFailed) {
     $scriptExitCode = 2
 } else {
-    $dotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+    $dotnet = @(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0].Source
 
     function Invoke-BenchmarkPass {
         param(
@@ -265,8 +269,7 @@ if ($preflightFailed) {
         )
 
         $passArtifactsPath = Join-Path $artifactsPath $Name
-        $benchmarkArguments = @(
-            '--filter', $Filter,
+        $benchmarkArguments = @('--filter') + $Filter + @(
             '--affinity', $affinityMask.ToString([Globalization.CultureInfo]::InvariantCulture),
             '--allStats',
             '--artifacts', $passArtifactsPath

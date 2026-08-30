@@ -34,6 +34,30 @@ public class ClassicWorldMetadataBenchmarks {
     }
 
 
+    static bool RejectMetadata(NbtTag tag) {
+        return tag.Name != "Metadata";
+    }
+
+
+    // The whole ~9.3k-tag subtree is rejected, so this measures the cost of skipping tags
+    // rather than constructing them.
+    [AverageBenchmark]
+    [Benchmark(Description = "Skip metadata via selector")]
+    public NbtFile SkipMetadataSelector() {
+        var file = new NbtFile();
+        file.LoadFromBuffer(rawBytes, 0, rawBytes.Length, NbtCompression.None, RejectMetadata);
+        return file;
+    }
+
+
+    // Exercises the measure-then-write double walk behind exact-size buffers.
+    [AverageBenchmark]
+    [Benchmark(Description = "Write metadata to exact buffer")]
+    public byte[] SaveMetadataToBuffer() {
+        return metadataFile.SaveToBuffer(NbtCompression.None);
+    }
+
+
     [VeryStableBenchmark]
     [Benchmark(Description = "Write metadata (~9.3k tags)")]
     public void WriteMetadata() {
