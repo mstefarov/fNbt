@@ -12,8 +12,10 @@ namespace fNbt {
         // Encoding can be shared among all instances of NbtBinaryWriter, because it is stateless.
         static readonly UTF8Encoding Encoding = new UTF8Encoding(false, true);
 
-        // Each instance has to have its own encoder, because it does maintain state.
-        readonly Encoder encoder = Encoding.GetEncoder();
+        // Each instance needs its own encoder, because it maintains state. Only the chunked
+        // long-string path uses it, so it is created on first need: most writers never
+        // see a string past 256 bytes.
+        Encoder? encoder;
 
         public Stream BaseStream {
             get {
@@ -291,6 +293,7 @@ namespace fNbt {
         void WriteChunked(string value) {
             // Aggressively try to avoid allocations in this loop. Use an Encoder to handle
             // surrogate pairs that cross buffer boundaries correctly.
+            if (encoder == null) encoder = Encoding.GetEncoder();
             int charStart = 0;
             int numLeft = value.Length;
             while (numLeft > 0) {
