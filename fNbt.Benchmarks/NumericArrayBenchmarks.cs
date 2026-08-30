@@ -18,6 +18,7 @@ public class NumericArrayBenchmarks {
     NbtCodec codec = null!;
     byte[] intDoc = null!;
     byte[] longDoc = null!;
+    byte[] intListDoc = null!;
     NbtCompound intRoot = null!;
     NbtCompound longRoot = null!;
     MemoryStream sink = null!;
@@ -36,6 +37,9 @@ public class NumericArrayBenchmarks {
         longRoot = new NbtCompound("r") { new NbtLongArray("a", longs) };
         intDoc = codec.WriteTag(intRoot);
         longDoc = codec.WriteTag(longRoot);
+        var intList = new NbtList("a");
+        foreach (int value in ints) intList.Add(new NbtInt(value));
+        intListDoc = codec.WriteTag(new NbtCompound("r") { intList });
         sink = new MemoryStream(longDoc.Length + 1024);
     }
 
@@ -67,6 +71,16 @@ public class NumericArrayBenchmarks {
         sink.Position = 0;
         codec.WriteTag(longRoot, sink);
         return sink.Position;
+    }
+
+    [AverageBenchmark]
+    [Benchmark(Description = "ReadListAsArray<int>")]
+    public int[] ReadListAsIntArray() {
+        using var ms = new MemoryStream(intListDoc);
+        var reader = new NbtReader(ms, Flavor);
+        reader.ReadToFollowing();
+        reader.ReadToFollowing();
+        return reader.ReadListAsArray<int>();
     }
 }
 #endif

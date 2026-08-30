@@ -927,57 +927,81 @@ namespace fNbt {
                 reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType, reader.UsesVarInt));
 
-                // special handling for reading byte arrays (as byte arrays)
-                if (elementType == NbtTagType.Byte && typeof(T) == typeof(byte)) {
+                // Exact-type matches read without boxing or conversion dispatch; ints and longs
+                // also get the bulk readers. Genuine conversions keep the ChangeType loops below.
+                if (typeof(T) == typeof(byte) && elementType == NbtTagType.Byte) {
                     T[] val = (T[])(object)reader.ReadArray(elementsToRead);
                     FinishListRead(unpublished);
                     return val;
                 }
+                if (typeof(T) == typeof(int) && elementType == NbtTagType.Int) {
+                    T[] val = (T[])(object)reader.ReadInt32Array(elementsToRead);
+                    FinishListRead(unpublished);
+                    return val;
+                }
+                if (typeof(T) == typeof(long) && elementType == NbtTagType.Long) {
+                    T[] val = (T[])(object)reader.ReadInt64Array(elementsToRead);
+                    FinishListRead(unpublished);
+                    return val;
+                }
 
-                // for everything else, gotta read elements one-by-one
                 var result = new T[elementsToRead];
-                switch (elementType) {
-                    case NbtTagType.Byte:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadByte(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                if (typeof(T) == typeof(short) && elementType == NbtTagType.Short) {
+                    short[] typed = (short[])(object)result;
+                    for (int i = 0; i < elementsToRead; i++) typed[i] = reader.ReadInt16();
+                } else if (typeof(T) == typeof(float) && elementType == NbtTagType.Float) {
+                    float[] typed = (float[])(object)result;
+                    for (int i = 0; i < elementsToRead; i++) typed[i] = reader.ReadSingle();
+                } else if (typeof(T) == typeof(double) && elementType == NbtTagType.Double) {
+                    double[] typed = (double[])(object)result;
+                    for (int i = 0; i < elementsToRead; i++) typed[i] = reader.ReadDouble();
+                } else if (typeof(T) == typeof(string) && elementType == NbtTagType.String) {
+                    string[] typed = (string[])(object)result;
+                    for (int i = 0; i < elementsToRead; i++) typed[i] = reader.ReadString();
+                } else {
+                    switch (elementType) {
+                        case NbtTagType.Byte:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadByte(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    case NbtTagType.Short:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadInt16(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        case NbtTagType.Short:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadInt16(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    case NbtTagType.Int:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadInt32(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        case NbtTagType.Int:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadInt32(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    case NbtTagType.Long:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadInt64(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        case NbtTagType.Long:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadInt64(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    case NbtTagType.Float:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadSingle(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        case NbtTagType.Float:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadSingle(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    case NbtTagType.Double:
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadDouble(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        case NbtTagType.Double:
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadDouble(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
 
-                    default: // must be String, the only value type left
-                        for (int i = 0; i < elementsToRead; i++) {
-                            result[i] = (T)Convert.ChangeType(reader.ReadString(), typeof(T), CultureInfo.InvariantCulture);
-                        }
-                        break;
+                        default: // must be String, the only value type left
+                            for (int i = 0; i < elementsToRead; i++) {
+                                result[i] = (T)Convert.ChangeType(reader.ReadString(), typeof(T), CultureInfo.InvariantCulture);
+                            }
+                            break;
+                    }
                 }
                 FinishListRead(unpublished);
                 return result;
