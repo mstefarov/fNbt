@@ -31,6 +31,18 @@
     Minecraft refuses. Reads accept both standard and modified UTF-8 under
     every flavor. Malformed strings throw NbtFormatException, as does a lone
     surrogate written under a Bedrock flavor.
+- NbtCompound now keeps its children in insertion order: enumeration,
+    ToString, and saved files list tags in the order they were added, even
+    after removals.
+- Much faster and leaner on real-world documents. Parsing allocates 44-54%
+    less (repeated tag names are shared, and small compounds skip the
+    dictionary), skipping unwanted data no longer builds throwaway tags
+    (NbtReader.Skip and selector-rejected subtrees run about 2.6x faster with
+    almost no allocation), NbtComparer compares without boxing (2-12x faster,
+    zero allocation), int/long arrays read and write in bulk on .NET 8 (up to
+    25x faster), exact-size buffer writes serialize once instead of twice
+    (about 1.4x faster), and compressed SaveToBuffer reuses pooled memory
+    (67-73% less allocation).
 - Negative list and array lengths now load as empty, and an empty list accepts
     any element type byte; both are more tolerant than Minecraft.
 - NbtWriter refuses a bad write before it changes anything: a rejected string
