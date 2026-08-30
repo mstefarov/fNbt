@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,31 +6,38 @@ using System.Globalization;
 using System.Text;
 
 namespace fNbt {
-    /// <summary> A tag containing a set of other named tags. Order is not guaranteed. </summary>
+    /// <summary> A tag containing a set of other named tags. Children keep insertion order. </summary>
     public sealed class NbtCompound : NbtTag, ICollection<NbtTag>, ICollection {
         /// <summary> Type of this tag (Compound). </summary>
         public override NbtTagType TagType {
             get { return NbtTagType.Compound; }
         }
 
-        internal readonly Dictionary<string, NbtTag> tags;
+        // Children in insertion order. Real compounds are small: the Bedrock palette's have 0-5
+        // children and ClassicWorld's schema compounds 13, so lookups below IndexThreshold walk
+        // the array and compare names, which starts with a reference check. A hashed index is
+        // built only for larger compounds. An empty compound owns no array at all.
+        NbtTag[]? items;
+        int count;
+        Dictionary<string, NbtTag>? index;
+        int version;
+
+        const int IndexThreshold = 16;
+        const int InitialCapacity = 4;
 
 
-        /// <summary> Creates an empty unnamed NbtByte tag. </summary>
-        public NbtCompound() {
-            tags = new Dictionary<string, NbtTag>();
-        }
+        /// <summary> Creates an empty unnamed NbtCompound tag. </summary>
+        public NbtCompound() { }
 
 
-        /// <summary> Creates an empty NbtByte tag with the given name. </summary>
+        /// <summary> Creates an empty NbtCompound tag with the given name. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtCompound(string? tagName) {
-            tags = new Dictionary<string, NbtTag>();
             name = tagName;
         }
 
 
-        /// <summary> Creates an unnamed NbtByte tag, containing the given tags. </summary>
+        /// <summary> Creates an unnamed NbtCompound tag, containing the given tags. </summary>
         /// <param name="tags"> Collection of tags to assign to this tag's Value. May not be null </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>, or one of the tags is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If some of the given tags were not named, or two tags with the same name were given. </exception>
@@ -38,7 +45,7 @@ namespace fNbt {
             : this(null, tags) { }
 
 
-        /// <summary> Creates an NbtByte tag with the given name, containing the given tags. </summary>
+        /// <summary> Creates an NbtCompound tag with the given name, containing the given tags. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to assign to this tag's Value. May not be null </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>, or one of the tags is <c>null</c>. </exception>
@@ -46,13 +53,13 @@ namespace fNbt {
         /// or a tag already has a Parent. </exception>
         public NbtCompound(string? tagName, IEnumerable<NbtTag> tags) {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
-            List<NbtTag> toAdd = new List<NbtTag>(tags);
-            this.tags = new Dictionary<string, NbtTag>(toAdd.Count);
             name = tagName;
+            var toAdd = new List<NbtTag>(tags);
             // Validate first, so a bad batch doesn't leave any tags pointing to a half-constructed parent.
             ValidateForAdd(toAdd, nameof(tags));
+            EnsureCapacity(toAdd.Count);
             foreach (NbtTag tag in toAdd) {
-                this.tags.Add(tag.Name!, tag);
+                AppendVerified(tag);
                 tag.Parent = this;
             }
         }
@@ -69,16 +76,97 @@ namespace fNbt {
         NbtCompound(NbtCompound other, int depthBudget) {
             if (other == null) throw new ArgumentNullException(nameof(other));
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            // Sized up front: growing a dictionary re-allocates its entry and bucket arrays each time.
-            tags = new Dictionary<string, NbtTag>(other.tags.Count);
             name = other.name;
-            // Fresh clones can't be duplicate keys or cycles, no need to revalidate.
-            foreach (NbtTag tag in other.tags.Values) {
-                NbtTag childClone = tag.Clone(childDepthBudget);
-                tags.Add(childClone.Name!, childClone);
+            // Sized up front, and fresh clones can't be duplicate keys or cycles: no revalidation.
+            EnsureCapacity(other.count);
+            NbtTag[]? otherItems = other.items;
+            for (int i = 0; i < other.count; i++) {
+                NbtTag childClone = otherItems![i].Clone(childDepthBudget);
+                AppendVerified(childClone);
                 childClone.Parent = this;
             }
         }
+
+
+        #region Storage
+
+        // Direct view for internal walkers. Slots at Count and beyond are unspecified.
+        internal NbtTag[]? ItemArray {
+            get { return items; }
+        }
+
+
+        NbtTag? Find(string tagName) {
+            if (index != null) {
+                index.TryGetValue(tagName, out NbtTag? found);
+                return found;
+            }
+            NbtTag[]? local = items;
+            for (int i = 0; i < count; i++) {
+                NbtTag child = local![i];
+                // The reference check inside == wins often: parsed names are canonicalized
+                if (child.name == tagName) return child;
+            }
+            return null;
+        }
+
+
+        void EnsureCapacity(int neededTotal) {
+            if (items == null) {
+                items = new NbtTag[Math.Max(InitialCapacity, neededTotal)];
+            } else if (items.Length < neededTotal) {
+                int newSize = items.Length * 2;
+                if (newSize < neededTotal) newSize = neededTotal;
+                Array.Resize(ref items, newSize);
+            }
+        }
+
+
+        // Appends a child whose name is known to be unique here. Callers set Parent.
+        void AppendVerified(NbtTag tag) {
+            EnsureCapacity(count + 1);
+            items![count++] = tag;
+            version++;
+            if (index != null) {
+                index.Add(tag.name!, tag);
+            } else if (count > IndexThreshold) {
+                BuildIndex();
+            }
+        }
+
+
+        void BuildIndex() {
+            var newIndex = new Dictionary<string, NbtTag>(count * 2);
+            NbtTag[] local = items!;
+            for (int i = 0; i < count; i++) {
+                newIndex.Add(local[i].name!, local[i]);
+            }
+            index = newIndex;
+        }
+
+
+        void RemoveAt(int position, NbtTag tag) {
+            NbtTag[] local = items!;
+            count--;
+            if (position < count) {
+                Array.Copy(local, position + 1, local, position, count - position);
+            }
+            local[count] = null!;
+            version++;
+            index?.Remove(tag.name!);
+            tag.Parent = null;
+        }
+
+
+        int IndexOfExact(NbtTag tag) {
+            NbtTag[]? local = items;
+            for (int i = 0; i < count; i++) {
+                if (ReferenceEquals(local![i], tag)) return i;
+            }
+            return -1;
+        }
+
+        #endregion
 
 
         /// <summary> Gets or sets the tag with the specified name. May return <c>null</c>. </summary>
@@ -103,11 +191,16 @@ namespace fNbt {
                 } else if (IsDescendantOf(value)) {
                     throw new ArgumentException("A tag may not be added to one of its own descendants.");
                 }
-                // Clear the displaced tag's Parent so it doesn't keep pointing here
-                if (tags.TryGetValue(tagName, out NbtTag? displaced) && !ReferenceEquals(displaced, value)) {
+                NbtTag? displaced = Find(tagName);
+                if (displaced == null) {
+                    AppendVerified(value);
+                } else if (!ReferenceEquals(displaced, value)) {
+                    // Replace in place, clearing the displaced tag's Parent
+                    items![IndexOfExact(displaced)] = value;
+                    version++;
+                    if (index != null) index[tagName] = value;
                     displaced.Parent = null;
                 }
-                tags[tagName] = value;
                 value.Parent = this;
             }
         }
@@ -121,11 +214,7 @@ namespace fNbt {
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public T? Get<T>(string tagName) where T : NbtTag {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? result;
-            if (tags.TryGetValue(tagName, out result)) {
-                return (T)result;
-            }
-            return null;
+            return (T?)Find(tagName);
         }
 
 
@@ -133,14 +222,9 @@ namespace fNbt {
         /// <param name="tagName"> The name of the tag to get. </param>
         /// <returns> The tag with the specified key. Null if tag with the given name was not found. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
-        /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public NbtTag? Get(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? result;
-            if (tags.TryGetValue(tagName, out result)) {
-                return result;
-            }
-            return null;
+            return Find(tagName);
         }
 
 
@@ -154,14 +238,13 @@ namespace fNbt {
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public bool TryGet<T>(string tagName, out T? result) where T : NbtTag {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? tempResult;
-            if (tags.TryGetValue(tagName, out tempResult)) {
-                result = (T)tempResult;
+            NbtTag? found = Find(tagName);
+            if (found != null) {
+                result = (T)found;
                 return true;
-            } else {
-                result = null;
-                return false;
             }
+            result = null;
+            return false;
         }
 
 
@@ -173,14 +256,8 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool TryGet(string tagName, out NbtTag? result) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? tempResult;
-            if (tags.TryGetValue(tagName, out tempResult)) {
-                result = tempResult;
-                return true;
-            } else {
-                result = null;
-                return false;
-            }
+            result = Find(tagName);
+            return result != null;
         }
 
 
@@ -193,10 +270,11 @@ namespace fNbt {
         public void AddRange(IEnumerable<NbtTag> newTags) {
             if (newTags == null) throw new ArgumentNullException(nameof(newTags));
             // Validate the whole batch first, so we don't partially add/reparent some tags on exception.
-            List<NbtTag> toAdd = new List<NbtTag>(newTags);
+            var toAdd = new List<NbtTag>(newTags);
             ValidateForAdd(toAdd, nameof(newTags));
+            EnsureCapacity(count + toAdd.Count);
             foreach (NbtTag tag in toAdd) {
-                tags.Add(tag.Name!, tag);
+                AppendVerified(tag);
                 tag.Parent = this;
             }
         }
@@ -216,7 +294,7 @@ namespace fNbt {
                     throw new ArgumentException("A tag may only be added to one compound/list at a time.");
                 } else if (IsDescendantOf(tag)) {
                     throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (tags.ContainsKey(tag.Name) || !seen.Add(tag.Name)) {
+                } else if (Find(tag.Name) != null || !seen.Add(tag.Name)) {
                     throw new ArgumentException("A tag with the name '" + tag.Name + "' already exists.");
                 }
             }
@@ -229,7 +307,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool Contains(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            return tags.ContainsKey(tagName);
+            return Find(tagName) != null;
         }
 
 
@@ -240,12 +318,9 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool Remove(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? tag;
-            if (!tags.TryGetValue(tagName, out tag)) {
-                return false;
-            }
-            tags.Remove(tagName);
-            tag.Parent = null;
+            NbtTag? tag = Find(tagName);
+            if (tag == null) return false;
+            RemoveAt(IndexOfExact(tag), tag);
             return true;
         }
 
@@ -254,32 +329,43 @@ namespace fNbt {
             NullableSupport.Assert(oldName != null);
             NullableSupport.Assert(newName != null);
             NullableSupport.Assert(newName != oldName);
-            if (tags.TryGetValue(newName, out _)) {
+            if (Find(newName) != null) {
                 throw new ArgumentException(
                     "Cannot rename tag '" + oldName + "' to '" + newName +
                     "': the compound already contains a tag with that name.");
             }
             // Verify this compound actually holds the tag under oldName.
             // A stale Parent link must not re-key whatever now lives at that key.
-            if (!tags.TryGetValue(oldName, out NbtTag? existing) || !ReferenceEquals(existing, tag)) {
+            NbtTag? existing = Find(oldName);
+            if (existing == null || !ReferenceEquals(existing, tag)) {
                 throw new InvalidOperationException(
                     "Cannot rename tag '" + oldName + "': it is missing from its parent compound. " +
                     "The Parent link is out of sync, most likely because the compound was modified " +
                     "from another thread.");
             }
-            tags.Remove(oldName);
-            tags.Add(newName, tag);
+            if (index != null) {
+                index.Remove(oldName);
+                index.Add(newName, tag);
+            }
         }
 
 
-        /// <summary> Gets a collection containing all tag names in this NbtCompound. </summary>
+        /// <summary> Gets a collection containing all tag names in this NbtCompound, in insertion order. </summary>
         public IEnumerable<string> Names {
-            get => tags.Keys;
+            get {
+                for (int i = 0; i < count; i++) {
+                    yield return items![i].name!;
+                }
+            }
         }
 
-        /// <summary> Gets a collection containing all tags in this NbtCompound. </summary>
+        /// <summary> Gets a collection containing all tags in this NbtCompound, in insertion order. </summary>
         public IEnumerable<NbtTag> Tags {
-            get => tags.Values;
+            get {
+                for (int i = 0; i < count; i++) {
+                    yield return items![i];
+                }
+            }
         }
 
 
@@ -355,11 +441,10 @@ namespace fNbt {
                 string tagName = readStream.ReadTagName();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
-                    try {
-                        tags.Add(tagName, newTag);
-                    } catch (ArgumentException) {
+                    if (Find(tagName) != null) {
                         throw new NbtFormatException("Duplicate tag name in compound: " + tagName);
                     }
+                    AppendVerified(newTag);
                 }
             }
         }
@@ -380,8 +465,9 @@ namespace fNbt {
 
 
         void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
-            foreach (NbtTag tag in tags.Values) {
-                tag.WriteTag(writeStream, childDepthBudget);
+            NbtTag[]? local = items;
+            for (int i = 0; i < count; i++) {
+                local![i].WriteTag(writeStream, childDepthBudget);
             }
             writeStream.Write(NbtTagType.End);
         }
@@ -391,15 +477,27 @@ namespace fNbt {
 
         #region Implementation of IEnumerable<NbtTag>
 
-        /// <summary> Returns an enumerator that iterates through all tags in this NbtCompound. </summary>
+        /// <summary> Returns an enumerator that iterates through all tags in this NbtCompound,
+        /// in insertion order. </summary>
         /// <returns> An IEnumerator&gt;NbtTag&lt; that can be used to iterate through the collection. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
-            return tags.Values.GetEnumerator();
+            return Enumerate();
         }
 
 
         IEnumerator IEnumerable.GetEnumerator() {
-            return tags.Values.GetEnumerator();
+            return Enumerate();
+        }
+
+
+        IEnumerator<NbtTag> Enumerate() {
+            int startVersion = version;
+            for (int i = 0; i < count; i++) {
+                if (version != startVersion) {
+                    throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
+                }
+                yield return items![i];
+            }
         }
 
         #endregion
@@ -424,18 +522,24 @@ namespace fNbt {
                 throw new ArgumentException("A tag may only be added to one compound/list at a time.");
             } else if (IsDescendantOf(newTag)) {
                 throw new ArgumentException("A tag may not be added to one of its own descendants.");
+            } else if (Find(newTag.Name) != null) {
+                throw new ArgumentException("A tag with the name '" + newTag.Name + "' already exists.");
             }
-            tags.Add(newTag.Name, newTag);
+            AppendVerified(newTag);
             newTag.Parent = this;
         }
 
 
         /// <summary> Removes all tags from this NbtCompound. </summary>
         public void Clear() {
-            foreach (NbtTag tag in tags.Values) {
-                tag.Parent = null;
+            NbtTag[]? local = items;
+            for (int i = 0; i < count; i++) {
+                local![i].Parent = null;
+                local[i] = null!;
             }
-            tags.Clear();
+            count = 0;
+            index = null;
+            version++;
         }
 
 
@@ -446,7 +550,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         public bool Contains(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
-            return tags.ContainsValue(tag);
+            return IndexOfExact(tag) >= 0;
         }
 
 
@@ -460,7 +564,14 @@ namespace fNbt {
         /// the number of tags in this NbtCompound is greater than the available space from arrayIndex to the end of the destination array;
         /// or type NbtTag cannot be cast automatically to the type of the destination array. </exception>
         public void CopyTo(NbtTag[] array, int arrayIndex) {
-            tags.Values.CopyTo(array, arrayIndex);
+            if (array == null) throw new ArgumentNullException(nameof(array));
+            if (arrayIndex < 0) throw new ArgumentOutOfRangeException(nameof(arrayIndex));
+            if (array.Length - arrayIndex < count) {
+                throw new ArgumentException("Not enough space in the destination array.");
+            }
+            if (items != null) {
+                Array.Copy(items, 0, array, arrayIndex, count);
+            }
         }
 
 
@@ -474,21 +585,17 @@ namespace fNbt {
         public bool Remove(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             if (tag.Name == null) throw new ArgumentException("Trying to remove an unnamed tag.");
-            NbtTag? maybeItem;
-            if (tags.TryGetValue(tag.Name, out maybeItem)) {
-                if (maybeItem == tag && tags.Remove(tag.Name)) {
-                    tag.Parent = null;
-                    return true;
-                }
-            }
-            return false;
+            int position = IndexOfExact(tag);
+            if (position < 0) return false;
+            RemoveAt(position, tag);
+            return true;
         }
 
 
         /// <summary> Gets the number of tags contained in the NbtCompound. </summary>
         /// <returns> The number of tags contained in the NbtCompound. </returns>
         public int Count {
-            get { return tags.Count; }
+            get { return count; }
         }
 
         bool ICollection<NbtTag>.IsReadOnly {
@@ -506,8 +613,15 @@ namespace fNbt {
 
 
         object ICollection.SyncRoot {
-            get { return (tags as ICollection).SyncRoot; }
+            get {
+                if (syncRoot == null) {
+                    System.Threading.Interlocked.CompareExchange(ref syncRoot, new object(), null);
+                }
+                return syncRoot;
+            }
         }
+
+        object? syncRoot;
 
         bool ICollection.IsSynchronized {
             get { return false; }
@@ -536,12 +650,12 @@ namespace fNbt {
             if (!String.IsNullOrEmpty(Name)) {
                 sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
             }
-            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", tags.Count);
+            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", count);
 
-            if (Count > 0) {
+            if (count > 0) {
                 sb.Append('\n');
-                foreach (NbtTag tag in tags.Values) {
-                    tag.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
+                for (int i = 0; i < count; i++) {
+                    items![i].PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
                     sb.Append('\n');
                 }
                 for (int i = 0; i < indentLevel; i++) {

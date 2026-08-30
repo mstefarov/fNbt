@@ -11,6 +11,7 @@ public class ClassicWorldMetadataBenchmarks {
     NbtCompound blockDefinitions = null!;
     byte[] rawBytes = null!;
     string[] definitionNames = null!;
+    string[] definitionFieldNames = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {
@@ -20,6 +21,7 @@ public class ClassicWorldMetadataBenchmarks {
         blockDefinitions = (NbtCompound)metadataRoot["Metadata"]!["CPE"]!["BlockDefinitions"]!;
         rawBytes = metadataFile.SaveToBuffer(NbtCompression.None);
         definitionNames = blockDefinitions.Names.ToArray();
+        definitionFieldNames = ((NbtCompound)blockDefinitions[definitionNames[0]]!).Names.ToArray();
     }
 
 
@@ -74,6 +76,23 @@ public class ClassicWorldMetadataBenchmarks {
         foreach (string name in definitionNames) {
             if (blockDefinitions[name] != null) {
                 found++;
+            }
+        }
+        return found;
+    }
+
+
+    // Lookups inside the small schema-shaped compounds, not just the big parent
+    [AverageBenchmark]
+    [Benchmark(Description = "Look up every field in every definition")]
+    public int LookupDefinitionFields() {
+        int found = 0;
+        foreach (string name in definitionNames) {
+            var definition = (NbtCompound)blockDefinitions[name]!;
+            foreach (string fieldName in definitionFieldNames) {
+                if (definition[fieldName] != null) {
+                    found++;
+                }
             }
         }
         return found;

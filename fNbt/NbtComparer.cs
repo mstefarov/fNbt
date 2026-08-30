@@ -164,11 +164,12 @@ namespace fNbt {
                         int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
                         // Child names are unique, so every child of x must have a same-named one in y.
                         // Looking them up beats a HashSet: no reliance on hash quality, and it can carry depth.
-                        // The internal dictionary's struct enumerator avoids boxing one per compound.
                         var xc = (NbtCompound)x;
                         var yc = (NbtCompound)y;
                         if (xc.Count != yc.Count) return false;
-                        foreach (NbtTag xChild in xc.tags.Values) {
+                        NbtTag[]? xChildren = xc.ItemArray;
+                        for (int i = 0; i < xc.Count; i++) {
+                            NbtTag xChild = xChildren![i];
                             NbtTag? yChild = yc.Get(xChild.Name!);
                             if (yChild == null || !Equals(xChild, yChild, childDepthBudget)) return false;
                         }

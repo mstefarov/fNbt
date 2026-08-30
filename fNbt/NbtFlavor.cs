@@ -131,9 +131,11 @@ namespace fNbt {
                     break;
                 case NbtTagType.Compound:
                     int compoundChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
-                    // Walk the concrete collections so their struct enumerators stay unboxed.
-                    foreach (NbtTag child in ((NbtCompound)tag).tags.Values) {
-                        ValidateTree(child, compoundChildBudget);
+                    // Walk the internal storage directly, without enumerator allocations.
+                    var compound = (NbtCompound)tag;
+                    NbtTag[]? children = compound.ItemArray;
+                    for (int i = 0; i < compound.Count; i++) {
+                        ValidateTree(children![i], compoundChildBudget);
                     }
                     break;
                 case NbtTagType.List:

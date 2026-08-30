@@ -83,8 +83,11 @@ namespace fNbt {
 
                 case NbtTagType.Compound: {
                     int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
+                    var compound = (NbtCompound)tag;
+                    NbtTag[]? children = compound.ItemArray;
                     long size = 1; // the closing TAG_End
-                    foreach (NbtTag child in ((NbtCompound)tag).tags.Values) {
+                    for (int i = 0; i < compound.Count; i++) {
+                        NbtTag child = children![i];
                         if (child.Name == null) {
                             throw new NbtFormatException("Name is null");
                         }
