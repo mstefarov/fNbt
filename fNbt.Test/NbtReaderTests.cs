@@ -497,6 +497,85 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ReadListAsArrayIncludesPublishedUnreadElement() {
+            var ms = new MemoryStream();
+            new NbtFile(TestFiles.MakeListTest()).SaveToStream(ms, NbtCompression.None);
+            ms.Position = 0;
+            var reader = new NbtReader(ms);
+
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.Int, reader.TagType);
+            Assert.AreEqual(0, reader.ListIndex);
+            int tagsReadBefore = reader.TagsRead;
+
+            int[] remaining = reader.ReadListAsArray<int>();
+
+            CollectionAssert.AreEqual(new[] { 1, 2000, -3000000 }, remaining);
+            Assert.AreEqual(tagsReadBefore + 2, reader.TagsRead);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayExcludesPublishedConsumedElement() {
+            var ms = new MemoryStream();
+            new NbtFile(TestFiles.MakeListTest()).SaveToStream(ms, NbtCompression.None);
+            ms.Position = 0;
+            var reader = new NbtReader(ms);
+
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(1, reader.ReadValue());
+            int tagsReadBefore = reader.TagsRead;
+
+            int[] remaining = reader.ReadListAsArray<int>();
+
+            CollectionAssert.AreEqual(new[] { 2000, -3000000 }, remaining);
+            Assert.AreEqual(tagsReadBefore + 2, reader.TagsRead);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
+
+            // Nothing left after the last element's value was consumed
+            ms.Position = 0;
+            reader = new NbtReader(ms);
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            for (int i = 0; i < 3; i++) {
+                Assert.IsTrue(reader.ReadToFollowing());
+            }
+            Assert.AreEqual(-3000000, reader.ReadValue());
+            Assert.AreEqual(0, reader.ReadListAsArray<int>().Length);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
+        }
+
+
+        [TestMethod]
+        public void ReadEmptyListAsArrayKeepsCursorOnTheList() {
+            var root = new NbtCompound("root") {
+                new NbtList("empty", NbtTagType.Int),
+                new NbtByte("after", 1)
+            };
+            var ms = new MemoryStream();
+            new NbtFile(root).SaveToStream(ms, NbtCompression.None);
+            ms.Position = 0;
+            var reader = new NbtReader(ms);
+
+            Assert.IsTrue(reader.ReadToFollowing("empty"));
+            int depth = reader.Depth;
+            Assert.AreEqual(0, reader.ReadListAsArray<int>().Length);
+            Assert.AreEqual("empty", reader.TagName);
+            Assert.AreEqual(NbtTagType.List, reader.TagType);
+            Assert.AreEqual(depth, reader.Depth);
+
+            // Still a list tag as far as navigation is concerned
+            Assert.IsTrue(reader.ReadToNextSibling());
+            Assert.AreEqual("after", reader.TagName);
+        }
+
+
+        [TestMethod]
         public void ReadListAsArrayRecast() {
             NbtCompound intList = TestFiles.MakeListTest();
 

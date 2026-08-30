@@ -798,20 +798,25 @@ namespace fNbt {
         }
 
 
-        /// <summary> If the current tag is a List, reads all elements of this list as an array.
-        /// If any tags/values have already been read from this list, only reads the remaining unread tags/values.
-        /// ListType must be a value type (byte, short, int, long, float, double, or string).
-        /// Stops reading after the last list element. </summary>
+        /// <summary> If the current tag is a List, or a value element of one, reads the list's
+        /// remaining values as an array. A current element whose value has not been read yet is
+        /// included; one whose value was already read is not. The element type must be byte, short,
+        /// int, long, float, double, or string. Stops reading after the last list element; an
+        /// empty list is not entered, so the reader stays on the list tag. </summary>
         /// <typeparam name="T"> Element type of the array to be returned.
         /// Tag contents should be convertible to this type. </typeparam>
         /// <returns> List contents converted to an array of the requested type. </returns>
         /// <exception cref="EndOfStreamException"> End of stream has been reached, or the list's
         /// declared length does not fit in the remaining stream. </exception>
-        /// <exception cref="InvalidOperationException"> Current tag is not of type List. </exception>
+        /// <exception cref="InvalidOperationException"> The reader is not on a List or one of its
+        /// value elements, or the list's element type is not supported by this method. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public T[] ReadListAsArray<T>() {
             NbtTagType elementType;
+            int elementsToRead;
+            // Elements whose headers the caller has not seen, which is what TagsRead counts
+            int unpublished;
             switch (state) {
                 case NbtParseState.AtStreamEnd:
                     throw new EndOfStreamException();
@@ -823,22 +828,40 @@ namespace fNbt {
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
                     }
+                    if (TagLength == 0) {
+                        // Nothing to enter, so the cursor stays on the list and the next step
+                        // treats it like any other list tag
+                        return Array.Empty<T>();
+                    }
                     GoDown();
                     ListIndex = 0;
                     TagType = elementType;
                     state = NbtParseState.InList;
+                    elementsToRead = ParentTagLength;
+                    unpublished = elementsToRead;
                     break;
                 case NbtParseState.InList:
-                    elementType = ListType;
+                    // The public ListType describes the current element, so the list's own
+                    // element type comes from the node that entered it
+                    NullableSupport.Assert(nodes != null);
+                    elementType = nodes.Peek().ListType;
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+                    }
+                    if (ListIndex >= ParentTagLength) {
+                        // An earlier bulk read consumed everything
+                        unpublished = 0;
+                        elementsToRead = 0;
+                    } else {
+                        // The current element's header is out already; its value is read here
+                        // unless the caller consumed it
+                        unpublished = ParentTagLength - ListIndex - 1;
+                        elementsToRead = unpublished + (atValue ? 1 : 0);
                     }
                     break;
                 default:
                     throw new InvalidOperationException("ReadListAsArray may only be used on List tags.");
             }
-
-            int elementsToRead = ParentTagLength - ListIndex;
 
             try {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
@@ -849,7 +872,7 @@ namespace fNbt {
                 // special handling for reading byte arrays (as byte arrays)
                 if (elementType == NbtTagType.Byte && typeof(T) == typeof(byte)) {
                     T[] val = (T[])(object)reader.ReadArray(elementsToRead);
-                    FinishListRead(elementsToRead);
+                    FinishListRead(unpublished);
                     return val;
                 }
 
@@ -898,7 +921,7 @@ namespace fNbt {
                         }
                         break;
                 }
-                FinishListRead(elementsToRead);
+                FinishListRead(unpublished);
                 return result;
             } catch {
                 // A failed read or conversion leaves the stream desynchronised
@@ -908,9 +931,10 @@ namespace fNbt {
         }
 
 
-        // Marks every element consumed, leaving the reader ready to step out of the list
-        void FinishListRead(int elementsRead) {
-            TagsRead += elementsRead;
+        // Marks every element consumed, leaving the reader ready to step out of the list.
+        // Only elements whose headers the caller never saw count as newly read.
+        void FinishListRead(int unpublished) {
+            TagsRead += unpublished;
             ListIndex = ParentTagLength;
             atValue = false;
         }

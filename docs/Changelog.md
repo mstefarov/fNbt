@@ -81,6 +81,12 @@
     every later call throws, since the document can no longer be
     completed. Write validation under the Bedrock flavors now catches a
     lone surrogate before anything is written.
+- NbtReader.ReadListAsArray now works when the reader is positioned on an
+    element of the list, reading the remaining values as documented
+    instead of throwing InvalidOperationException, and includes the
+    current element only if its value has not been read yet. On an empty
+    list it now leaves the reader on the list tag, so ReadToNextSibling
+    finds the next tag instead of skipping it.
 - ZLib saves on .NET 6 and later now run through the framework's ZLibStream,
     which computes the Adler-32 checksum in native code. Saving a map-sized
     document with ZLib compression gets about 1.3x faster.
