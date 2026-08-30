@@ -332,20 +332,34 @@ namespace fNbt {
 
 
         void WriteUnsignedVarInt32(uint value) {
-            while (value >= 0x80) {
-                stream.WriteByte((byte)(value | 0x80));
-                value >>= 7;
+            if (value < 0x80) {
+                stream.WriteByte((byte)value);
+                return;
             }
-            stream.WriteByte((byte)value);
+            // Encode into the scratch buffer and issue one write, instead of one
+            // Stream.WriteByte per encoded byte
+            int pos = 0;
+            do {
+                buffer[pos++] = (byte)(value | 0x80);
+                value >>= 7;
+            } while (value >= 0x80);
+            buffer[pos++] = (byte)value;
+            stream.Write(buffer, 0, pos);
         }
 
 
         void WriteUnsignedVarInt64(ulong value) {
-            while (value >= 0x80) {
-                stream.WriteByte((byte)(value | 0x80));
-                value >>= 7;
+            if (value < 0x80) {
+                stream.WriteByte((byte)value);
+                return;
             }
-            stream.WriteByte((byte)value);
+            int pos = 0;
+            do {
+                buffer[pos++] = (byte)(value | 0x80);
+                value >>= 7;
+            } while (value >= 0x80);
+            buffer[pos++] = (byte)value;
+            stream.Write(buffer, 0, pos);
         }
 
 
