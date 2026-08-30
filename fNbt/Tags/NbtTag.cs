@@ -7,7 +7,7 @@ namespace fNbt {
     /// <summary> Base class for different kinds of named binary tags. </summary>
     public abstract class NbtTag : ICloneable {
         // Reading, writing, cloning, and printing are all recursive.
-        // A stack overflow cannot be caught, so every recursive walk caps depth instead.
+        // A stack overflow cannot be caught, so every recursive walk caps open containers instead.
         // Matches Minecraft's own limit. Real NBT is nowhere near this deep.
         internal const int MaxDepth = 512;
 
@@ -105,15 +105,24 @@ namespace fNbt {
             return false;
         }
 
-        internal abstract bool ReadTag(NbtBinaryReader readStream);
+        // depthBudget is the number of container tags that this call and its descendants may
+        // still enter. Value tags leave it untouched; compounds and lists consume one.
+        internal abstract bool ReadTag(NbtBinaryReader readStream, int depthBudget);
 
-        internal abstract void SkipTag(NbtBinaryReader readStream);
+        internal abstract void SkipTag(NbtBinaryReader readStream, int depthBudget);
 
-        internal abstract void WriteTag(NbtBinaryWriter writeReader);
+        internal abstract void WriteTag(NbtBinaryWriter writeStream, int depthBudget);
 
         // WriteData does not write the tag's ID byte or the name
-        internal abstract void WriteData(NbtBinaryWriter writeStream);
+        internal abstract void WriteData(NbtBinaryWriter writeStream, int depthBudget);
 
+
+        // Called exactly once when a recursive walk enters a compound or list. Returning the
+        // child budget makes the off-by-one rule common to reading, writing, cloning, and validation.
+        internal static int ConsumeDepthBudget(int depthBudget) {
+            if (depthBudget <= 0) throw new NbtFormatException(DepthLimitMessage);
+            return depthBudget - 1;
+        }
 
         #region Shortcuts
 #pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
@@ -366,9 +375,9 @@ namespace fNbt {
         public abstract object Clone();
 
 
-        // Depth-tracking clone, used by deep copies of compounds and lists.
+        // Depth-budgeted clone, used by deep copies of compounds and lists.
         // Throws for ridiculously deep nesting instead of overflowing the stack.
-        internal virtual NbtTag Clone(int depth) {
+        internal virtual NbtTag Clone(int depthBudget) {
             return (NbtTag)Clone(); // Default implementation for Value tags that do not recurse.
         }
 
@@ -382,12 +391,12 @@ namespace fNbt {
         public string ToString(string indentString) {
             if (indentString == null) throw new ArgumentNullException(nameof(indentString));
             var sb = new StringBuilder();
-            PrettyPrint(sb, indentString, 0);
+            PrettyPrint(sb, indentString, 0, MaxDepth);
             return sb.ToString();
         }
 
 
-        internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel);
+        internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget);
 
         /// <summary> String to use for indentation in NbtTag's and NbtFile's ToString() methods by default. </summary>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>

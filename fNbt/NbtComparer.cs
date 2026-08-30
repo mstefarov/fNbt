@@ -19,16 +19,16 @@ namespace fNbt {
 
         /// <inheritdoc/>
         public bool Equals(NbtTag? x, NbtTag? y) {
-            return Equals(x, y, 0);
+            return Equals(x, y, MaxDepth);
         }
 
 
-        private bool Equals(NbtTag? x, NbtTag? y, int depth) {
+        private bool Equals(NbtTag? x, NbtTag? y, int depthBudget) {
             if (ReferenceEquals(x, y)) return true;
             if (x is null || y is null) return false;
             if (x.TagType != y.TagType) return false;
             if (!String.Equals(x.Name, y.Name, StringComparison.Ordinal)) return false; // null names are permitted
-            return DeepEquals(x, y, depth);
+            return DeepEquals(x, y, depthBudget);
         }
 
         /// <inheritdoc/>
@@ -94,11 +94,7 @@ namespace fNbt {
         }
 
         // Compare detailed attributes of two given tags
-        private bool DeepEquals(NbtTag x, NbtTag y, int depth) {
-            if (depth >= MaxDepth) {
-                throw new ArgumentException("Tags are nested deeper than " + MaxDepth + " levels.", nameof(x));
-            }
-
+        private bool DeepEquals(NbtTag x, NbtTag y, int depthBudget) {
             // Assume that tags have same type and are non-null
             switch (x.TagType) {
                 case NbtTagType.ByteArray: {
@@ -126,6 +122,7 @@ namespace fNbt {
                         return true;
                     }
                 case NbtTagType.Compound: {
+                        int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
                         // Child names are unique, so every child of x must have a same-named one in y.
                         // Looking them up beats a HashSet: no reliance on hash quality, and it can carry depth.
                         var xc = (NbtCompound)x;
@@ -133,17 +130,18 @@ namespace fNbt {
                         if (xc.Count != yc.Count) return false;
                         foreach (NbtTag xChild in xc) {
                             NbtTag? yChild = yc.Get(xChild.Name!);
-                            if (yChild == null || !Equals(xChild, yChild, depth + 1)) return false;
+                            if (yChild == null || !Equals(xChild, yChild, childDepthBudget)) return false;
                         }
                         return true;
                     }
                 case NbtTagType.List: {
+                        int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
                         // Lists are considered equal if their type, count, and contents are equal
                         var xl = (NbtList)x;
                         var yl = (NbtList)y;
                         if (xl.ListType != yl.ListType || xl.Count != yl.Count) return false;
                         for (int i = 0; i < xl.Count; i++)
-                            if (!Equals(xl[i], yl[i], depth + 1)) return false;
+                            if (!Equals(xl[i], yl[i], childDepthBudget)) return false;
                         return true;
                     }
                 default: {
@@ -157,6 +155,15 @@ namespace fNbt {
                         throw new ArgumentException("Cannot compare tags of type " + x.TagType);
                     }
             }
+        }
+
+
+        private static int ConsumeDepthBudget(int depthBudget, string paramName) {
+            if (depthBudget <= 0) {
+                throw new ArgumentException(
+                    "Tags are nested deeper than " + MaxDepth + " levels.", paramName);
+            }
+            return depthBudget - 1;
         }
 
         private static object? GetRawValue(NbtTag tag) {

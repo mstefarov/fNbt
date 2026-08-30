@@ -13,7 +13,7 @@ namespace fNbt {
             get { return NbtTagType.Compound; }
         }
 
-        readonly Dictionary<string, NbtTag> tags;
+        internal readonly Dictionary<string, NbtTag> tags;
 
 
         /// <summary> Creates an empty unnamed NbtByte tag. </summary>
@@ -63,18 +63,18 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
         public NbtCompound(NbtCompound other)
-            : this(other, 0) { }
+            : this(other, MaxDepth) { }
 
 
-        NbtCompound(NbtCompound other, int depth) {
+        NbtCompound(NbtCompound other, int depthBudget) {
             if (other == null) throw new ArgumentNullException(nameof(other));
-            if (depth >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             // Sized up front: growing a dictionary re-allocates its entry and bucket arrays each time.
             tags = new Dictionary<string, NbtTag>(other.tags.Count);
             name = other.name;
             // Fresh clones can't be duplicate keys or cycles, no need to revalidate.
             foreach (NbtTag tag in other.tags.Values) {
-                NbtTag childClone = tag.Clone(depth + 1);
+                NbtTag childClone = tag.Clone(childDepthBudget);
                 tags.Add(childClone.Name!, childClone);
                 childClone.Parent = this;
             }
@@ -285,19 +285,18 @@ namespace fNbt {
 
         #region Reading / Writing
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (Parent != null && readStream.Selector != null && !readStream.Selector(this)) {
-                SkipTag(readStream);
+                SkipTag(readStream, depthBudget);
                 return false;
             }
 
-            readStream.IncreaseDepth();
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             while (true) {
                 NbtTagType nextTag = readStream.ReadTagType();
                 NbtTag newTag;
                 switch (nextTag) {
                     case NbtTagType.End:
-                        readStream.DecreaseDepth();
                         return true;
 
                     case NbtTagType.Byte:
@@ -355,7 +354,7 @@ namespace fNbt {
                 // Assigned to the field: the tag has no name yet, so the property's rename path is dead weight.
                 string tagName = readStream.ReadString();
                 newTag.name = tagName;
-                if (newTag.ReadTag(readStream)) {
+                if (newTag.ReadTag(readStream, childDepthBudget)) {
                     try {
                         tags.Add(tagName, newTag);
                     } catch (ArgumentException) {
@@ -366,14 +365,13 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            readStream.IncreaseDepth();
+        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             while (true) {
                 NbtTagType nextTag = readStream.ReadTagType();
                 NbtTag newTag;
                 switch (nextTag) {
                     case NbtTagType.End:
-                        readStream.DecreaseDepth();
                         return;
 
                     case NbtTagType.Byte:
@@ -428,26 +426,30 @@ namespace fNbt {
                         throw new NbtFormatException("Unsupported tag type found in NBT_Compound: " + nextTag);
                 }
                 readStream.SkipString();
-                newTag.SkipTag(readStream);
+                newTag.SkipTag(readStream, childDepthBudget);
             }
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.Compound);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             if (Name == null) throw new NbtFormatException("Name is null");
+            writeStream.Write(NbtTagType.Compound);
             writeStream.Write(Name);
-            WriteData(writeStream);
+            WritePayload(writeStream, childDepthBudget);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
-            writeStream.IncreaseDepth();
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
+            WritePayload(writeStream, ConsumeDepthBudget(depthBudget));
+        }
+
+
+        void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
             foreach (NbtTag tag in tags.Values) {
-                tag.WriteTag(writeStream);
+                tag.WriteTag(writeStream, childDepthBudget);
             }
             writeStream.Write(NbtTagType.End);
-            writeStream.DecreaseDepth();
         }
 
         #endregion
@@ -583,17 +585,16 @@ namespace fNbt {
         /// <inheritdoc />
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public override object Clone() {
-            return new NbtCompound(this, 0);
+            return new NbtCompound(this, MaxDepth);
         }
 
 
-        internal override NbtTag Clone(int depth) {
-            return new NbtCompound(this, depth);
+        internal override NbtTag Clone(int depthBudget) {
+            return new NbtCompound(this, depthBudget);
         }
 
-
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            if (indentLevel >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             for (int i = 0; i < indentLevel; i++) {
                 sb.Append(indentString);
             }
@@ -606,7 +607,7 @@ namespace fNbt {
             if (Count > 0) {
                 sb.Append('\n');
                 foreach (NbtTag tag in tags.Values) {
-                    tag.PrettyPrint(sb, indentString, indentLevel + 1);
+                    tag.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
                     sb.Append('\n');
                 }
                 for (int i = 0; i < indentLevel; i++) {

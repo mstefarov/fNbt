@@ -81,7 +81,7 @@ namespace fNbt {
         }
 
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             // Negative lengths are tolerated as empty, exceeding Minecraft's own readers on purpose
             int length = Math.Max(0, readStream.ReadInt32());
 
@@ -94,21 +94,21 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
+        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
             int length = Math.Max(0, readStream.ReadInt32());
             readStream.Skip<byte>(length);
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(NbtTagType.ByteArray);
             if (Name == null) throw new NbtFormatException("Name is null");
             writeStream.Write(Name);
-            WriteData(writeStream);
+            WriteData(writeStream, depthBudget);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value.Length);
             writeStream.Write(Value, 0, Value.Length);
         }
@@ -120,7 +120,7 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
             for (int i = 0; i < indentLevel; i++) {
                 sb.Append(indentString);
             }

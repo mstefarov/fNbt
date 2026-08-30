@@ -741,22 +741,26 @@ namespace fNbt {
         /// If you already have lots of NbtTag objects, you might as well use NbtFile to write them all at once. </summary>
         /// <param name="tag"> Tag to write. Must not be null. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// given tag is unacceptable at this time -OR- its tree is nested more than 512 levels deep -OR-
+        /// given tag is unacceptable at this time -OR- its tree, together with the containers
+        /// currently open, is nested more than 512 levels deep -OR-
         /// a string inside it is longer than the flavor's limit (65,535 bytes for the Java flavors) -OR-
         /// enabled validation rejects a tag type or string length inside it for the flavor. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
+            // The tree may use whatever depth the open containers leave, so streaming and
+            // tree nesting share one limit
+            int depthBudget = NbtTag.MaxDepth - OpenContainerCount;
             if (maxTagType < NbtTagType.LongArray) {
                 // Only the subtree needs the pre-walk; per-call writes are checked inline.
                 // Validate before EnforceConstraints, which counts the tag against its list.
-                flavor.ValidateTree(tag, 0);
+                flavor.ValidateTree(tag, depthBudget);
             }
             EnforceConstraints(tag.Name, tag.TagType);
             if (tag.Name != null) {
-                tag.WriteTag(writer);
+                tag.WriteTag(writer, depthBudget);
             } else {
-                tag.WriteData(writer);
+                tag.WriteData(writer, depthBudget);
             }
         }
 
@@ -772,12 +776,17 @@ namespace fNbt {
         }
 
 
+        // The stack holds every open container except the root
+        int OpenContainerCount {
+            get { return (nodes == null ? 0 : nodes.Count) + 1; }
+        }
+
+
         void GoDown(NbtTagType thisType) {
             if (nodes == null) {
                 nodes = new Stack<NbtWriterNode>();
             }
-            // The stack holds every open container except the root, so add 1 for the depth check.
-            if (nodes.Count + 1 >= NbtTag.MaxDepth) {
+            if (OpenContainerCount >= NbtTag.MaxDepth) {
                 throw new NbtFormatException(NbtTag.DepthLimitMessage);
             }
             var newNode = new NbtWriterNode {

@@ -81,6 +81,42 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ComparerDepthMatchesTheOtherTreeWalks() {
+            // A scalar below 512 containers is one tag level deeper, but consumes no container budget.
+            NbtCompound left = MakeNestedCompoundTree(MaxDepth);
+            NbtCompound right = MakeNestedCompoundTree(MaxDepth);
+            NbtCompound leftDeepest = left;
+            NbtCompound rightDeepest = right;
+            while (leftDeepest.Get<NbtCompound>("c") != null) {
+                leftDeepest = leftDeepest.Get<NbtCompound>("c")!;
+                rightDeepest = rightDeepest.Get<NbtCompound>("c")!;
+            }
+            leftDeepest.Add(new NbtByte("leaf", 1));
+            rightDeepest.Add(new NbtByte("leaf", 1));
+            Assert.IsTrue(NbtComparer.Instance.Equals(left, right));
+
+            NbtCompound tooDeepLeft = MakeNestedCompoundTree(MaxDepth + 1);
+            NbtCompound tooDeepRight = MakeNestedCompoundTree(MaxDepth + 1);
+            Assert.Throws<ArgumentException>(() => NbtComparer.Instance.Equals(tooDeepLeft, tooDeepRight));
+        }
+
+
+        [TestMethod]
+        public void NamedContainerDepthFailureWritesNoHeader() {
+            using (var ms = new MemoryStream()) {
+                var binaryWriter = new NbtBinaryWriter(ms, true);
+                Assert.Throws<NbtFormatException>(
+                    () => new NbtCompound("c").WriteTag(binaryWriter, 0));
+                Assert.AreEqual(0, ms.Length);
+
+                Assert.Throws<NbtFormatException>(
+                    () => new NbtList("l", NbtTagType.End).WriteTag(binaryWriter, 0));
+                Assert.AreEqual(0, ms.Length);
+            }
+        }
+
+
+        [TestMethod]
         public void LoadingDocAtDepthLimitSucceeds() {
             byte[] listDoc = MakeNestedListDoc(MaxDepth - 1);
             var file = new NbtFile();
@@ -193,6 +229,8 @@ namespace fNbt.Test {
                 }
                 Assert.Throws<NbtFormatException>(() => writer.BeginCompound("d"));
                 Assert.Throws<NbtFormatException>(() => writer.BeginList("l", NbtTagType.Int, 0));
+                // The budget counts containers, so a scalar payload at this point is still valid.
+                writer.WriteByte("leaf", 1);
 
                 // The refused calls wrote nothing, so a document at the cap still closes and reloads
                 for (int i = 0; i < MaxDepth; i++) {
@@ -203,6 +241,54 @@ namespace fNbt.Test {
                 var file = new NbtFile();
                 file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
                 Assert.IsNotNull(file.RootTag.Get<NbtCompound>("c"));
+            }
+        }
+
+
+        [TestMethod]
+        public void NbtWriterCountsOpenContainersAgainstWrittenSubtree() {
+            // The root is already open, so a 512-container subtree would put the document
+            // one level over the cap. Restricted flavors preflight it without output.
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", NbtFlavor.ClassiCube);
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(
+                    () => writer.WriteTag(MakeNestedCompoundTree(MaxDepth)));
+                Assert.AreEqual(before, ms.Length);
+
+                writer.WriteTag(MakeNestedCompoundTree(MaxDepth - 1));
+                writer.EndCompound();
+                writer.Finish();
+                byte[] doc = ms.ToArray();
+                new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+            }
+
+            // The same accounting must include an arbitrary streamed prefix, not just the root.
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root", NbtFlavor.ClassiCube);
+                for (int i = 0; i < 200; i++) {
+                    writer.BeginCompound("c");
+                }
+                long before = ms.Length;
+                Assert.Throws<NbtFormatException>(
+                    () => writer.WriteTag(MakeNestedCompoundTree(MaxDepth - 200)));
+                Assert.AreEqual(before, ms.Length);
+
+                writer.WriteTag(MakeNestedCompoundTree(MaxDepth - 201));
+                for (int i = 0; i <= 200; i++) {
+                    writer.EndCompound();
+                }
+                writer.Finish();
+                byte[] doc = ms.ToArray();
+                new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+            }
+
+            // Java avoids a second whole-tree walk, so its recursive write detects the same
+            // limit partway through
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "root");
+                Assert.Throws<NbtFormatException>(
+                    () => writer.WriteTag(MakeNestedCompoundTree(MaxDepth)));
             }
         }
 

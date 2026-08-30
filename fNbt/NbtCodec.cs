@@ -397,7 +397,7 @@ namespace fNbt {
                     NbtTag.GetCanonicalTagName(tag.TagType));
             }
             if (validateOnWrite) {
-                flavor.ValidateTree(tag, 0);
+                flavor.ValidateTree(tag, NbtTag.MaxDepth);
             }
         }
 
@@ -407,7 +407,7 @@ namespace fNbt {
             if (flavor.HasRootName) {
                 writer.Write(tag.Name ?? "");
             }
-            tag.WriteData(writer);
+            tag.WriteData(writer, NbtTag.MaxDepth);
         }
 
 
@@ -497,7 +497,7 @@ namespace fNbt {
             if (flavor.HasRootName) {
                 tag.name = reader.ReadString();
             }
-            tag.ReadTag(reader);
+            tag.ReadTag(reader, NbtTag.MaxDepth);
             return tag;
         }
 
@@ -512,8 +512,8 @@ namespace fNbt {
 
 
         IEnumerable<NbtTag> ReadConcatenatedTagsIterator(Stream stream) {
-            // One reader serves the whole sequence; its depth counter is back to zero after
-            // every complete document
+            // One binary reader serves the whole sequence; each document walk receives a fresh
+            // full depth budget.
             NbtBinaryReader? reader = null;
             while (true) {
                 int firstByte = stream.ReadByte();

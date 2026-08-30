@@ -12,7 +12,7 @@ namespace fNbt {
             get { return NbtTagType.List; }
         }
 
-        readonly List<NbtTag> tags = new List<NbtTag>();
+        internal readonly List<NbtTag> tags = new List<NbtTag>();
 
         // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
         // of a corrupt length. Longer lists just grow as before.
@@ -151,17 +151,17 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
         public NbtList(NbtList other)
-            : this(other, 0) { }
+            : this(other, MaxDepth) { }
 
 
-        NbtList(NbtList other, int depth) {
+        NbtList(NbtList other, int depthBudget) {
             if (other == null) throw new ArgumentNullException(nameof(other));
-            if (depth >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             name = other.name;
             listType = other.listType;
             tags.Capacity = other.tags.Count;
             foreach (NbtTag tag in other.tags) {
-                NbtTag childClone = tag.Clone(depth + 1);
+                NbtTag childClone = tag.Clone(childDepthBudget);
                 tags.Add(childClone);
                 childClone.Parent = this;
             }
@@ -285,18 +285,17 @@ namespace fNbt {
 
         #region Reading / Writing
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                SkipTag(readStream);
+                SkipTag(readStream, depthBudget);
                 return false;
             }
 
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             NbtTagType newListType = readStream.ReadListHeader(out int length);
             if (length == 0) {
                 // Still counts as a nesting level, like a non-empty list would. The field
                 // assignment keeps a tolerated End type without the property's checks.
-                readStream.IncreaseDepth();
-                readStream.DecreaseDepth();
                 listType = newListType;
                 return true;
             }
@@ -304,7 +303,6 @@ namespace fNbt {
 
             tags.Capacity = Math.Min(length, MaxPresizedCapacity);
 
-            readStream.IncreaseDepth();
             for (int i = 0; i < length; i++) {
                 NbtTag newTag = ListType switch {
                     NbtTagType.Byte => new NbtByte(),
@@ -323,26 +321,23 @@ namespace fNbt {
                     _ => throw new NbtFormatException("Unsupported tag type found in a list: " + ListType),
                 };
                 newTag.Parent = this;
-                if (newTag.ReadTag(readStream)) {
+                if (newTag.ReadTag(readStream, childDepthBudget)) {
                     tags.Add(newTag);
                 }
             }
-            readStream.DecreaseDepth();
             return true;
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
+        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             NbtTagType newListType = readStream.ReadListHeader(out int length);
             if (length == 0) {
-                readStream.IncreaseDepth();
-                readStream.DecreaseDepth();
                 listType = newListType;
                 return;
             }
             ListType = newListType;
 
-            readStream.IncreaseDepth();
             switch (ListType) {
                 case NbtTagType.Byte:
                     readStream.Skip<byte>(length);
@@ -366,22 +361,22 @@ namespace fNbt {
                     for (int i = 0; i < length; i++) {
                         switch (listType) {
                             case NbtTagType.ByteArray:
-                                new NbtByteArray().SkipTag(readStream);
+                                new NbtByteArray().SkipTag(readStream, childDepthBudget);
                                 break;
                             case NbtTagType.String:
                                 readStream.SkipString();
                                 break;
                             case NbtTagType.List:
-                                new NbtList().SkipTag(readStream);
+                                new NbtList().SkipTag(readStream, childDepthBudget);
                                 break;
                             case NbtTagType.Compound:
-                                new NbtCompound().SkipTag(readStream);
+                                new NbtCompound().SkipTag(readStream, childDepthBudget);
                                 break;
                             case NbtTagType.IntArray:
-                                new NbtIntArray().SkipTag(readStream);
+                                new NbtIntArray().SkipTag(readStream, childDepthBudget);
                                 break;
                             case NbtTagType.LongArray:
-                                new NbtLongArray().SkipTag(readStream);
+                                new NbtLongArray().SkipTag(readStream, childDepthBudget);
                                 break;
                             default:
                                 throw new NbtFormatException("Unsupported tag type found in a list: " + listType);
@@ -389,29 +384,39 @@ namespace fNbt {
                     }
                     break;
             }
-            readStream.DecreaseDepth();
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.List);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            EnsureListType();
             if (Name == null) throw new NbtFormatException("Name is null");
+            writeStream.Write(NbtTagType.List);
             writeStream.Write(Name);
-            WriteData(writeStream);
+            WritePayload(writeStream, childDepthBudget);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            EnsureListType();
+            WritePayload(writeStream, childDepthBudget);
+        }
+
+
+        void EnsureListType() {
             if (ListType == NbtTagType.Unknown) {
                 throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
             }
-            writeStream.IncreaseDepth();
+        }
+
+
+        void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
             writeStream.Write(ListType);
             writeStream.Write(tags.Count);
             foreach (NbtTag tag in tags) {
-                tag.WriteData(writeStream);
+                tag.WriteData(writeStream, childDepthBudget);
             }
-            writeStream.DecreaseDepth();
         }
 
         #endregion
@@ -634,17 +639,16 @@ namespace fNbt {
         /// <inheritdoc />
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public override object Clone() {
-            return new NbtList(this, 0);
+            return new NbtList(this, MaxDepth);
         }
 
 
-        internal override NbtTag Clone(int depth) {
-            return new NbtList(this, depth);
+        internal override NbtTag Clone(int depthBudget) {
+            return new NbtList(this, depthBudget);
         }
 
-
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            if (indentLevel >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             for (int i = 0; i < indentLevel; i++) {
                 sb.Append(indentString);
             }
@@ -657,7 +661,7 @@ namespace fNbt {
             if (Count > 0) {
                 sb.Append('\n');
                 foreach (NbtTag tag in tags) {
-                    tag.PrettyPrint(sb, indentString, indentLevel + 1);
+                    tag.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
                     sb.Append('\n');
                 }
                 for (int i = 0; i < indentLevel; i++) {

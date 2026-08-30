@@ -13,7 +13,6 @@ namespace fNbt {
         readonly bool swapNeeded;
         readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
-        int depth;
 
         // Opt-in limits, set at most once by whichever entry point owns this reader, before
         // any parsing. Defaults keep every check a single always-false comparison.
@@ -46,21 +45,6 @@ namespace fNbt {
                     maxAllocation + " bytes).");
             }
         }
-
-
-        // Parsing nested tags is recursive. Check for ridiculously nested tags before the stack runs out.
-        public void IncreaseDepth() {
-            if (depth >= NbtTag.MaxDepth) {
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
-            }
-            depth++;
-        }
-
-
-        public void DecreaseDepth() {
-            depth--;
-        }
-
 
         public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt)
             : base(input) {

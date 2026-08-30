@@ -116,9 +116,9 @@ namespace fNbt {
 
         // Conformance pre-walk for write validation, run only for flavors with restrictions:
         // every tag type within the flavor's range, every name and string value within its ceiling.
-        // Depth counts open containers, like the write walk, so a maximally deep tree that
-        // writes cleanly also validates.
-        internal void ValidateTree(NbtTag tag, int depth) {
+        // Containers consume one unit from the same remaining-depth budget as the write walk,
+        // so a maximally deep tree that writes cleanly also validates.
+        internal void ValidateTree(NbtTag tag, int depthBudget) {
             if (tag.TagType > MaxTagType) {
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName(tag.TagType) + " is not permitted by the " + Name + " flavor.");
@@ -131,17 +131,14 @@ namespace fNbt {
                     ValidateString(((NbtString)tag).Value);
                     break;
                 case NbtTagType.Compound:
-                    if (depth >= NbtTag.MaxDepth) {
-                        throw new NbtFormatException(NbtTag.DepthLimitMessage);
-                    }
-                    foreach (NbtTag child in (NbtCompound)tag) {
-                        ValidateTree(child, depth + 1);
+                    int compoundChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
+                    // Walk the concrete collections so their struct enumerators stay unboxed.
+                    foreach (NbtTag child in ((NbtCompound)tag).tags.Values) {
+                        ValidateTree(child, compoundChildBudget);
                     }
                     break;
                 case NbtTagType.List:
-                    if (depth >= NbtTag.MaxDepth) {
-                        throw new NbtFormatException(NbtTag.DepthLimitMessage);
-                    }
+                    int listChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     var list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
                     if (list.ListType > MaxTagType) {
@@ -149,8 +146,8 @@ namespace fNbt {
                             NbtTag.GetCanonicalTagName(list.ListType) + " is not permitted by the " +
                             Name + " flavor.");
                     }
-                    foreach (NbtTag child in list) {
-                        ValidateTree(child, depth + 1);
+                    foreach (NbtTag child in list.tags) {
+                        ValidateTree(child, listChildBudget);
                     }
                     break;
             }
@@ -158,7 +155,8 @@ namespace fNbt {
 
 
         internal void ValidateString(string value) {
-            // Neither encoding exceeds 4 bytes per char, so short strings skip the exact count
+            // Neither encoding exceeds 4 bytes per char, so short strings skip the exact count.
+            // Encoding errors are still reported by NbtBinaryWriter when the string is emitted.
             if ((long)value.Length * 4 <= MaxStringBytes) return;
             long byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {

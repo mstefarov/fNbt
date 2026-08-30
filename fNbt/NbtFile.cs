@@ -513,7 +513,7 @@ namespace fNbt {
             }
 
             var rootCompound = new NbtCompound(reader.ReadString());
-            rootCompound.ReadTag(reader);
+            rootCompound.ReadTag(reader, NbtTag.MaxDepth);
             RootTag = rootCompound;
         }
 
@@ -649,7 +649,7 @@ namespace fNbt {
                     "Cannot save NbtFile: Root tag is not named. Its name may be an empty string, but not null.");
             }
             if (validateOnWrite && flavor.HasRestrictions) {
-                flavor.ValidateTree(rootTag, 0);
+                flavor.ValidateTree(rootTag, NbtTag.MaxDepth);
             }
 
             long startOffset = 0;
@@ -666,7 +666,7 @@ namespace fNbt {
                     // with the checksum computed in native code
                     using (var compressStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Compress, true)) {
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8), NbtTag.MaxDepth);
                         bufferedStream.Flush();
                     }
 #else
@@ -675,7 +675,7 @@ namespace fNbt {
                     int checksum;
                     using (var compressStream = new ZLibStream(stream, CompressionMode.Compress, true)) {
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8), NbtTag.MaxDepth);
                         bufferedStream.Flush();
                         checksum = compressStream.Checksum;
                     }
@@ -692,14 +692,14 @@ namespace fNbt {
                     using (var compressStream = new GZipStream(stream, CompressionMode.Compress, true)) {
                         // use a buffered stream to avoid GZipping in small increments (which has a lot of overhead)
                         var bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8));
+                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8), NbtTag.MaxDepth);
                         bufferedStream.Flush();
                     }
                     break;
 
                 case NbtCompression.None:
                     var writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
-                    RootTag.WriteTag(writer);
+                    RootTag.WriteTag(writer, NbtTag.MaxDepth);
                     break;
 
                     // Can't be AutoDetect or unknown: parameter is already validated

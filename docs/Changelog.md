@@ -65,6 +65,12 @@
     was not zero.
 - NbtReader now enters its error state when a value read fails partway
     through, instead of trying to continue from the middle of a payload.
+- NbtWriter.WriteTag now counts nesting from the containers currently
+    open, so streaming and tree writes together can no longer exceed the
+    512-level limit by one and produce a document that fNbt itself refuses
+    to load. NbtComparer now counts only containers against that limit,
+    like every other walk, so a value inside the 512th container no longer
+    makes Equals throw.
 - ZLib saves on .NET 6 and later now run through the framework's ZLibStream,
     which computes the Adler-32 checksum in native code. Saving a map-sized
     document with ZLib compression gets about 1.3x faster.

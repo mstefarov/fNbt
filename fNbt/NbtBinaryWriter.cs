@@ -44,25 +44,9 @@ namespace fNbt {
         // Lowered by NbtWriter when write validation is on for a flavor with a smaller ceiling
         int maxStringBytes = ushort.MaxValue;
 
-        int depth;
-
 
         internal void SetMaxStringBytes(int value) {
             maxStringBytes = Math.Min(ushort.MaxValue, value);
-        }
-
-
-        // Writing a tag tree is recursive. Check for ridiculously nested tags before the stack runs out.
-        public void IncreaseDepth() {
-            if (depth >= NbtTag.MaxDepth) {
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
-            }
-            depth++;
-        }
-
-
-        public void DecreaseDepth() {
-            depth--;
         }
 
 
