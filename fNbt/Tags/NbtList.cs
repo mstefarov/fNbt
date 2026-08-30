@@ -287,7 +287,7 @@ namespace fNbt {
 
         internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                SkipTag(readStream, depthBudget);
+                readStream.SkipPayload(NbtTagType.List, depthBudget);
                 return false;
             }
 
@@ -326,64 +326,6 @@ namespace fNbt {
                 }
             }
             return true;
-        }
-
-
-        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
-            int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            NbtTagType newListType = readStream.ReadListHeader(out int length);
-            if (length == 0) {
-                listType = newListType;
-                return;
-            }
-            ListType = newListType;
-
-            switch (ListType) {
-                case NbtTagType.Byte:
-                    readStream.Skip<byte>(length);
-                    break;
-                case NbtTagType.Short:
-                    readStream.Skip<short>(length);
-                    break;
-                case NbtTagType.Int:
-                    readStream.Skip<int>(length);
-                    break;
-                case NbtTagType.Long:
-                    readStream.Skip<long>(length);
-                    break;
-                case NbtTagType.Float:
-                    readStream.Skip<float>(length);
-                    break;
-                case NbtTagType.Double:
-                    readStream.Skip<double>(length);
-                    break;
-                default:
-                    for (int i = 0; i < length; i++) {
-                        switch (listType) {
-                            case NbtTagType.ByteArray:
-                                new NbtByteArray().SkipTag(readStream, childDepthBudget);
-                                break;
-                            case NbtTagType.String:
-                                readStream.SkipString();
-                                break;
-                            case NbtTagType.List:
-                                new NbtList().SkipTag(readStream, childDepthBudget);
-                                break;
-                            case NbtTagType.Compound:
-                                new NbtCompound().SkipTag(readStream, childDepthBudget);
-                                break;
-                            case NbtTagType.IntArray:
-                                new NbtIntArray().SkipTag(readStream, childDepthBudget);
-                                break;
-                            case NbtTagType.LongArray:
-                                new NbtLongArray().SkipTag(readStream, childDepthBudget);
-                                break;
-                            default:
-                                throw new NbtFormatException("Unsupported tag type found in a list: " + listType);
-                        }
-                    }
-                    break;
-            }
         }
 
 

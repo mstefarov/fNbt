@@ -287,7 +287,7 @@ namespace fNbt {
 
         internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (Parent != null && readStream.Selector != null && !readStream.Selector(this)) {
-                SkipTag(readStream, depthBudget);
+                readStream.SkipPayload(NbtTagType.Compound, depthBudget);
                 return false;
             }
 
@@ -361,72 +361,6 @@ namespace fNbt {
                         throw new NbtFormatException("Duplicate tag name in compound: " + tagName);
                     }
                 }
-            }
-        }
-
-
-        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
-            int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            while (true) {
-                NbtTagType nextTag = readStream.ReadTagType();
-                NbtTag newTag;
-                switch (nextTag) {
-                    case NbtTagType.End:
-                        return;
-
-                    case NbtTagType.Byte:
-                        newTag = new NbtByte();
-                        break;
-
-                    case NbtTagType.Short:
-                        newTag = new NbtShort();
-                        break;
-
-                    case NbtTagType.Int:
-                        newTag = new NbtInt();
-                        break;
-
-                    case NbtTagType.Long:
-                        newTag = new NbtLong();
-                        break;
-
-                    case NbtTagType.Float:
-                        newTag = new NbtFloat();
-                        break;
-
-                    case NbtTagType.Double:
-                        newTag = new NbtDouble();
-                        break;
-
-                    case NbtTagType.ByteArray:
-                        newTag = new NbtByteArray();
-                        break;
-
-                    case NbtTagType.String:
-                        newTag = new NbtString();
-                        break;
-
-                    case NbtTagType.List:
-                        newTag = new NbtList();
-                        break;
-
-                    case NbtTagType.Compound:
-                        newTag = new NbtCompound();
-                        break;
-
-                    case NbtTagType.IntArray:
-                        newTag = new NbtIntArray();
-                        break;
-
-                    case NbtTagType.LongArray:
-                        newTag = new NbtLongArray();
-                        break;
-
-                    default:
-                        throw new NbtFormatException("Unsupported tag type found in NBT_Compound: " + nextTag);
-                }
-                readStream.SkipString();
-                newTag.SkipTag(readStream, childDepthBudget);
             }
         }
 

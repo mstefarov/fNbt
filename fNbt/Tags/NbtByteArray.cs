@@ -94,12 +94,6 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream, int depthBudget) {
-            int length = Math.Max(0, readStream.ReadInt32());
-            readStream.Skip<byte>(length);
-        }
-
-
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(NbtTagType.ByteArray);
             if (Name == null) throw new NbtFormatException("Name is null");

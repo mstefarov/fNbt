@@ -287,6 +287,152 @@ namespace fNbt {
         }
 
 
+        public void SkipPayload(NbtTagType type, int depthBudget) {
+            int tagCount = 0, endTagCount = 0;
+            SkipPayload(type, depthBudget, ref tagCount, ref endTagCount);
+        }
+
+
+        // Discards one tag's payload without constructing tags, counting names or lists as
+        // NbtReader would: tagCount gets named children and list elements, endTagCount gets
+        // TAG_End markers. Applies the same wire tolerances, flavor limits, and depth budget
+        // as a parsing walk. MaxAllocation deliberately does not apply: nothing is allocated.
+        public void SkipPayload(NbtTagType type, int depthBudget, ref int tagCount, ref int endTagCount) {
+            switch (type) {
+                case NbtTagType.Byte:
+                    ReadByte();
+                    break;
+
+                case NbtTagType.Short:
+                    ReadInt16();
+                    break;
+
+                case NbtTagType.Int:
+                    ReadInt32();
+                    break;
+
+                case NbtTagType.Long:
+                    ReadInt64();
+                    break;
+
+                case NbtTagType.Float:
+                    Skip<float>(1);
+                    break;
+
+                case NbtTagType.Double:
+                    Skip<double>(1);
+                    break;
+
+                case NbtTagType.String:
+                    SkipString();
+                    break;
+
+                case NbtTagType.ByteArray:
+                    // Negative lengths are tolerated as empty, like the parsing walk
+                    Skip<byte>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.IntArray:
+                    Skip<int>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.LongArray:
+                    Skip<long>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.List: {
+                    int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
+                    NbtTagType elementType = ReadListHeader(out int length);
+                    SkipListElements(elementType, length, childDepthBudget, ref tagCount, ref endTagCount);
+                    break;
+                }
+
+                case NbtTagType.Compound: {
+                    int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
+                    while (true) {
+                        NbtTagType childType = ReadTagType();
+                        if (childType == NbtTagType.End) {
+                            endTagCount++;
+                            break;
+                        }
+                        tagCount++;
+                        SkipString();
+                        SkipPayload(childType, childDepthBudget, ref tagCount, ref endTagCount);
+                    }
+                    break;
+                }
+
+                default:
+                    throw new NbtFormatException("Unsupported tag type found in NBT_Compound: " + type);
+            }
+        }
+
+
+        // Discards list elements whose header was already consumed. Fixed-width elements skip
+        // in one step; varint ints/longs decode one at a time through Skip<T>.
+        public void SkipListElements(NbtTagType elementType, int count, int childDepthBudget,
+                                     ref int tagCount, ref int endTagCount) {
+            // An empty list's element type is decorative and may even be TAG_End
+            if (count <= 0) return;
+            unchecked {
+                tagCount += count;
+            }
+            switch (elementType) {
+                case NbtTagType.Byte:
+                    Skip<byte>(count);
+                    break;
+
+                case NbtTagType.Short:
+                    Skip<short>(count);
+                    break;
+
+                case NbtTagType.Int:
+                    Skip<int>(count);
+                    break;
+
+                case NbtTagType.Long:
+                    Skip<long>(count);
+                    break;
+
+                case NbtTagType.Float:
+                    Skip<float>(count);
+                    break;
+
+                case NbtTagType.Double:
+                    Skip<double>(count);
+                    break;
+
+                case NbtTagType.String:
+                    for (int i = 0; i < count; i++) SkipString();
+                    break;
+
+                case NbtTagType.ByteArray:
+                    for (int i = 0; i < count; i++) Skip<byte>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.IntArray:
+                    for (int i = 0; i < count; i++) Skip<int>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.LongArray:
+                    for (int i = 0; i < count; i++) Skip<long>(Math.Max(0, ReadInt32()));
+                    break;
+
+                case NbtTagType.List:
+                case NbtTagType.Compound:
+                    for (int i = 0; i < count; i++) {
+                        SkipPayload(elementType, childDepthBudget, ref tagCount, ref endTagCount);
+                    }
+                    break;
+
+                default:
+                    // ReadListHeader rejects TAG_End on non-empty lists, so only a corrupt
+                    // caller-supplied type can land here
+                    throw new NbtFormatException("Unsupported tag type found in a list: " + elementType);
+            }
+        }
+
+
         // Rejects impossible array/list lengths that can't fit in the remaining stream,
         // to prevent massive allocations. Only seekable streams can be efficiently checked.
         public void EnsureCanRead(long byteCount) {

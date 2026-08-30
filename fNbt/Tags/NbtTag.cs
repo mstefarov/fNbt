@@ -109,8 +109,6 @@ namespace fNbt {
         // still enter. Value tags leave it untouched; compounds and lists consume one.
         internal abstract bool ReadTag(NbtBinaryReader readStream, int depthBudget);
 
-        internal abstract void SkipTag(NbtBinaryReader readStream, int depthBudget);
-
         internal abstract void WriteTag(NbtBinaryWriter writeStream, int depthBudget);
 
         // WriteData does not write the tag's ID byte or the name

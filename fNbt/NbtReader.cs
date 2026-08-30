@@ -516,14 +516,17 @@ namespace fNbt {
                 return false;
             }
             int currentDepth = Depth;
-            while (ReadToFollowing()) {
-                if (Depth == currentDepth) {
-                    return true;
-                } else if (Depth < currentDepth) {
-                    return false;
+            while (true) {
+                // A container the cursor has not entered can be discarded wholesale
+                if (state == NbtParseState.AtCompoundBeginning || state == NbtParseState.AtListBeginning) {
+                    SkipUnenteredContainer();
+                    if (state == NbtParseState.AtStreamEnd) return false;
+                    continue;
                 }
+                if (!ReadToFollowing()) return false;
+                if (Depth == currentDepth) return true;
+                if (Depth < currentDepth) return false;
             }
-            return false;
         }
 
 
@@ -556,11 +559,53 @@ namespace fNbt {
             }
             int startDepth = Depth;
             int skipped = 0;
-            // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-            while (ReadToFollowing() && Depth >= startDepth) {
+            while (true) {
+                // A container the cursor has not entered can be discarded wholesale
+                if (state == NbtParseState.AtCompoundBeginning || state == NbtParseState.AtListBeginning) {
+                    skipped += SkipUnenteredContainer();
+                    if (state == NbtParseState.AtStreamEnd) return skipped;
+                    continue;
+                }
+                if (!ReadToFollowing() || Depth < startDepth) return skipped;
                 skipped++;
             }
-            return skipped;
+        }
+
+
+        // Discards the current unentered container's contents through the binary layer, without
+        // constructing tags or cursor states for its descendants. Leaves the cursor where a
+        // ReadToFollowing walk past the last descendant would: same depth, ready for the next
+        // sibling. Returns how many tags were passed over, counted like ReadToFollowing counts.
+        int SkipUnenteredContainer() {
+            NbtTagType resumeParent = ParentTagType;
+            int tags = 0, endTags = 0;
+            // The budget an equivalent tree walk would have at this depth: GoDown refuses to
+            // open a container at Depth > MaxDepth, so this container gets MaxDepth - Depth + 1.
+            int depthBudget = NbtTag.MaxDepth - Depth + 1;
+            state = NbtParseState.Error;
+            if (TagType == NbtTagType.Compound) {
+                reader.SkipPayload(NbtTagType.Compound, depthBudget, ref tags, ref endTags);
+            } else {
+                // The list's type and length were consumed with its header
+                reader.SkipListElements(ListType, TagLength, NbtTag.ConsumeDepthBudget(depthBudget),
+                                        ref tags, ref endTags);
+            }
+            int newlyRead = tags + (SkipEndTags ? 0 : endTags);
+            TagsRead += newlyRead;
+            if (resumeParent == NbtTagType.List) {
+                state = NbtParseState.InList;
+            } else if (resumeParent == NbtTagType.Compound) {
+                state = NbtParseState.InCompound;
+            } else {
+                // The root was skipped, so the document is over. Mirror the cursor state an
+                // orderly walk ends with.
+                state = NbtParseState.AtStreamEnd;
+                TagType = NbtTagType.End;
+                TagName = null;
+                valueCache = null;
+                TagLength = 0;
+            }
+            return newlyRead;
         }
 
 
