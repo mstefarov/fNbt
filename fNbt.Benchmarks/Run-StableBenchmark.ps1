@@ -115,6 +115,7 @@ if ($env:OS -ne 'Windows_NT') {
 }
 
 $Filter = @($Filter | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+$AdditionalArguments = @($AdditionalArguments | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 
 if ($BaselineSource -and -not $Baseline) {
     throw '-BaselineSource requires -Baseline.'
