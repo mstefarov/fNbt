@@ -367,7 +367,14 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
-            WriteTag(tag, new BufferWriterStream(output));
+            var stream = new BufferWriterStream(output);
+            try {
+                WriteTag(tag, stream);
+            } finally {
+                // Staged bytes become visible in the output either way, like the
+                // stream-based overload's completed writes
+                stream.Flush();
+            }
         }
 
 
@@ -385,7 +392,12 @@ namespace fNbt {
         /// are already written when this throws. </exception>
         public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
-            WriteConcatenatedTags(tags, new BufferWriterStream(output));
+            var stream = new BufferWriterStream(output);
+            try {
+                WriteConcatenatedTags(tags, stream);
+            } finally {
+                stream.Flush();
+            }
         }
 #endif
 

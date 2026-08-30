@@ -5,9 +5,17 @@ using System.IO;
 
 namespace fNbt {
     // Write-only Stream over an IBufferWriter<byte>, so the stream-based writers can fill
-    // pipes and pooled buffers directly.
+    // pipes and pooled buffers directly. Writes stage into one outstanding region and are
+    // handed to the buffer writer in batches: per-byte GetSpan/Advance transactions would
+    // otherwise dominate small-tag output. Owners flush before handing control back to
+    // whoever gave them the buffer writer.
     internal sealed class BufferWriterStream : Stream {
+        // Past this size, staging just adds a copy; hand the span to the writer directly.
+        const int DirectWriteCutoff = 512;
+
         readonly IBufferWriter<byte> output;
+        Memory<byte> current;
+        int position;
 
 
         public BufferWriterStream(IBufferWriter<byte> output) {
@@ -16,22 +24,44 @@ namespace fNbt {
 
 
         public override void Write(byte[] buffer, int offset, int count) {
-            output.Write(buffer.AsSpan(offset, count));
+            Write(buffer.AsSpan(offset, count));
         }
 
 
         public override void Write(ReadOnlySpan<byte> buffer) {
-            output.Write(buffer);
+            if (buffer.Length <= current.Length - position) {
+                buffer.CopyTo(current.Span.Slice(position));
+                position += buffer.Length;
+                return;
+            }
+            Flush();
+            if (buffer.Length >= DirectWriteCutoff) {
+                output.Write(buffer);
+                return;
+            }
+            current = output.GetMemory(buffer.Length);
+            buffer.CopyTo(current.Span);
+            position = buffer.Length;
         }
 
 
         public override void WriteByte(byte value) {
-            output.GetSpan(1)[0] = value;
-            output.Advance(1);
+            if (position >= current.Length) {
+                Flush();
+                current = output.GetMemory(1);
+            }
+            current.Span[position++] = value;
         }
 
 
-        public override void Flush() { }
+        // Commits staged bytes. The region is dropped rather than kept: Advance invalidates it.
+        public override void Flush() {
+            if (position > 0) {
+                output.Advance(position);
+                current = default;
+                position = 0;
+            }
+        }
 
 
         public override int Read(byte[] buffer, int offset, int count) {
