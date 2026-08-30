@@ -10,7 +10,8 @@ namespace fNbt {
     public class NbtReader {
         NbtParseState state = NbtParseState.AtStreamBeginning;
         readonly NbtBinaryReader reader;
-        Stack<NbtReaderNode>? nodes;
+        NbtReaderNode[]? nodes;
+        int nodeCount;
         readonly long streamStartOffset;
         bool atValue;
         object? valueCache;
@@ -377,15 +378,17 @@ namespace fNbt {
                 state = NbtParseState.Error;
                 throw new NbtFormatException(NbtTag.DepthLimitMessage);
             }
-            if (nodes == null) nodes = new Stack<NbtReaderNode>();
-            var newNode = new NbtReaderNode {
-                ListIndex = ListIndex,
-                ParentTagLength = ParentTagLength,
-                ParentName = ParentName,
-                ParentTagType = ParentTagType,
-                ListType = ListType
-            };
-            nodes.Push(newNode);
+            if (nodes == null) {
+                nodes = new NbtReaderNode[4];
+            } else if (nodeCount == nodes.Length) {
+                Array.Resize(ref nodes, nodes.Length * 2);
+            }
+            ref NbtReaderNode newNode = ref nodes[nodeCount++];
+            newNode.ListIndex = ListIndex;
+            newNode.ParentTagLength = ParentTagLength;
+            newNode.ParentName = ParentName;
+            newNode.ParentTagType = ParentTagType;
+            newNode.ListType = ListType;
 
             ParentName = TagName;
             ParentTagType = TagType;
@@ -400,13 +403,15 @@ namespace fNbt {
         // Goes one step up the NBT file's hierarchy, restoring previous state
         void GoUp() {
             NullableSupport.Assert(nodes != null);
-            NbtReaderNode oldNode = nodes.Pop();
+            ref NbtReaderNode oldNode = ref nodes[--nodeCount];
 
             ParentName = oldNode.ParentName;
             ParentTagType = oldNode.ParentTagType;
             ParentTagLength = oldNode.ParentTagLength;
             ListIndex = oldNode.ListIndex;
             ListType = oldNode.ListType;
+            // Let the popped frame's name reference go; the array itself is reused
+            oldNode.ParentName = null;
             TagLength = 0;
 
             Depth--;
@@ -897,7 +902,7 @@ namespace fNbt {
                     // The public ListType describes the current element, so the list's own
                     // element type comes from the node that entered it
                     NullableSupport.Assert(nodes != null);
-                    elementType = nodes.Peek().ListType;
+                    elementType = nodes[nodeCount - 1].ListType;
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
                     }
