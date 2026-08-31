@@ -49,6 +49,14 @@ class Program {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
         }
 
+        if (customArgs.ServerGc && customArgs.BaselineVersion == null) {
+            // The GC mode must land in each generated app's runtimeconfig, which only a job
+            // can do (BDN's runtimeconfig overrides GC environment variables). Package
+            // comparisons build their jobs below; support only that shape.
+            logger.WriteLineError("// --server-gc requires --baseline");
+            return 1;
+        }
+
         // When "--baseline" is specified, add the package comparison job.
         if (customArgs.BaselineVersion is string version) {
             // Settings such as --launchCount are represented as a mutator job. Give that mutator
@@ -61,6 +69,10 @@ class Program {
             Job job = parsedJobs.Length == 0 || parsedJobs[0].Meta.IsMutator
                 ? Job.Default
                 : parsedJobs[0];
+            if (customArgs.ServerGc) {
+                job = job.WithGcServer(true);
+                logger.WriteLineInfo("// Server GC scenario: jobs run with GcServer=true");
+            }
             initialConfig.AddJob(job);
             var msBuildArgs = new List<string> { $"/p:FNbtNuGetVersion={version}" };
             if (customArgs.BaselineSource is string source) {
@@ -113,12 +125,14 @@ public class CustomArguments {
     public string? BaselineVersion { get; private set; }
     public string? BaselineSource { get; private set; }
     public bool ReverseOrder { get; private set; }
+    public bool ServerGc { get; private set; }
     private readonly string[] remainingArgs;
 
     public CustomArguments(string[] args) {
         var argsList = args.ToList();
         BaselineVersion = TakeValue(argsList, "--baseline");
         ReverseOrder = TakeSwitch(argsList, "--reverse-order");
+        ServerGc = TakeSwitch(argsList, "--server-gc");
 
         // A folder of .nupkg files, so the baseline can be a local build.
         string? source = TakeValue(argsList, "--baseline-source");
