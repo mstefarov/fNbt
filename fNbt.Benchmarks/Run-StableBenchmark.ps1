@@ -47,6 +47,11 @@ param(
 
     [string] $ArtifactsRoot,
 
+    # Logical-CPU mask for the measured process. The default is CPU 8 alone; Server GC
+    # scenarios need at least two usable processors or the runtime silently falls back to
+    # Workstation GC, so pass 768 (CPUs 8+9, both reserved by the machine setup) for those.
+    [uint64] $AffinityMask = 256,
+
     [switch] $ForceBusy,
 
     [string[]] $AdditionalArguments = @()
@@ -121,8 +126,11 @@ if ($BaselineSource -and -not $Baseline) {
     throw '-BaselineSource requires -Baseline.'
 }
 
-$affinityMask = [uint64] 256
+$affinityMask = $AffinityMask
 $reservedProcessorMask = [int64] 0x300
+if (($affinityMask -band (-bnot [uint64] $reservedProcessorMask)) -ne 0) {
+    throw "AffinityMask $affinityMask reaches outside the reserved CPUs 8/9 (mask 0x300)."
+}
 $logicalProcessorCount = [Environment]::ProcessorCount
 if ($logicalProcessorCount -le 8) {
     throw "This machine-specific runner requires logical CPU 8, but only $logicalProcessorCount logical processors are available."
