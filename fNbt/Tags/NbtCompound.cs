@@ -7,26 +7,26 @@ using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
-    /// <summary> A tag containing a set of other named tags. Children keep insertion order. </summary>
+    /// <summary> A tag containing a collection of other named tags. Children are kept in the
+    /// order they were added, and stay in it after removals: enumerating, saving, or printing
+    /// this compound always lists them in insertion order. </summary>
     public sealed class NbtCompound : NbtTag, ICollection<NbtTag>, ICollection {
         /// <summary> Type of this tag (Compound). </summary>
         public override NbtTagType TagType {
             get { return NbtTagType.Compound; }
         }
 
-        // Children in insertion order. Real compounds are small: the Bedrock palette's have 0-5
-        // children and ClassicWorld's schema compounds 13, so lookups below IndexThreshold walk
-        // the array and compare names, which starts with a reference check. An empty compound
-        // shares the empty array.
+        // Children in insertion order. Real compounds are small, 0-5 children in the Bedrock
+        // block palette and 13 in ClassicWorld's schema, so anything below IndexThreshold just
+        // scans and compares names. An empty compound shares the empty array.
         NbtTag[] items = Array.Empty<NbtTag>();
         int count;
         int version;
 
-        // Hashed index for larger compounds: an open-addressing table of
-        // (hash << 32) | (position + 2), where 0 is empty and 1 a tombstone. Positions point
-        // into items, so the table holds no object references: an insert probes once for both
-        // the duplicate check and the free slot, then writes one ulong; growth re-buckets from
-        // the stored hashes without reading a single name. Load stays at or below one half.
+        // Index for larger compounds: open-addressed slots of (hash << 32) | (position + 2),
+        // where 0 is empty and 1 a tombstone. Storing positions instead of references keeps
+        // names out of the table, so growth re-buckets without touching a single string.
+        // Load stays at or below one half.
         ulong[]? table;
         int tombstones;
 
@@ -137,10 +137,11 @@ namespace fNbt {
 
         int FindLinearPosition(string tagName) {
 #if NET8_0_OR_GREATER
-            // The span gets the bounds check hoisted where the field-count loop cannot
+            // The span gets its bounds check hoisted where a loop over the count field cannot
             ReadOnlySpan<NbtTag> children = items.AsSpan(0, count);
             for (int i = 0; i < children.Length; i++) {
-                // The reference check inside == wins often: parsed names are canonicalized
+                // == starts with a reference check, which parsed names usually pass: readers
+                // hand out one shared string per repeated name
                 if (children[i].name == tagName) return i;
             }
 #else
@@ -190,10 +191,9 @@ namespace fNbt {
         }
 
 
-        // The append itself, shaped like List<T>.Add: the bounds check doubles as the capacity
-        // check, and resizing stays out of line so this inlines. The ref-based store skips the
-        // covariant-array store helper, which is safe because every items array is created as
-        // exactly NbtTag[].
+        // Shaped like List<T>.Add: the bounds check doubles as the capacity check, and resizing
+        // stays out of line so this inlines. The ref-based store skips the covariant-store
+        // helper, safe here because items is always exactly NbtTag[].
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void Append(NbtTag tag) {
             NbtTag[] local = items;
@@ -222,8 +222,8 @@ namespace fNbt {
 
         void EnsureCapacity(int neededTotal) {
             if (items.Length < neededTotal) {
-                // Quadrupling past 64 slots keeps large build-by-Add compounds from churning
-                // through every doubling; small compounds keep the tight sizes
+                // Quadrupling past 64 saves large build-by-Add compounds several copies,
+                // while small ones keep the tight sizes
                 int newSize = items.Length < 64 ? items.Length * 2 : items.Length * 4;
                 if (newSize < InitialCapacity) newSize = InitialCapacity;
                 if (newSize < neededTotal) newSize = neededTotal;
@@ -267,7 +267,7 @@ namespace fNbt {
         }
 
 
-        // Rebuilds at quadruple size when genuinely full, or in place to purge tombstones.
+        // Rebuilds at quadruple size when really full, or at the same size to purge tombstones.
         void GrowTable() {
             ulong[] old = table!;
             int newSize = count * 2 >= old.Length ? old.Length * 4 : old.Length;
@@ -297,9 +297,9 @@ namespace fNbt {
             ulong[]? t = table;
             if (t != null) {
                 TombstoneEntry(t, tag.name!, position);
-                // Later children shifted down one; their stored positions follow. Position is
-                // kept in the low bits offset by 2, so a plain decrement never borrows into
-                // the hash half.
+                // Later children just shifted down one, so their stored positions follow.
+                // Position lives in the low bits, offset by 2, so decrementing the whole slot
+                // never borrows into the hash half.
                 for (int s = 0; s < t.Length; s++) {
                     ulong slot = t[s];
                     if (slot > 1 && (int)(uint)slot - 2 > position) {
@@ -316,8 +316,8 @@ namespace fNbt {
             uint hash = NameHash(tagName);
             int mask = t.Length - 1;
             int i = (int)(hash & (uint)mask);
-            // The entry is known to exist; positions are unique, so matching on the position
-            // alone is exact (empty and tombstone slots decode to -2 and -1)
+            // The entry exists and positions are unique, so the position alone identifies it.
+            // Empty and tombstone slots decode to -2 and -1, which never match.
             while ((int)(uint)t[i] - 2 != position) {
                 i = (i + 1) & mask;
             }
@@ -325,8 +325,8 @@ namespace fNbt {
         }
 
 
-        // Position of this exact instance. Names are unique, so on indexed compounds one
-        // probe for the tag's name settles it either way.
+        // Position of this exact instance. Names are unique, so an indexed compound can settle
+        // it with one probe for the tag's name.
         int PositionOfExact(NbtTag tag) {
             string? tagName = tag.name;
             if (table != null && tagName != null) {
@@ -371,8 +371,8 @@ namespace fNbt {
                 } else {
                     NbtTag displaced = items[position];
                     if (!ReferenceEquals(displaced, value)) {
-                        // Replace in place, clearing the displaced tag's Parent. Same name,
-                        // same position: the table entry already describes the new tag.
+                        // Same name and same position, so the table entry already fits the
+                        // replacement
                         items[position] = value;
                         version++;
                         displaced.Parent = null;

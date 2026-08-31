@@ -50,17 +50,17 @@ class Program {
         }
 
         if (customArgs.ServerGc && customArgs.BaselineVersion == null) {
-            // The GC mode must land in each generated app's runtimeconfig, which only a job
-            // can do (BDN's runtimeconfig overrides GC environment variables). Package
-            // comparisons build their jobs below; support only that shape.
+            // BDN writes its own runtimeconfig for each generated app, which beats any GC
+            // environment variable, so the mode has to come from a job. Only the package
+            // comparison below builds one.
             logger.WriteLineError("// --server-gc requires --baseline");
             return 1;
         }
 
-        // When "--baseline" is specified, add the package comparison job.
         if (customArgs.BaselineVersion is string version) {
-            // Settings such as --launchCount are represented as a mutator job. Give that mutator
-            // two runnable jobs to modify; cloning it directly leaves only the NuGet job runnable.
+            // A setting like --launchCount arrives as a mutator job rather than a runnable one.
+            // Both the local and the NuGet job have to be added for it to modify, since cloning
+            // the mutator itself would leave only the NuGet job runnable.
             Job[] parsedJobs = parsedConfig.GetJobs().ToArray();
             if (parsedJobs.Length > 1) {
                 logger.WriteLineError("// --baseline cannot be combined with multiple jobs or runtimes; run each comparison separately");
@@ -85,8 +85,8 @@ class Program {
             logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
         }
 
-        // Args go to the switcher itself, not into the config. Given an empty array, it ignores
-        // --filter and drops into interactive selection.
+        // The switcher needs the args itself, not just the config built from them. Hand it an
+        // empty array and it ignores --filter and drops into interactive selection.
         Summary[] summaries = BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
             .Run(benchmarkArgs, initialConfig)

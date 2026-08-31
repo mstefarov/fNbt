@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.IO;
 
 namespace fNbt {
-    // Write-only output stream over pooled segments, for results whose size cannot be measured
-    // up front (compressed saves). Avoids MemoryStream's doubling garbage: segments come from
-    // the shared pool and go back on Dispose, and the exact result array is assembled once.
+    // Write-only stream for output whose size cannot be measured up front, compressed saves
+    // above all. Segments come from the shared pool and go back on Dispose, so growing costs
+    // no garbage and only the exact result array survives.
     internal sealed class PooledSegmentStream : Stream {
         const int FirstSegmentSize = 64 * 1024;
         const int MaxSegmentSize = 1024 * 1024;

@@ -65,8 +65,8 @@ public class NumericArrayBenchmarks {
 }
 
 
-// TAG_Long_Array is a Java-only reality: both Bedrock flavors predate it and their
-// validation rejects it, so long-array throughput measures Java alone.
+// Both Bedrock flavors predate TAG_Long_Array and their validation rejects it, so
+// long-array throughput can only be measured under Java.
 [BenchmarkCategory(Program.BaselineIncompatible)]
 public class LongArrayBenchmarks {
     [Params(4096, 1048576)]

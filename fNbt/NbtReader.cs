@@ -410,7 +410,7 @@ namespace fNbt {
             ParentTagLength = oldNode.ParentTagLength;
             ListIndex = oldNode.ListIndex;
             ListType = oldNode.ListType;
-            // Let the popped frame's name reference go; the array itself is reused
+            // The array is reused, so drop the popped frame's name reference by hand
             oldNode.ParentName = null;
             TagLength = 0;
 
@@ -577,15 +577,14 @@ namespace fNbt {
         }
 
 
-        // Discards the current unentered container's contents through the binary layer, without
-        // constructing tags or cursor states for its descendants. Leaves the cursor where a
-        // ReadToFollowing walk past the last descendant would: same depth, ready for the next
-        // sibling. Returns how many tags were passed over, counted like ReadToFollowing counts.
+        // Discards the current unentered container through the binary layer, building no tags
+        // or cursor states for its descendants. Leaves the cursor where a ReadToFollowing walk
+        // past the last descendant would, and counts the tags it passed the same way.
         int SkipUnenteredContainer() {
             NbtTagType resumeParent = ParentTagType;
             int tags = 0, endTags = 0;
-            // The budget an equivalent tree walk would have at this depth: GoDown refuses to
-            // open a container at Depth > MaxDepth, so this container gets MaxDepth - Depth + 1.
+            // What an equivalent tree walk would have left at this depth. GoDown refuses to open
+            // a container past MaxDepth, so this one gets MaxDepth - Depth + 1.
             int depthBudget = NbtTag.MaxDepth - Depth + 1;
             state = NbtParseState.Error;
             if (TagType == NbtTagType.Compound) {
@@ -602,8 +601,8 @@ namespace fNbt {
             } else if (resumeParent == NbtTagType.Compound) {
                 state = NbtParseState.InCompound;
             } else {
-                // The root was skipped, so the document is over. Mirror the cursor state an
-                // orderly walk ends with.
+                // The root itself was skipped, so the document is over. Land on the same
+                // cursor state an orderly walk ends with.
                 state = NbtParseState.AtStreamEnd;
                 TagType = NbtTagType.End;
                 TagName = null;
@@ -927,8 +926,8 @@ namespace fNbt {
                 reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType, reader.UsesVarInt));
 
-                // Exact-type matches read without boxing or conversion dispatch; ints and longs
-                // also get the bulk readers. Genuine conversions keep the ChangeType loops below.
+                // Exact-type matches skip boxing and conversion dispatch, and ints and longs
+                // reach the bulk readers. Real conversions fall through to ChangeType below.
                 if (typeof(T) == typeof(byte) && elementType == NbtTagType.Byte) {
                     T[] val = (T[])(object)reader.ReadArray(elementsToRead);
                     FinishListRead(unpublished);

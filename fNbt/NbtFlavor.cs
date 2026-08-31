@@ -131,7 +131,7 @@ namespace fNbt {
                     break;
                 case NbtTagType.Compound:
                     int compoundChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
-                    // Walk the internal storage directly, without enumerator allocations.
+                    // Walk the storage directly, so validation allocates no enumerators
                     var compound = (NbtCompound)tag;
                     NbtTag[]? children = compound.ItemArray;
                     for (int i = 0; i < compound.Count; i++) {

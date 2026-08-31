@@ -4,8 +4,7 @@ using System.IO;
 
 namespace fNbt {
     /// <summary> Standalone reader for NBT primitives from a stream, taking care of endianness,
-    /// string encoding, and skipping. Multi-byte values compose directly in wire order, so
-    /// big-endian reads don't pay for a little-endian read plus a swap. </summary>
+    /// string encoding, and skipping. Multi-byte values compose directly in wire order. </summary>
     internal sealed unsafe class NbtBinaryReader {
         readonly Stream stream;
         readonly byte[] buffer = new byte[sizeof(double)];
@@ -19,10 +18,9 @@ namespace fNbt {
         readonly bool useVarInt;
         readonly byte[] stringConversionBuffer = new byte[64];
 
-        // Bounded name cache backing ReadTagName, activated lazily and capped so a hostile
-        // all-unique document cannot grow an unbounded secondary index. Activation waits until
-        // the names read could plausibly repay the table itself: a reader that only ever sees a
-        // few dozen names (one small document per reader) must not pay for a table per document.
+        // Bounded name cache backing ReadTagName. Capped so that a huge all-unique document
+        // cannot grow an unbounded side table, and activated late so a reader that parses
+        // one small document never pays for a table at all.
         NameCacheEntry[]? nameCache;
         int nameCacheCount;
         int namesRead;
@@ -288,11 +286,10 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads a length-prefixed string like <see cref="ReadString"/>, canonicalizing
-        /// repeated names through a bounded per-reader cache. Real documents draw tag names from a
-        /// small set (schemas, palettes), so most reads return an existing string instead of
-        /// allocating. Cached entries are keyed by encoded bytes; alternate encodings of the same
-        /// name simply occupy separate entries that decode to equal strings. </summary>
+        /// <summary> Reads a length-prefixed string like <see cref="ReadString"/>, but returns
+        /// the cached instance when the same name bytes repeat. Real documents draw tag names
+        /// from a small set, so most reads allocate nothing. Entries are keyed by encoded bytes;
+        /// alternate encodings of one name get separate entries that decode equal. </summary>
         public string ReadTagName() {
             int length = ReadStringLength(maxStringBytes);
             if (length == 0) return "";
@@ -312,8 +309,8 @@ namespace fNbt {
 
 
         string LookUpName(int length) {
-            // A document that keeps missing (unique names everywhere) drops the cache so it
-            // stops paying for hashing and probes
+            // A document of mostly unique names keeps missing; drop the cache so reads
+            // stop paying for hashing and probes
             if ((++nameLookups & 1023) == 0 && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;
@@ -471,7 +468,7 @@ namespace fNbt {
         // Discards one tag's payload without constructing tags, counting names or lists as
         // NbtReader would: tagCount gets named children and list elements, endTagCount gets
         // TAG_End markers. Applies the same wire tolerances, flavor limits, and depth budget
-        // as a parsing walk. MaxAllocation deliberately does not apply: nothing is allocated.
+        // as a parsing walk. MaxAllocation does not apply: skips allocate nothing.
         public void SkipPayload(NbtTagType type, int depthBudget, ref int tagCount, ref int endTagCount) {
             switch (type) {
                 case NbtTagType.Byte:
@@ -641,8 +638,7 @@ namespace fNbt {
                 if (bigEndian != BitConverter.IsLittleEndian) {
                     stream.ReadExactly(bytes);
                 } else {
-                    // Read and reverse in chunks that stay cache-hot, instead of two
-                    // whole-array passes
+                    // Read and reverse in chunks that stay cache-hot, instead of two whole-array passes
                     while (!bytes.IsEmpty) {
                         Span<byte> chunk = bytes.Slice(0, Math.Min(ReverseChunkBytes, bytes.Length));
                         stream.ReadExactly(chunk);

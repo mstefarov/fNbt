@@ -3,8 +3,8 @@ using System.IO;
 using System.Text;
 
 namespace fNbt {
-    /// <summary> BinaryWriter wrapper that writes NBT primitives to a stream,
-    /// while taking care of endianness and string encoding, and counting bytes written. </summary>
+    /// <summary> Writes NBT primitives to a stream, taking care of endianness and string
+    /// encoding. Counterpart to <see cref="NbtBinaryReader"/>. </summary>
     internal sealed unsafe class NbtBinaryWriter {
         // Write at most 4 MiB at a time.
         public const int MaxWriteChunk = 4 * 1024 * 1024;
@@ -13,8 +13,8 @@ namespace fNbt {
         static readonly UTF8Encoding Encoding = new UTF8Encoding(false, true);
 
         // Each instance needs its own encoder, because it maintains state. Only the chunked
-        // long-string path uses it, so it is created on first need: most writers never
-        // see a string past 256 bytes.
+        // long-string path uses it, so it waits until first need. Most writers never see a
+        // string long enough to get there.
         Encoder? encoder;
 
         public Stream BaseStream {

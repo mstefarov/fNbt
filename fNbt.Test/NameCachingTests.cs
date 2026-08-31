@@ -29,8 +29,8 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void RepeatedNamesShareOneInstance() {
-            // Names repeated across compounds may come back as the same string instance.
-            // This is intended behavior, not an accident: pin it.
+            // Names repeated across compounds may come back as one string instance. That is
+            // intended, so pin it.
             string[] names = { "alpha", "beta", "gamma" };
             NbtFile file = Roundtrip(MakeSchemaDoc(60, (i, f) => names[f]));
             var items = (NbtList)file.RootTag["Items"];

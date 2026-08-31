@@ -1,11 +1,9 @@
-#if !FNBT_BASELINE
 using BenchmarkDotNet.Attributes;
 
 namespace fNbt.Benchmarks;
 
 // Standalone large-array comparisons, which the metadata comparer row leaves uncovered.
-// Equal inputs are the worst case: no early exit. NbtComparer postdates 1.1.1.
-[BenchmarkCategory(Program.BaselineIncompatible)]
+// Equal inputs are the worst case: no early exit.
 public class ComparerBenchmarks {
     NbtByteArray byteArrayA = null!;
     NbtByteArray byteArrayB = null!;
@@ -53,4 +51,3 @@ public class ComparerBenchmarks {
         return NbtComparer.Instance.Equals(longArrayA, longArrayB);
     }
 }
-#endif

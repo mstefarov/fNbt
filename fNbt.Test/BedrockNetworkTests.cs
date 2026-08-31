@@ -141,8 +141,8 @@ namespace fNbt.Test {
             Assert.AreEqual(saved.Length, bytesRead);
             Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, reloaded.RootTag));
 
-            // The golden doc holds the same tags, so it must load to an equal tree even if
-            // the dictionary happened to write them in another order
+            // The hand-written golden doc holds the same tags, so it must load to an equal
+            // tree even though its children come in another order
             var golden = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
             golden.LoadFromBuffer(GoldenDoc, 0, GoldenDoc.Length, NbtCompression.None);
             Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, golden.RootTag));

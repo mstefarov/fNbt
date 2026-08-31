@@ -600,8 +600,8 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
-                // Uncompressed size is computed structurally, so the document is serialized once
-                // into an exact array instead of twice. Validation runs once, in the write.
+                // Sizing the tree up front buys an exact array from a single write pass, where
+                // this used to serialize twice. Validation now happens once, in the write.
                 long size = NbtSizer.SizeDocument(rootTag, withName: true, flavor);
                 if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
@@ -612,8 +612,8 @@ namespace fNbt {
             }
 
 #if NETCOREAPP
-            // Compressed size is unknowable up front. Pooled segments avoid MemoryStream's
-            // doubling garbage, and the exact result is assembled once.
+            // Compressed size cannot be known up front, so pooled segments stand in for the
+            // buffers MemoryStream would double through and throw away.
             using (var pooled = new PooledSegmentStream()) {
                 SaveToStream(pooled, compression);
                 return pooled.ToArray();

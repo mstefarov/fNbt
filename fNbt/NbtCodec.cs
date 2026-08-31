@@ -371,8 +371,8 @@ namespace fNbt {
             try {
                 WriteTag(tag, stream);
             } finally {
-                // Staged bytes become visible in the output either way, like the
-                // stream-based overload's completed writes
+                // Staged bytes reach the output even on failure, matching what the
+                // stream-based overload leaves behind
                 stream.Flush();
             }
         }
@@ -441,9 +441,9 @@ namespace fNbt {
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
-            // Size is computed structurally, so the document is serialized once into an exact
-            // array. An absent document is a single TAG_End byte; WriteTag makes the
-            // flavor-allows-it check either way.
+            // Sizing the tree up front buys an exact array from a single write pass. An absent
+            // document is a lone TAG_End byte, and WriteTag still checks that the flavor
+            // allows one.
             long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor);
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");

@@ -1,11 +1,10 @@
 using System;
 
 namespace fNbt {
-    // Computes the exact encoded size of a tree without serializing it, so exact-buffer writes
-    // measure with a cheap walk instead of a full counting serialization. Sizes must agree with
-    // NbtBinaryWriter byte for byte. Flavor conformance is not checked here: the write pass
-    // that follows enforces it, and a failure then produces the same exception with nothing
-    // returned, exactly as the counting pass did.
+    // Exact encoded size of a tree, computed by walking it instead of serializing it into a
+    // counting stream. Sizes must agree with NbtBinaryWriter byte for byte. Flavor conformance
+    // is left to the write pass that follows, which throws the same exception the old counting
+    // pass did, before anything is returned.
     internal static class NbtSizer {
         // Size of one complete document: type byte, optional root name, payload.
         public static long SizeDocument(NbtTag tag, bool withName, NbtFlavor flavor) {

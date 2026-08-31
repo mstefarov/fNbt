@@ -5,10 +5,9 @@ using System.IO;
 
 namespace fNbt {
     // Write-only Stream over an IBufferWriter<byte>, so the stream-based writers can fill
-    // pipes and pooled buffers directly. Writes stage into one outstanding region and are
-    // handed to the buffer writer in batches: per-byte GetSpan/Advance transactions would
-    // otherwise dominate small-tag output. Owners flush before handing control back to
-    // whoever gave them the buffer writer.
+    // pipes and pooled buffers directly. Writes stage into one outstanding region and go out
+    // in batches, because a GetSpan/Advance pair per byte would dominate small-tag output.
+    // Owners flush before handing control back to whoever gave them the buffer writer.
     internal sealed class BufferWriterStream : Stream {
         // Past this size, staging just adds a copy; hand the span to the writer directly.
         const int DirectWriteCutoff = 512;

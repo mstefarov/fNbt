@@ -143,8 +143,8 @@ namespace fNbt {
         // sequences, CESU-8 surrogate pairs, the overlong NUL, and lone surrogates all decode.
         static string DecodeLenient(byte[] buffer, int offset, int count) {
 #if NET8_0_OR_GREATER
-            // charCount never exceeds count, so a rented buffer avoids a second full-size
-            // allocation; a huge string would otherwise put a throwaway char[] on the LOH
+            // charCount never exceeds count, so renting sidesteps a second full-size
+            // allocation. A huge string would otherwise drop a throwaway char[] on the LOH.
             char[] chars = System.Buffers.ArrayPool<char>.Shared.Rent(count);
             try {
                 return new string(chars, 0, DecodeLenientCore(buffer, offset, count, chars));
