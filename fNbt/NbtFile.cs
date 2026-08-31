@@ -492,12 +492,13 @@ namespace fNbt {
                     compression = NbtCompression.GZip;
                     break;
 
-                case 0x78:
-                    // ZLib header
-                    compression = NbtCompression.ZLib;
-                    break;
-
                 default:
+                    // A plausible ZLib CMF names deflate and a window no larger than 32 KiB.
+                    // Full header validation belongs to the decompressor.
+                    if (firstByte <= 0x78 && (firstByte & 0x0F) == 8) {
+                        compression = NbtCompression.ZLib;
+                        break;
+                    }
                     throw new InvalidDataException("Could not auto-detect compression format.");
             }
             stream.Seek(-1, SeekOrigin.Current);

@@ -240,7 +240,12 @@ namespace fNbt.Test {
             var file = new NbtFile();
             file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib);
             Assert.AreEqual(12345, file.RootTag["v"].IntValue);
-            Assert.AreEqual("root", NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.ZLib, NbtFlavor.Java));
+
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.AutoDetect);
+            Assert.AreEqual(NbtCompression.ZLib, file.FileCompression);
+            Assert.AreEqual(12345, file.RootTag["v"].IntValue);
+            Assert.AreEqual("root", NbtFile.ReadRootTagName(
+                new MemoryStream(doc), NbtCompression.AutoDetect, NbtFlavor.Java));
         }
 
 
