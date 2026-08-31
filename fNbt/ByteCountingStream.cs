@@ -42,7 +42,7 @@ namespace fNbt {
 
 
 #if NETCOREAPP
-        // Without these, framework span calls fall through Stream's compatibility shim,
+        // Without these, dotnet's span calls fall through Stream's compatibility shim,
         // which rents and copies a temporary array per call
         public override int Read(Span<byte> buffer) {
             int bytesActuallyRead = baseStream.Read(buffer);

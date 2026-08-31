@@ -53,7 +53,7 @@ namespace fNbt {
         }
 
 
-        // Commits staged bytes. The region is dropped rather than kept: Advance invalidates it.
+        // Commits staged bytes. Drop the region because Advance invalidates it.
         public override void Flush() {
             if (position > 0) {
                 output.Advance(position);

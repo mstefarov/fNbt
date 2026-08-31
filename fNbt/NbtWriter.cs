@@ -9,8 +9,8 @@ namespace fNbt {
     /// EXCEPT checking for duplicate tag names within a compound. </summary>
     /// <remarks> Every check the writer can make up front runs before any byte is written or a
     /// list slot consumed, so a refused call leaves the writer as it was. A write that fails after
-    /// committing bytes, an I/O error for example, leaves the writer in a failed state where every
-    /// later call throws <see cref="NbtFormatException"/>. </remarks>
+    /// committing bytes, an I/O error for example, leaves the writer in an error state where every
+    /// later call throws <see cref="NbtFormatException"/>. See <see cref="IsInErrorState"/>. </remarks>
     public sealed class NbtWriter {
         const int MaxStreamCopyBufferSize = 8 * 1024;
 
@@ -109,6 +109,17 @@ namespace fNbt {
         /// No more tags may be written after the root tag has been closed. </summary>
         public bool IsDone {
             get { return container.Type == NbtTagType.End; }
+        }
+
+        /// <summary> Gets whether an earlier write failed after emitting bytes, an I/O error for
+        /// example. The document cannot be finished: every later write, End, and
+        /// <see cref="Finish"/> call throws <see cref="NbtFormatException"/>, and the partial
+        /// output should be discarded. A write refused before it emitted anything leaves the
+        /// writer usable and does not set this. </summary>
+        /// <remarks> A stream that reads this from inside its own Write sees <c>true</c> for the
+        /// write in flight: that state and a failure share one sentinel. </remarks>
+        public bool IsInErrorState {
+            get { return IsFailed; }
         }
 
         /// <summary> Gets the underlying stream of the NbtWriter, flushing buffered output first. </summary>

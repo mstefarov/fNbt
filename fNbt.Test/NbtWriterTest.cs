@@ -26,8 +26,10 @@ namespace fNbt.Test {
                     writer.WriteString("string", "123");
                 }
                 Assert.IsFalse(writer.IsDone);
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.EndCompound();
                 Assert.IsTrue(writer.IsDone);
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.Finish();
 
                 ms.Position = 0;
@@ -174,6 +176,7 @@ namespace fNbt.Test {
                 }
                 writer.EndCompound();
                 writer.Finish();
+                Assert.IsFalse(writer.IsInErrorState);
 
                 ms.Seek(0, SeekOrigin.Begin);
                 var file = new NbtFile();
@@ -248,8 +251,10 @@ namespace fNbt.Test {
                 }
                 writer.EndList();
                 Assert.IsFalse(writer.IsDone);
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.EndCompound();
                 Assert.IsTrue(writer.IsDone);
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.Finish();
 
                 ms.Position = 0;
@@ -637,6 +642,7 @@ namespace fNbt.Test {
                 long before = ms.Length;
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(partialTree));
                 Assert.IsTrue(ms.Length > before);
+                Assert.IsTrue(writer.IsInErrorState);
                 Assert.Throws<NbtFormatException>(() => writer.WriteInt("afterFailure", 1));
                 Assert.Throws<NbtFormatException>(writer.EndCompound);
                 Assert.Throws<NbtFormatException>(writer.Finish);
@@ -653,6 +659,9 @@ namespace fNbt.Test {
 
                 // The int payload is four bytes, so the stream writes a prefix before throwing.
                 Assert.Throws<IOException>(() => writer.WriteInt(123));
+                // Observable without catching, and distinct from being done
+                Assert.IsTrue(writer.IsInErrorState);
+                Assert.IsFalse(writer.IsDone);
                 Assert.Throws<NbtFormatException>(() => writer.WriteInt(456));
                 Assert.Throws<NbtFormatException>(writer.EndList);
                 Assert.Throws<NbtFormatException>(writer.EndCompound);
@@ -680,6 +689,7 @@ namespace fNbt.Test {
                 // The getter flushes, so the failure surfaces there, but reading the property
                 // is not a write: the writer stays usable, and a monitoring read cannot fail it
                 Assert.Throws<IOException>(() => { _ = writer.BaseStream; });
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.WriteInt("after", 2);
                 writer.EndCompound();
                 writer.Finish();
@@ -698,6 +708,10 @@ namespace fNbt.Test {
                 writer.EndCompound();
                 writer.Finish();
                 Assert.IsTrue(stream.Logged > 0);
+                // In-flight writes share the error-state sentinel, so a stream that asks from
+                // inside its own Write sees true. Reads from outside a write are exact.
+                Assert.IsTrue(stream.SawInFlightErrorState);
+                Assert.IsFalse(writer.IsInErrorState);
             }
         }
 
@@ -705,12 +719,14 @@ namespace fNbt.Test {
         sealed class PositionLoggingStream : MemoryStream {
             public NbtWriter Writer;
             public int Logged;
+            public bool SawInFlightErrorState;
 
 
             public override void Write(byte[] buffer, int offset, int count) {
                 base.Write(buffer, offset, count);
                 if (Writer != null) {
                     _ = Writer.BaseStream.Position;
+                    if (Writer.IsInErrorState) SawInFlightErrorState = true;
                     Logged++;
                 }
             }
@@ -922,8 +938,10 @@ namespace fNbt.Test {
                 Assert.Throws<NbtFormatException>(() => writer.BeginCompound(over));
                 Assert.Throws<NbtFormatException>(() => writer.BeginList(over, NbtTagType.Int, 0));
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtInt(over, 1)));
-                // No type byte or name reached the stream, and no container was left open
+                // No type byte or name reached the stream, no container was left open, and
+                // nothing that wrote nothing counts as an error
                 Assert.AreEqual(before, ms.Length);
+                Assert.IsFalse(writer.IsInErrorState);
                 writer.WriteInt("i", 1);
                 writer.EndCompound();
                 writer.Finish();
