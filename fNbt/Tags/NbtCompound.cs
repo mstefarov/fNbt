@@ -16,15 +16,29 @@ namespace fNbt {
 
         // Children in insertion order. Real compounds are small: the Bedrock palette's have 0-5
         // children and ClassicWorld's schema compounds 13, so lookups below IndexThreshold walk
-        // the array and compare names, which starts with a reference check. A hashed index is
-        // built only for larger compounds. An empty compound shares the empty array.
+        // the array and compare names, which starts with a reference check. An empty compound
+        // shares the empty array.
         NbtTag[] items = Array.Empty<NbtTag>();
         int count;
-        Dictionary<string, NbtTag>? index;
         int version;
+
+        // Hashed index for larger compounds: an open-addressing table of
+        // (hash << 32) | (position + 2), where 0 is empty and 1 a tombstone. Positions point
+        // into items, so the table holds no object references: an insert probes once for both
+        // the duplicate check and the free slot, then writes one ulong; growth re-buckets from
+        // the stored hashes without reading a single name. Load stays at or below one half.
+        ulong[]? table;
+        int tombstones;
 
         const int IndexThreshold = 16;
         const int InitialCapacity = 4;
+        const int InitialTableSize = 64;
+
+
+        static uint NameHash(string tagName) {
+            // The runtime's seeded string hash, so crafted names can't force long probe runs
+            return (uint)tagName.GetHashCode();
+        }
 
 
         /// <summary> Creates an empty unnamed NbtCompound tag. </summary>
@@ -98,41 +112,80 @@ namespace fNbt {
 
 
         NbtTag? Find(string tagName) {
-            if (index != null) {
-                index.TryGetValue(tagName, out NbtTag? found);
-                return found;
-            }
-            return FindLinear(tagName);
+            int position = FindPosition(tagName);
+            return position < 0 ? null : items[position];
         }
 
 
-        NbtTag? FindLinear(string tagName) {
+        int FindPosition(string tagName) {
+            ulong[]? t = table;
+            if (t == null) return FindLinearPosition(tagName);
+            uint hash = NameHash(tagName);
+            int mask = t.Length - 1;
+            int i = (int)(hash & (uint)mask);
+            while (true) {
+                ulong slot = t[i];
+                if (slot == 0) return -1;
+                if (slot != 1 && (uint)(slot >> 32) == hash) {
+                    int position = (int)(uint)slot - 2;
+                    if (items[position].name == tagName) return position;
+                }
+                i = (i + 1) & mask;
+            }
+        }
+
+
+        int FindLinearPosition(string tagName) {
+#if NET8_0_OR_GREATER
+            // The span gets the bounds check hoisted where the field-count loop cannot
+            ReadOnlySpan<NbtTag> children = items.AsSpan(0, count);
+            for (int i = 0; i < children.Length; i++) {
+                // The reference check inside == wins often: parsed names are canonicalized
+                if (children[i].name == tagName) return i;
+            }
+#else
             NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
-                NbtTag child = local[i];
-                // The reference check inside == wins often: parsed names are canonicalized
-                if (child.name == tagName) return child;
+                if (local[i].name == tagName) return i;
             }
-            return null;
+#endif
+            return -1;
         }
 
 
-        // Inserts unless the name is taken, hashing once on modern targets. Callers set Parent.
+        // Inserts unless the name is taken. One probe pass serves both the duplicate check
+        // and the slot search. Callers set Parent.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryInsert(NbtTag tag) {
             string tagName = tag.name!;
-            if (index != null) {
-#if NET8_0_OR_GREATER
-                if (!index.TryAdd(tagName, tag)) return false;
-#else
-                if (index.ContainsKey(tagName)) return false;
-                index.Add(tagName, tag);
-#endif
+            ulong[]? t = table;
+            if (t == null) {
+                if (FindLinearPosition(tagName) >= 0) return false;
                 Append(tag);
+                if (table == null && count > IndexThreshold) BuildTable();
                 return true;
             }
-            if (FindLinear(tagName) != null) return false;
-            AppendVerified(tag);
+            uint hash = NameHash(tagName);
+            int mask = t.Length - 1;
+            int i = (int)(hash & (uint)mask);
+            int insertAt = -1;
+            while (true) {
+                ulong slot = t[i];
+                if (slot == 0) {
+                    if (insertAt < 0) insertAt = i;
+                    break;
+                }
+                if (slot == 1) {
+                    if (insertAt < 0) insertAt = i;
+                } else if ((uint)(slot >> 32) == hash && items[(int)(uint)slot - 2].name == tagName) {
+                    return false;
+                }
+                i = (i + 1) & mask;
+            }
+            if (t[insertAt] == 1) tombstones--;
+            t[insertAt] = ((ulong)hash << 32) | ((uint)count + 2);
+            Append(tag);
+            if ((count + tombstones) * 2 >= t.Length) GrowTable();
             return true;
         }
 
@@ -181,42 +234,108 @@ namespace fNbt {
 
         // Appends a child whose name is known to be unique here. Callers set Parent.
         void AppendVerified(NbtTag tag) {
-            Append(tag);
-            if (index != null) {
-                index.Add(tag.name!, tag);
-            } else if (count > IndexThreshold) {
-                BuildIndex();
+            ulong[]? t = table;
+            if (t != null) {
+                AddTableEntry(t, NameHash(tag.name!), count);
+                Append(tag);
+                if ((count + tombstones) * 2 >= t.Length) GrowTable();
+                return;
             }
+            Append(tag);
+            if (count > IndexThreshold) BuildTable();
         }
 
 
-        void BuildIndex() {
-            var newIndex = new Dictionary<string, NbtTag>(count * 2);
-            NbtTag[] local = items!;
-            for (int i = 0; i < count; i++) {
-                newIndex.Add(local[i].name!, local[i]);
+        static void AddTableEntry(ulong[] t, uint hash, int position) {
+            int mask = t.Length - 1;
+            int i = (int)(hash & (uint)mask);
+            while (t[i] > 1) {
+                i = (i + 1) & mask;
             }
-            index = newIndex;
+            t[i] = ((ulong)hash << 32) | ((uint)position + 2);
+        }
+
+
+        void BuildTable() {
+            var t = new ulong[InitialTableSize];
+            NbtTag[] local = items;
+            for (int position = 0; position < count; position++) {
+                AddTableEntry(t, NameHash(local[position].name!), position);
+            }
+            table = t;
+            tombstones = 0;
+        }
+
+
+        // Rebuilds at quadruple size when genuinely full, or in place to purge tombstones.
+        void GrowTable() {
+            ulong[] old = table!;
+            int newSize = count * 2 >= old.Length ? old.Length * 4 : old.Length;
+            var t = new ulong[newSize];
+            int mask = newSize - 1;
+            foreach (ulong slot in old) {
+                if (slot <= 1) continue;
+                int i = (int)((uint)(slot >> 32) & (uint)mask);
+                while (t[i] != 0) {
+                    i = (i + 1) & mask;
+                }
+                t[i] = slot;
+            }
+            table = t;
+            tombstones = 0;
         }
 
 
         void RemoveAt(int position, NbtTag tag) {
-            NbtTag[] local = items!;
+            NbtTag[] local = items;
             count--;
             if (position < count) {
                 Array.Copy(local, position + 1, local, position, count - position);
             }
             local[count] = null!;
             version++;
-            index?.Remove(tag.name!);
+            ulong[]? t = table;
+            if (t != null) {
+                TombstoneEntry(t, tag.name!, position);
+                // Later children shifted down one; their stored positions follow. Position is
+                // kept in the low bits offset by 2, so a plain decrement never borrows into
+                // the hash half.
+                for (int s = 0; s < t.Length; s++) {
+                    ulong slot = t[s];
+                    if (slot > 1 && (int)(uint)slot - 2 > position) {
+                        t[s] = slot - 1;
+                    }
+                }
+                if (++tombstones * 4 >= t.Length) GrowTable();
+            }
             tag.Parent = null;
         }
 
 
-        int IndexOfExact(NbtTag tag) {
-            NbtTag[]? local = items;
+        static void TombstoneEntry(ulong[] t, string tagName, int position) {
+            uint hash = NameHash(tagName);
+            int mask = t.Length - 1;
+            int i = (int)(hash & (uint)mask);
+            // The entry is known to exist; positions are unique, so matching on the position
+            // alone is exact (empty and tombstone slots decode to -2 and -1)
+            while ((int)(uint)t[i] - 2 != position) {
+                i = (i + 1) & mask;
+            }
+            t[i] = 1;
+        }
+
+
+        // Position of this exact instance. Names are unique, so on indexed compounds one
+        // probe for the tag's name settles it either way.
+        int PositionOfExact(NbtTag tag) {
+            string? tagName = tag.name;
+            if (table != null && tagName != null) {
+                int position = FindPosition(tagName);
+                return position >= 0 && ReferenceEquals(items[position], tag) ? position : -1;
+            }
+            NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
-                if (ReferenceEquals(local![i], tag)) return i;
+                if (ReferenceEquals(local[i], tag)) return i;
             }
             return -1;
         }
@@ -246,15 +365,18 @@ namespace fNbt {
                 } else if (IsDescendantOf(value)) {
                     throw new ArgumentException("A tag may not be added to one of its own descendants.");
                 }
-                NbtTag? displaced = Find(tagName);
-                if (displaced == null) {
+                int position = FindPosition(tagName);
+                if (position < 0) {
                     AppendVerified(value);
-                } else if (!ReferenceEquals(displaced, value)) {
-                    // Replace in place, clearing the displaced tag's Parent
-                    items![IndexOfExact(displaced)] = value;
-                    version++;
-                    if (index != null) index[tagName] = value;
-                    displaced.Parent = null;
+                } else {
+                    NbtTag displaced = items[position];
+                    if (!ReferenceEquals(displaced, value)) {
+                        // Replace in place, clearing the displaced tag's Parent. Same name,
+                        // same position: the table entry already describes the new tag.
+                        items[position] = value;
+                        version++;
+                        displaced.Parent = null;
+                    }
                 }
                 value.Parent = this;
             }
@@ -375,9 +497,9 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool Remove(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
-            NbtTag? tag = Find(tagName);
-            if (tag == null) return false;
-            RemoveAt(IndexOfExact(tag), tag);
+            int position = FindPosition(tagName);
+            if (position < 0) return false;
+            RemoveAt(position, items[position]);
             return true;
         }
 
@@ -400,9 +522,14 @@ namespace fNbt {
                     "The Parent link is out of sync, most likely because the compound was modified " +
                     "from another thread.");
             }
-            if (index != null) {
-                index.Remove(oldName);
-                index.Add(newName, tag);
+            ulong[]? t = table;
+            if (t != null) {
+                // Same position, new hash. The tombstone may push load past the threshold.
+                int position = FindPosition(oldName);
+                TombstoneEntry(t, oldName, position);
+                tombstones++;
+                AddTableEntry(t, NameHash(newName), position);
+                if ((count + tombstones) * 2 >= t.Length) GrowTable();
             }
         }
 
@@ -588,13 +715,14 @@ namespace fNbt {
 
         /// <summary> Removes all tags from this NbtCompound. </summary>
         public void Clear() {
-            NbtTag[]? local = items;
+            NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
-                local![i].Parent = null;
+                local[i].Parent = null;
                 local[i] = null!;
             }
             count = 0;
-            index = null;
+            table = null;
+            tombstones = 0;
             version++;
         }
 
@@ -606,7 +734,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         public bool Contains(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
-            return IndexOfExact(tag) >= 0;
+            return PositionOfExact(tag) >= 0;
         }
 
 
@@ -643,7 +771,7 @@ namespace fNbt {
         public bool Remove(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
             if (tag.Name == null) throw new ArgumentException("Trying to remove an unnamed tag.");
-            int position = IndexOfExact(tag);
+            int position = PositionOfExact(tag);
             if (position < 0) return false;
             RemoveAt(position, tag);
             return true;
