@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
@@ -16,8 +17,8 @@ namespace fNbt {
         // Children in insertion order. Real compounds are small: the Bedrock palette's have 0-5
         // children and ClassicWorld's schema compounds 13, so lookups below IndexThreshold walk
         // the array and compare names, which starts with a reference check. A hashed index is
-        // built only for larger compounds. An empty compound owns no array at all.
-        NbtTag[]? items;
+        // built only for larger compounds. An empty compound shares the empty array.
+        NbtTag[] items = Array.Empty<NbtTag>();
         int count;
         Dictionary<string, NbtTag>? index;
         int version;
@@ -91,7 +92,7 @@ namespace fNbt {
         #region Storage
 
         // Direct view for internal walkers. Slots at Count and beyond are unspecified.
-        internal NbtTag[]? ItemArray {
+        internal NbtTag[] ItemArray {
             get { return items; }
         }
 
@@ -106,9 +107,9 @@ namespace fNbt {
 
 
         NbtTag? FindLinear(string tagName) {
-            NbtTag[]? local = items;
+            NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
-                NbtTag child = local![i];
+                NbtTag child = local[i];
                 // The reference check inside == wins often: parsed names are canonicalized
                 if (child.name == tagName) return child;
             }
@@ -117,6 +118,7 @@ namespace fNbt {
 
 
         // Inserts unless the name is taken, hashing once on modern targets. Callers set Parent.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryInsert(NbtTag tag) {
             string tagName = tag.name!;
             if (index != null) {
@@ -126,9 +128,7 @@ namespace fNbt {
                 if (index.ContainsKey(tagName)) return false;
                 index.Add(tagName, tag);
 #endif
-                EnsureCapacity(count + 1);
-                items![count++] = tag;
-                version++;
+                Append(tag);
                 return true;
             }
             if (FindLinear(tagName) != null) return false;
@@ -137,11 +137,42 @@ namespace fNbt {
         }
 
 
+        // The append itself, shaped like List<T>.Add: the bounds check doubles as the capacity
+        // check, and resizing stays out of line so this inlines. The ref-based store skips the
+        // covariant-array store helper, which is safe because every items array is created as
+        // exactly NbtTag[].
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void Append(NbtTag tag) {
+            NbtTag[] local = items;
+            int c = count;
+            if ((uint)c < (uint)local.Length) {
+#if NET8_0_OR_GREATER
+                Unsafe.Add(ref System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(local), c) = tag;
+#else
+                local[c] = tag;
+#endif
+                count = c + 1;
+                version++;
+            } else {
+                AppendWithResize(tag);
+            }
+        }
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void AppendWithResize(NbtTag tag) {
+            EnsureCapacity(count + 1);
+            items![count++] = tag;
+            version++;
+        }
+
+
         void EnsureCapacity(int neededTotal) {
-            if (items == null) {
-                items = new NbtTag[Math.Max(InitialCapacity, neededTotal)];
-            } else if (items.Length < neededTotal) {
-                int newSize = items.Length * 2;
+            if (items.Length < neededTotal) {
+                // Quadrupling past 64 slots keeps large build-by-Add compounds from churning
+                // through every doubling; small compounds keep the tight sizes
+                int newSize = items.Length < 64 ? items.Length * 2 : items.Length * 4;
+                if (newSize < InitialCapacity) newSize = InitialCapacity;
                 if (newSize < neededTotal) newSize = neededTotal;
                 Array.Resize(ref items, newSize);
             }
@@ -150,9 +181,7 @@ namespace fNbt {
 
         // Appends a child whose name is known to be unique here. Callers set Parent.
         void AppendVerified(NbtTag tag) {
-            EnsureCapacity(count + 1);
-            items![count++] = tag;
-            version++;
+            Append(tag);
             if (index != null) {
                 index.Add(tag.name!, tag);
             } else if (count > IndexThreshold) {
@@ -695,3 +724,5 @@ namespace fNbt {
         }
     }
 }
+
+
