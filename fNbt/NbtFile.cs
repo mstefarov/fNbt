@@ -346,10 +346,10 @@ namespace fNbt {
                         if (bufferSize > 0) {
                             var bufferedStream = new BufferedStream(decStream, bufferSize);
                             LoadFromStreamInternal(bufferedStream, selector);
-                            DrainToEnd(bufferedStream);
+                            DrainToEnd(stream, bufferedStream);
                         } else {
                             LoadFromStreamInternal(decStream, selector);
-                            DrainToEnd(decStream);
+                            DrainToEnd(stream, decStream);
                         }
                     }
                     FinishCompressedLoad(stream);
@@ -367,10 +367,10 @@ namespace fNbt {
                             if (bufferSize > 0) {
                                 var bufferedStream = new BufferedStream(decStream, bufferSize);
                                 LoadFromStreamInternal(bufferedStream, selector);
-                                DrainToEnd(bufferedStream);
+                                DrainToEnd(stream, bufferedStream);
                             } else {
                                 LoadFromStreamInternal(decStream, selector);
-                                DrainToEnd(decStream);
+                                DrainToEnd(stream, decStream);
                             }
                         }
                     } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
@@ -383,10 +383,10 @@ namespace fNbt {
                         if (bufferSize > 0) {
                             var bufferedStream = new BufferedStream(decStream, bufferSize);
                             LoadFromStreamInternal(bufferedStream, selector);
-                            DrainToEnd(bufferedStream);
+                            DrainToEnd(stream, bufferedStream);
                         } else {
                             LoadFromStreamInternal(decStream, selector);
-                            DrainToEnd(decStream);
+                            DrainToEnd(stream, decStream);
                         }
                         ValidateZLibChecksum(stream, startOffset, decStream.Checksum);
                     }
@@ -422,15 +422,20 @@ namespace fNbt {
         }
 
 
-        // Reading a decompressor to its end forces it to process the container's trailer, so
-        // checksum validation cannot depend on how the input happened to be chunked.
-        static void DrainToEnd(Stream stream) {
+        // Reading a decompressor to its end forces it to process the container's trailer.
+        // Without this, whether the trailer gets pulled during the parse depends on how the
+        // document happens to align with the decompressor's buffers, and at some sizes a corrupt
+        // checksum goes unnoticed. Only seekable sources are drained: finishing a GZip member
+        // makes GZipStream read on looking for the next one, which would block on a source that
+        // stays open instead of ending, like a socket.
+        static void DrainToEnd(Stream source, Stream decompressed) {
+            if (!source.CanSeek) return;
 #if NETCOREAPP
             Span<byte> buffer = stackalloc byte[4096];
-            while (stream.Read(buffer) > 0) { }
+            while (decompressed.Read(buffer) > 0) { }
 #else
             byte[] buffer = new byte[4096];
-            while (stream.Read(buffer, 0, buffer.Length) > 0) { }
+            while (decompressed.Read(buffer, 0, buffer.Length) > 0) { }
 #endif
         }
 

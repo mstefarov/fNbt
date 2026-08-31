@@ -1,8 +1,10 @@
 ﻿## 2.0.0 (fNbt, unreleased)
 - Add support for all variants of NBT via new NbtFlavor type. It includes
     Java (the default), JavaAnvil, JavaLegacy, JavaNetwork, Bedrock,
-    BedrockNetwork, and ClassiCube. Choose a default NbtFile.DefaultFlavor,
-    or configure individual NbtFile, NbtReader, and NbtWriter.
+    BedrockNetwork, and ClassiCube. A flavor defines which tag types,
+    encodings, and limits should be used. Choose a default
+    NbtFile.DefaultFlavor, or configure individual NbtFile, NbtReader,
+    and NbtWriter.
 - Add support for varint encoding when BedrockNetwork flavor is active.
 - Add NbtOptions: combines the flavor, ValidateOnWrite flag (default on),
     ValidateOnRead (default off), and MaxAllocation (defensive opt-in cap
@@ -37,8 +39,8 @@
     when given a non-zero offset and producing a bad NBT document.
 - Fixed NbtReader.ReadListAsArray throwing when called on an element of the
     list instead of the list itself.
-- The checksum is now validated for compressed NBT files and streams on .NET
-    Standard 2.0 too, for ZLib when the stream is seekable.
+- Fixed corrupt compressed documents sometimes loading silently. Loads from
+    seekable sources now always verify the checksum.
 - Old BigEndian properties and params are deprecated (but still work).
 
 ## 1.1.1 (fNbt)

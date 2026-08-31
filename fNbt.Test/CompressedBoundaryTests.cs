@@ -1,11 +1,12 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 
 namespace fNbt.Test {
     // Checksum validation and stream-consumption contracts for compressed loads.
-    // Compressed loads read the container to its end, so the trailer checksum is always
-    // validated where the target supports it, and byte counts are deterministic.
+    // Seekable sources are read to the container's end, so the trailer checksum is validated
+    // where the target supports it and byte counts are deterministic. Non-seekable sources stop
+    // wherever decompression did, since draining them could block.
     [TestClass]
     public class CompressedBoundaryTests {
         static byte[] MakeDoc(NbtCompression compression) {
@@ -75,10 +76,8 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CompressedLoadDoesNotOverreadNonSeekableStreams() {
-            // Non-seekable sources are left wherever decompression stopped, so a load cannot
-            // block on a stream that never ends. The count never passes the document, and it
-            // reaches at least the end of the deflate data; the few trailer bytes may stay
-            // unpulled on the .NET Framework build.
+            // A load must never read past the document on a non-seekable source. Those are not
+            // drained, so a load can stop with the container's trailer still unread.
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);
                 using (var ms = new MemoryStream(doc)) {
@@ -86,7 +85,7 @@ namespace fNbt.Test {
                     var file = new NbtFile();
                     long bytesRead = file.LoadFromStream(awkward, compression);
                     Assert.IsTrue(bytesRead <= doc.Length, compression + ": read past the document");
-                    Assert.IsTrue(bytesRead >= doc.Length - 8, compression + ": stopped before the trailer region");
+                    TestFiles.AssertNbtSmallFile(file);
                 }
             }
         }
@@ -211,6 +210,83 @@ namespace fNbt.Test {
                 Assert.AreEqual(doc.Length, bytesRead, compression.ToString());
                 TestFiles.AssertNbtSmallFile(file);
             }
+        }
+
+
+        [TestMethod]
+        public void CompressedLoadDoesNotReadPastANonSeekableSource() {
+            // GZipStream supports concatenated members, so draining it reads on looking for
+            // another header. On a source that stays open, a socket for example, that read
+            // blocks forever instead of returning end-of-stream. Non-seekable sources are
+            // therefore not drained, and nothing may be read past the compressed data.
+            foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
+                byte[] doc = MakeDoc(compression);
+                var file = new NbtFile();
+                file.LoadFromStream(new ThrowOnOverreadStream(doc), compression);
+                TestFiles.AssertNbtSmallFile(file);
+            }
+        }
+
+
+        [TestMethod]
+        public void DrainingCatchesTrailerCorruptionAtAwkwardSizes() {
+            // Whether the parse alone pulls the trailer depends on how the document aligns with
+            // the decompressor's buffers. These payload sizes are ones where it does not, so an
+            // undrained load accepts a corrupt checksum. Draining is what closes it, which is
+            // why seekable sources are read to the end; non-seekable ones keep the gap.
+            foreach ((NbtCompression compression, int payloadSize, int trailer) in
+                     new[] { (NbtCompression.GZip, 8148, 8), (NbtCompression.ZLib, 24541, 4) }) {
+                var payload = new byte[payloadSize];
+                new Random(payloadSize).NextBytes(payload);
+                var root = new NbtCompound("root") { new NbtByteArray("data", payload) };
+                byte[] doc = new NbtFile(root).SaveToBuffer(compression);
+                byte[] bad = (byte[])doc.Clone();
+                bad[bad.Length - trailer] ^= 0xFF;
+
+                Assert.Throws<InvalidDataException>(
+                    () => new NbtFile().LoadFromBuffer(bad, 0, bad.Length, compression),
+                    compression + ": seekable load accepted a corrupt trailer");
+
+            }
+        }
+
+
+        // Stands in for a source that would block rather than report end-of-stream.
+        sealed class ThrowOnOverreadStream : Stream {
+            readonly byte[] data;
+            int position;
+
+
+            public ThrowOnOverreadStream(byte[] data) {
+                this.data = data;
+            }
+
+
+            public override int Read(byte[] buffer, int offset, int count) {
+                if (position >= data.Length) {
+                    throw new IOException("Read past the compressed data; a live source would block here.");
+                }
+                int bytesRead = Math.Min(count, data.Length - position);
+                Buffer.BlockCopy(data, position, buffer, offset, bytesRead);
+                position += bytesRead;
+                return bytesRead;
+            }
+
+
+            public override bool CanRead { get { return true; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanWrite { get { return false; } }
+            public override long Length { get { throw new NotSupportedException(); } }
+
+            public override long Position {
+                get { throw new NotSupportedException(); }
+                set { throw new NotSupportedException(); }
+            }
+
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+            public override void SetLength(long value) { throw new NotSupportedException(); }
+            public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
         }
     }
 }
