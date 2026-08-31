@@ -338,6 +338,8 @@ namespace fNbt {
 
 
         /// <summary> Removes the tag with the specified name from this NbtCompound. </summary>
+        /// <remarks> Removing shifts every later child to preserve insertion order. When removing
+        /// many tags from a large compound, rebuilding it without them is faster. </remarks>
         /// <param name="tagName"> The name of the tag to remove. </param>
         /// <returns> true if the tag is successfully found and removed; otherwise, false.
         /// This method returns false if name is not found in the NbtCompound. </returns>
@@ -602,6 +604,8 @@ namespace fNbt {
 
         /// <summary> Removes the first occurrence of a specific NbtTag from the NbtCompound.
         /// Looks for exact object matches, not name matches. </summary>
+        /// <remarks> Removing shifts every later child to preserve insertion order. When removing
+        /// many tags from a large compound, rebuilding it without them is faster. </remarks>
         /// <returns> true if tag was successfully removed from the NbtCompound; otherwise, false.
         /// This method also returns false if tag is not found. </returns>
         /// <param name="tag"> The tag to remove from the NbtCompound. </param>
