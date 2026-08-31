@@ -37,8 +37,8 @@
 - Much faster and leaner on real-world documents. Parsing allocates 44-54%
     less (repeated tag names are shared, and small compounds skip the
     dictionary), skipping unwanted data no longer builds throwaway tags
-    (NbtReader.Skip and selector-rejected subtrees run about 2.6x faster with
-    almost no allocation), NbtComparer compares without boxing (2-12x faster,
+    (NbtReader.Skip runs about 4x faster with almost no allocation, and
+    selector skips up to 7x faster), NbtComparer compares without boxing (2-12x faster,
     zero allocation), int/long arrays read and write in bulk on .NET 8 (up to
     25x faster), exact-size buffer writes serialize once instead of twice
     (about 1.4x faster), and compressed SaveToBuffer reuses pooled memory
