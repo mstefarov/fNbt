@@ -608,7 +608,7 @@ namespace fNbt.Test {
             // NbtFile and NbtCodec share the validation walk
             var doc = new NbtCompound("root") { new NbtString("value", loneSurrogate) };
             using (var ms = new MemoryStream()) {
-                var file = new NbtFile(doc) { Flavor = NbtFlavor.Bedrock };
+                var file = new NbtFile(doc, NbtFlavor.Bedrock);
                 Assert.Throws<NbtFormatException>(() => file.SaveToStream(ms, NbtCompression.None));
                 Assert.AreEqual(0, ms.Length);
             }

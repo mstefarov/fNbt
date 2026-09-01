@@ -24,14 +24,14 @@ namespace fNbt {
         Stack<NbtWriterNode>? ancestors;
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class, with default options
-        /// (<see cref="NbtFlavor.Java"/>, validation on write). </summary>
+        /// <summary> Initializes a new instance of the NbtWriter class with the current defaults
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults). </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="rootTagName"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable. </exception>
         public NbtWriter(Stream stream, string rootTagName)
-            : this(stream, rootTagName, NbtFlavor.Java, true, null) { }
+            : this(stream, rootTagName, NbtOptions.ResolveDefaults()) { }
 
 
         /// <summary> Initializes a new instance of the NbtWriter class. </summary>
@@ -46,7 +46,7 @@ namespace fNbt {
 
 
         /// <summary> Initializes a new instance of the NbtWriter class for the given flavor,
-        /// with otherwise-default options. </summary>
+        /// with the current default policy settings. </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
         /// <param name="flavor"> Encoding to write with. </param>
@@ -55,14 +55,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor)
-            : this(stream, rootTagName, ValidFlavor(flavor), true, null) { }
-
-
-        static NbtFlavor ValidFlavor(NbtFlavor flavor) {
-            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
-            flavor.EnsureUsableForFiles(nameof(flavor));
-            return flavor;
-        }
+            : this(stream, rootTagName, NbtOptions.ResolveForFile(flavor, nameof(flavor))) { }
 
 
         /// <summary> Initializes a new instance of the NbtWriter class with the given options.
@@ -77,18 +70,15 @@ namespace fNbt {
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtOptions options)
-            : this(stream, rootTagName, NbtOptions.SnapshotFileFlavor(options), options.ValidateOnWrite,
-                   NbtOptions.SnapshotMaxAllocation(options)) { }
+            : this(stream, rootTagName, NbtOptions.ResolveForFile(options, nameof(options))) { }
 
 
-        // maxAllocation is validated by the callers and otherwise unused: writing allocates
-        // nothing based on input
-        NbtWriter(Stream stream, string rootTagName, NbtFlavor flavor, bool validateOnWrite,
-                  long? maxAllocation) {
+        // Resolve validates MaxAllocation; writing itself allocates nothing based on input
+        NbtWriter(Stream stream, string rootTagName, NbtOptions.Resolved resolved) {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
-            this.flavor = flavor;
+            flavor = resolved.Flavor;
             writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
-            validates = validateOnWrite && flavor.HasRestrictions;
+            validates = resolved.ValidateOnWrite && flavor.HasRestrictions;
             if (validates) {
                 maxTagType = flavor.MaxTagType;
                 writer.SetMaxStringBytes(flavor.MaxStringBytes);

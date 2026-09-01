@@ -3,7 +3,7 @@ using System.IO;
 
 namespace fNbt.Test {
     // NbtOptions plumbing through NbtFile, NbtReader, and NbtWriter, and the
-    // legacy BigEndian knobs translating to flavors.
+    // legacy BigEndian getters reflecting flavors.
     [TestClass]
     public class FlavorPlumbingTests {
         static NbtCompound MakeSampleRoot(string name) {
@@ -17,51 +17,40 @@ namespace fNbt.Test {
         [TestMethod]
         public void NbtFileFlavorRoundTrip() {
             NbtCompound root = MakeSampleRoot("hello");
-            var file = new NbtFile(root) { Flavor = NbtFlavor.Bedrock };
+            var file = new NbtFile(root, NbtFlavor.Bedrock);
             byte[] doc = file.SaveToBuffer(NbtCompression.None);
 
             // Bytes match the codec's little-endian output exactly
             CollectionAssert.AreEqual(NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root), doc);
 
-            var reloaded = new NbtFile { Flavor = NbtFlavor.Bedrock };
+            var reloaded = new NbtFile(NbtFlavor.Bedrock);
             reloaded.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
             Assert.IsTrue(NbtComparer.Instance.Equals(root, reloaded.RootTag));
         }
 
 
         [TestMethod]
-        public void ObsoleteBigEndianMapsToFlavor() {
+        public void ObsoleteBigEndianReflectsFlavor() {
 #pragma warning disable 618 // testing the obsolete surface on purpose
-            var file = new NbtFile();
-            file.BigEndian = false;
-            Assert.AreSame(NbtFlavor.Bedrock, file.Flavor);
-            file.BigEndian = true;
-            Assert.AreSame(NbtFlavor.Java, file.Flavor);
-
-            file.Flavor = NbtFlavor.ClassiCube;
-            Assert.IsTrue(file.BigEndian);
-
-            // Setting a matching endianness keeps the current flavor
-            file.BigEndian = true;
-            Assert.AreSame(NbtFlavor.ClassiCube, file.Flavor);
-            file.BigEndian = false;
-            Assert.AreSame(NbtFlavor.Bedrock, file.Flavor);
+            Assert.IsTrue(new NbtFile().BigEndian);
+            Assert.IsFalse(new NbtFile(NbtFlavor.Bedrock).BigEndian);
+            Assert.IsTrue(new NbtFile(NbtFlavor.ClassiCube).BigEndian);
 #pragma warning restore 618
         }
 
 
         [TestMethod]
-        public void ObsoleteBigEndianByDefaultMapsToDefaultFlavor() {
+        public void ObsoleteBigEndianByDefaultReflectsDefaultFlavor() {
 #pragma warning disable 618
             try {
-                NbtFile.BigEndianByDefault = false;
-                Assert.AreSame(NbtFlavor.Bedrock, NbtFile.DefaultFlavor);
+                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+                Assert.IsFalse(NbtFile.BigEndianByDefault);
                 Assert.AreSame(NbtFlavor.Bedrock, new NbtFile().Flavor);
 
-                NbtFile.BigEndianByDefault = true;
-                Assert.AreSame(NbtFlavor.Java, NbtFile.DefaultFlavor);
+                NbtOptions.DefaultFlavor = NbtFlavor.Java;
+                Assert.IsTrue(NbtFile.BigEndianByDefault);
             } finally {
-                NbtFile.DefaultFlavor = NbtFlavor.Java;
+                NbtOptions.DefaultFlavor = NbtFlavor.Java;
             }
 #pragma warning restore 618
         }
@@ -70,10 +59,10 @@ namespace fNbt.Test {
         [TestMethod]
         public void FileApisRejectUnnamedRootFlavors() {
             // JavaNetwork has no root name, which the named-root APIs cannot express
-            Assert.Throws<ArgumentException>(() => new NbtFile().Flavor = NbtFlavor.JavaNetwork);
+            Assert.Throws<ArgumentException>(() => new NbtFile(NbtFlavor.JavaNetwork));
             Assert.Throws<ArgumentException>(
                 () => new NbtFile(new NbtOptions { Flavor = NbtFlavor.JavaNetwork }));
-            Assert.Throws<ArgumentException>(() => NbtFile.DefaultFlavor = NbtFlavor.JavaNetwork);
+            Assert.Throws<ArgumentException>(() => NbtOptions.DefaultFlavor = NbtFlavor.JavaNetwork);
 
             using (var ms = new MemoryStream(new byte[] { 0x0A })) {
                 Assert.Throws<ArgumentException>(() => new NbtReader(ms, NbtFlavor.JavaNetwork));
@@ -106,7 +95,7 @@ namespace fNbt.Test {
                 NbtFlavor.Bedrock, NbtFlavor.BedrockNetwork, NbtFlavor.ClassiCube
             };
             foreach (NbtFlavor flavor in flavors) {
-                byte[] doc = new NbtFile(new NbtCompound("rootName")) { Flavor = flavor }
+                byte[] doc = new NbtFile(new NbtCompound("rootName"), flavor)
                     .SaveToBuffer(NbtCompression.None);
                 using (var ms = new MemoryStream(doc)) {
                     Assert.AreEqual("rootName",
@@ -139,7 +128,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void ReadRootTagNameTakesFlavor() {
             NbtCompound root = MakeSampleRoot("hello");
-            byte[] doc = new NbtFile(root) { Flavor = NbtFlavor.Bedrock }.SaveToBuffer(NbtCompression.None);
+            byte[] doc = new NbtFile(root, NbtFlavor.Bedrock).SaveToBuffer(NbtCompression.None);
             using (var ms = new MemoryStream(doc)) {
                 Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.Bedrock));
             }

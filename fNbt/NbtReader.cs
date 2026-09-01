@@ -18,13 +18,13 @@ namespace fNbt {
         readonly bool canSeekStream;
 
 
-        /// <summary> Initializes a new instance of the NbtReader class, with default options
-        /// (<see cref="NbtFlavor.Java"/>, no validation, no limits). </summary>
+        /// <summary> Initializes a new instance of the NbtReader class with the current defaults
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults). </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable. </exception>
         public NbtReader(Stream stream)
-            : this(stream, NbtFlavor.Java, false, null) { }
+            : this(stream, NbtOptions.ResolveDefaults()) { }
 
 
         /// <summary> Initializes a new instance of the NbtReader class. </summary>
@@ -38,21 +38,14 @@ namespace fNbt {
 
 
         /// <summary> Initializes a new instance of the NbtReader class for the given flavor,
-        /// with otherwise-default options. </summary>
+        /// with the current default policy settings. </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <param name="flavor"> Encoding to read with. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         public NbtReader(Stream stream, NbtFlavor flavor)
-            : this(stream, ValidFlavor(flavor), false, null) { }
-
-
-        static NbtFlavor ValidFlavor(NbtFlavor flavor) {
-            if (flavor == null) throw new ArgumentNullException(nameof(flavor));
-            flavor.EnsureUsableForFiles(nameof(flavor));
-            return flavor;
-        }
+            : this(stream, NbtOptions.ResolveForFile(flavor, nameof(flavor))) { }
 
 
         /// <summary> Initializes a new instance of the NbtReader class with the given options.
@@ -66,12 +59,12 @@ namespace fNbt {
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtReader(Stream stream, NbtOptions options)
-            : this(stream, NbtOptions.SnapshotFileFlavor(options), options.ValidateOnRead,
-                   NbtOptions.SnapshotMaxAllocation(options)) { }
+            : this(stream, NbtOptions.ResolveForFile(options, nameof(options))) { }
 
 
-        NbtReader(Stream stream, NbtFlavor flavor, bool validateOnRead, long? maxAllocationOption) {
+        NbtReader(Stream stream, NbtOptions.Resolved resolved) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
+            NbtFlavor flavor = resolved.Flavor;
             Flavor = flavor;
             SkipEndTags = true;
             CacheTagValues = false;
@@ -84,11 +77,10 @@ namespace fNbt {
             }
 
             reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
-            long maxAllocation = maxAllocationOption ?? long.MaxValue;
             NbtFlavor? readValidationFlavor =
-                (validateOnRead && flavor.HasRestrictions) ? flavor : null;
-            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
-                reader.SetLimits(maxAllocation, readValidationFlavor);
+                (resolved.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
+            if (resolved.MaxAllocation != long.MaxValue || readValidationFlavor != null) {
+                reader.SetLimits(resolved.MaxAllocation, readValidationFlavor);
             }
         }
 

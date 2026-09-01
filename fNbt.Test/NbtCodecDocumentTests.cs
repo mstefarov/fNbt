@@ -40,7 +40,7 @@ namespace fNbt.Test {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] codecBytes = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
 
-            var file = new NbtFile(root) { Flavor = NbtFlavor.Java };
+            var file = new NbtFile(root, NbtFlavor.Java);
             byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
             CollectionAssert.AreEqual(fileBytes, codecBytes);
         }
@@ -51,7 +51,7 @@ namespace fNbt.Test {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] codecBytes = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
 
-            var file = new NbtFile(root) { Flavor = NbtFlavor.Bedrock };
+            var file = new NbtFile(root, NbtFlavor.Bedrock);
             byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
             CollectionAssert.AreEqual(fileBytes, codecBytes);
         }

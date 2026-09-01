@@ -175,18 +175,36 @@ namespace fNbt {
         }
 
 
-        // One shared default-options codec per flavor, backing NbtCodec.For.
-        NbtCodec? defaultCodec;
+        // One shared codec per flavor, backing NbtCodec.For, rebuilt when the policy defaults
+        // change. The (policy, codec) pair is a single reference: For is called concurrently in
+        // steady state, and two separate fields could be observed as a mismatched pair.
+        CachedCodec? defaultCodec;
+
+        sealed class CachedCodec {
+            public readonly NbtOptions.PolicySnapshot Policy;
+            public readonly NbtCodec Codec;
+
+            public CachedCodec(NbtOptions.PolicySnapshot policy, NbtCodec codec) {
+                Policy = policy;
+                Codec = codec;
+            }
+        }
 
         internal NbtCodec DefaultCodec {
             get {
-                NbtCodec? codec = defaultCodec;
-                if (codec == null) {
-                    codec = new NbtCodec(this);
-                    // A benign race: codecs are immutable, so either instance works
-                    codec = Interlocked.CompareExchange(ref defaultCodec, codec, null) ?? codec;
+                NbtOptions.PolicySnapshot policy = NbtOptions.CurrentPolicy;
+                CachedCodec? cached = Volatile.Read(ref defaultCodec);
+                if (cached != null && ReferenceEquals(cached.Policy, policy)) {
+                    return cached.Codec;
                 }
-                return codec;
+                var fresh = new CachedCodec(policy, new NbtCodec(new NbtOptions(this, policy)));
+                // A benign race: if another thread published an equivalent pair first, share its
+                // codec; codecs are immutable, so either instance works
+                CachedCodec? witness = Interlocked.CompareExchange(ref defaultCodec, fresh, cached);
+                if (witness != cached && witness != null && ReferenceEquals(witness.Policy, policy)) {
+                    return witness.Codec;
+                }
+                return fresh.Codec;
             }
         }
 

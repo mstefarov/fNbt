@@ -2,13 +2,15 @@
 - Add support for all variants of NBT via new NbtFlavor type. It includes
     Java (the default), JavaAnvil, JavaLegacy, JavaNetwork, Bedrock,
     BedrockNetwork, and ClassiCube. A flavor defines which tag types,
-    encodings, and limits should be used. Choose a default
-    NbtFile.DefaultFlavor, or configure individual NbtFile, NbtReader,
+    encodings, and limits should be used. Choose a default via
+    NbtOptions.DefaultFlavor, or configure individual NbtFile, NbtReader,
     and NbtWriter.
 - Add support for varint encoding when BedrockNetwork flavor is active.
 - Add NbtOptions: combines the flavor, ValidateOnWrite flag (default on),
     ValidateOnRead (default off), and MaxAllocation (defensive opt-in cap
-    on any single allocation during load).
+    on any single allocation during load). Process-wide defaults for all
+    four can be changed via the static NbtOptions.Default* properties;
+    changing a default never affects existing objects.
 - Add NbtCodec, for working with NBT documents that are not "files":
     packet payloads, LevelDB values, NBT embedded in other formats, etc.
     It handles unnamed roots, non-compound roots, absent documents, and
@@ -41,7 +43,13 @@
     list instead of the list itself.
 - Fixed corrupt compressed documents sometimes loading silently. Loads from
     seekable sources now always verify the checksum.
-- Old BigEndian properties and params are deprecated (but still work).
+- NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
+    constructors. To re-save a document under a different flavor, create a
+    new NbtFile over the same RootTag.
+- Old BigEndian properties and params are deprecated. The bool constructors
+    and getters still work, but the BigEndian and BigEndianByDefault setters
+    are removed; use NbtOptions.DefaultFlavor or a flavor constructor
+    instead.
 
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching

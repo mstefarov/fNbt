@@ -153,7 +153,12 @@ namespace fNbt.Test {
             // is (correctly) rejected by Bedrock conformance validation
             var loadedFile = new NbtFile(new NbtOptions { ValidateOnWrite = false });
             loadedFile.LoadFromFile(Path.Combine(TestFiles.DirName, fileName), NbtCompression.AutoDetect, null);
-            loadedFile.Flavor = bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock;
+            // Flavor is fixed at construction; re-saving under another flavor means a new
+            // NbtFile over the same root tag
+            loadedFile = new NbtFile(loadedFile.RootTag, new NbtOptions {
+                Flavor = bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock,
+                ValidateOnWrite = false
+            });
             if (!buffered) {
                 loadedFile.BufferSize = 0;
             }

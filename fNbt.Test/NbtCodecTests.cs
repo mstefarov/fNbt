@@ -23,14 +23,14 @@ namespace fNbt.Test {
             Assert.AreSame(NbtFlavor.Java, options.Flavor);
             Assert.IsFalse(options.ValidateOnRead);
             Assert.IsTrue(options.ValidateOnWrite);
-            Assert.IsNull(options.MaxAllocation);
+            Assert.AreEqual(long.MaxValue, options.MaxAllocation);
 
             // The flavor constructor keeps every other default
             var flavored = new NbtOptions(NbtFlavor.Bedrock);
             Assert.AreSame(NbtFlavor.Bedrock, flavored.Flavor);
             Assert.IsFalse(flavored.ValidateOnRead);
             Assert.IsTrue(flavored.ValidateOnWrite);
-            Assert.IsNull(flavored.MaxAllocation);
+            Assert.AreEqual(long.MaxValue, flavored.MaxAllocation);
             Assert.Throws<ArgumentNullException>(() => new NbtOptions(null));
         }
 

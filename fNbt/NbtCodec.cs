@@ -15,12 +15,14 @@ namespace fNbt {
     /// stop exactly at the end of one document, leaving trailing bytes in place, and accept any
     /// root tag type unless <see cref="NbtOptions.ValidateOnRead"/> is set. Writes enforce the
     /// flavor's root rules, and its conformance rules when <see cref="NbtOptions.ValidateOnWrite"/>
-    /// is set. For one-off use with default options, <see cref="For"/> returns a cached
-    /// per-flavor instance. The .NET 8 build also reads from <c>ReadOnlySpan&lt;byte&gt;</c> and
+    /// is set. For one-off use with the current default options, <see cref="For"/> returns a
+    /// cached per-flavor instance. The .NET 8 build also reads from <c>ReadOnlySpan&lt;byte&gt;</c> and
     /// writes to <c>IBufferWriter&lt;byte&gt;</c>, for pooled buffers and pipelines. </remarks>
     public sealed class NbtCodec {
-        /// <summary> Returns a cached codec with default options for the given flavor,
-        /// for one-off use: <c>NbtCodec.For(NbtFlavor.Bedrock).ReadTag(stream)</c>. </summary>
+        /// <summary> Returns a cached codec with the current default policy settings for the
+        /// given flavor, for one-off use: <c>NbtCodec.For(NbtFlavor.Bedrock).ReadTag(stream)</c>.
+        /// A returned codec never changes; after a policy default changes, a later call returns
+        /// a fresh instance built from the new defaults. </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public static NbtCodec For(NbtFlavor flavor) {
@@ -42,8 +44,8 @@ namespace fNbt {
         readonly bool requireCompoundRootOnRead;
 
 
-        /// <summary> Creates a codec for the given flavor with default options
-        /// (validation on write only, no allocation limit). </summary>
+        /// <summary> Creates a codec for the given flavor with the current default policy
+        /// settings. </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtFlavor flavor)
@@ -56,11 +58,12 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtCodec(NbtOptions options) {
-            flavor = NbtOptions.SnapshotFlavor(options);
-            maxAllocation = NbtOptions.SnapshotMaxAllocation(options) ?? long.MaxValue;
-            validateOnWrite = options.ValidateOnWrite && flavor.HasRestrictions;
-            readValidationFlavor = (options.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
-            requireCompoundRootOnRead = options.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
+            NbtOptions.Resolved resolved = NbtOptions.ResolveForCodec(options, nameof(options));
+            flavor = resolved.Flavor;
+            maxAllocation = resolved.MaxAllocation;
+            validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;
+            readValidationFlavor = (resolved.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
+            requireCompoundRootOnRead = resolved.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
         }
 
 

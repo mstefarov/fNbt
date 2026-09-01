@@ -133,17 +133,17 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void NbtFileRoundTripsUncompressed() {
-            var file = new NbtFile(MakeGoldenTree()) { Flavor = NbtFlavor.BedrockNetwork };
+            var file = new NbtFile(MakeGoldenTree(), NbtFlavor.BedrockNetwork);
             byte[] saved = file.SaveToBuffer(NbtCompression.None);
 
-            var reloaded = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            var reloaded = new NbtFile(NbtFlavor.BedrockNetwork);
             long bytesRead = reloaded.LoadFromBuffer(saved, 0, saved.Length, NbtCompression.None);
             Assert.AreEqual(saved.Length, bytesRead);
             Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, reloaded.RootTag));
 
             // The hand-written golden doc holds the same tags, so it must load to an equal
             // tree even though its children come in another order
-            var golden = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            var golden = new NbtFile(NbtFlavor.BedrockNetwork);
             golden.LoadFromBuffer(GoldenDoc, 0, GoldenDoc.Length, NbtCompression.None);
             Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, golden.RootTag));
         }
@@ -152,7 +152,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void SelectorSkipsVarIntArrays() {
             // The tree-loading skip path must walk varint elements one at a time
-            var file = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            var file = new NbtFile(NbtFlavor.BedrockNetwork);
             file.LoadFromBuffer(GoldenDoc, 0, GoldenDoc.Length, NbtCompression.None,
                                 tag => tag.Name != "ia" && tag.Name != "list" && tag.Name != "L");
             Assert.IsFalse(file.RootTag.Contains("ia"));
@@ -209,7 +209,7 @@ namespace fNbt.Test {
                 reader.ReadToFollowing(); // "x"
                 Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
             }
-            var file = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            var file = new NbtFile(NbtFlavor.BedrockNetwork);
             Assert.Throws<NbtFormatException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => false));
         }
@@ -222,7 +222,7 @@ namespace fNbt.Test {
             byte[] doc = { 0x0A, 0x80, 0x80, 0x80, 0x80, 0x10, 0x00 };
             Assert.Throws<NbtFormatException>(
                 () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _));
-            var file = new NbtFile { Flavor = NbtFlavor.BedrockNetwork };
+            var file = new NbtFile(NbtFlavor.BedrockNetwork);
             Assert.Throws<NbtFormatException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
             using (var ms = new MemoryStream(doc)) {
