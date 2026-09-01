@@ -303,22 +303,7 @@ namespace fNbt {
             tags.Capacity = Math.Min(length, MaxPresizedCapacity);
 
             for (int i = 0; i < length; i++) {
-                NbtTag newTag = ListType switch {
-                    NbtTagType.Byte => new NbtByte(),
-                    NbtTagType.Short => new NbtShort(),
-                    NbtTagType.Int => new NbtInt(),
-                    NbtTagType.Long => new NbtLong(),
-                    NbtTagType.Float => new NbtFloat(),
-                    NbtTagType.Double => new NbtDouble(),
-                    NbtTagType.ByteArray => new NbtByteArray(),
-                    NbtTagType.String => new NbtString(),
-                    NbtTagType.List => new NbtList(),
-                    NbtTagType.Compound => new NbtCompound(),
-                    NbtTagType.IntArray => new NbtIntArray(),
-                    NbtTagType.LongArray => new NbtLongArray(),
-                    // should never happen, since ListType is checked beforehand
-                    _ => throw new NbtFormatException("Unsupported tag type found in a list: " + ListType),
-                };
+                NbtTag newTag = NbtTag.Create(newListType);
                 newTag.Parent = this;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
                     tags.Add(newTag);

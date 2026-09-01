@@ -576,62 +576,8 @@ namespace fNbt {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             while (true) {
                 NbtTagType nextTag = readStream.ReadTagType();
-                NbtTag newTag;
-                switch (nextTag) {
-                    case NbtTagType.End:
-                        return true;
-
-                    case NbtTagType.Byte:
-                        newTag = new NbtByte();
-                        break;
-
-                    case NbtTagType.Short:
-                        newTag = new NbtShort();
-                        break;
-
-                    case NbtTagType.Int:
-                        newTag = new NbtInt();
-                        break;
-
-                    case NbtTagType.Long:
-                        newTag = new NbtLong();
-                        break;
-
-                    case NbtTagType.Float:
-                        newTag = new NbtFloat();
-                        break;
-
-                    case NbtTagType.Double:
-                        newTag = new NbtDouble();
-                        break;
-
-                    case NbtTagType.ByteArray:
-                        newTag = new NbtByteArray();
-                        break;
-
-                    case NbtTagType.String:
-                        newTag = new NbtString();
-                        break;
-
-                    case NbtTagType.List:
-                        newTag = new NbtList();
-                        break;
-
-                    case NbtTagType.Compound:
-                        newTag = new NbtCompound();
-                        break;
-
-                    case NbtTagType.IntArray:
-                        newTag = new NbtIntArray();
-                        break;
-
-                    case NbtTagType.LongArray:
-                        newTag = new NbtLongArray();
-                        break;
-
-                    default:
-                        throw new NbtFormatException("Unsupported tag type found in NBT_Compound: " + nextTag);
-                }
+                if (nextTag == NbtTagType.End) return true;
+                NbtTag newTag = NbtTag.Create(nextTag);
                 newTag.Parent = this;
                 // Assigned to the field: the tag has no name yet, so the property's rename path is dead weight.
                 string tagName = readStream.ReadTagName();

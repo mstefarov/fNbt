@@ -359,6 +359,27 @@ namespace fNbt {
         }
 
 
+        // The one tag-type-to-constructor map. Parse paths validate the type before calling.
+        internal static NbtTag Create(NbtTagType type) {
+            switch (type) {
+                case NbtTagType.Byte: return new NbtByte();
+                case NbtTagType.Short: return new NbtShort();
+                case NbtTagType.Int: return new NbtInt();
+                case NbtTagType.Long: return new NbtLong();
+                case NbtTagType.Float: return new NbtFloat();
+                case NbtTagType.Double: return new NbtDouble();
+                case NbtTagType.ByteArray: return new NbtByteArray();
+                case NbtTagType.String: return new NbtString();
+                case NbtTagType.List: return new NbtList();
+                case NbtTagType.Compound: return new NbtCompound();
+                case NbtTagType.IntArray: return new NbtIntArray();
+                case NbtTagType.LongArray: return new NbtLongArray();
+                default:
+                    throw new NbtFormatException("NBT tag type out of range: " + (int)type);
+            }
+        }
+
+
         /// <summary> Prints contents of this tag, and any child tags, to a string.
         /// Indents the string using multiples of the given indentation string. </summary>
         /// <returns> A string representing contents of this tag, and all child tags (if any). </returns>
