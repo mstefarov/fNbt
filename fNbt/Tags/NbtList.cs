@@ -180,21 +180,7 @@ namespace fNbt {
         public override NbtTag this[int tagIndex] {
             get { return tags[tagIndex]; }
             set {
-                if (value == null) {
-                    throw new ArgumentNullException(nameof(value));
-                } else if (value.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (value == this || value == Parent) {
-                    throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-                } else if (IsDescendantOf(value)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (value.Name != null) {
-                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-                }
-                if (listType != NbtTagType.Unknown && value.TagType != listType) {
-                    throw new ArgumentException("Items in this list must be of type " + listType +
-                                                ". Given type: " + value.TagType);
-                }
+                ValidateCanAttach(value, listType, nameof(value));
                 // Clear the displaced tag's Parent so it doesn't keep pointing at this list
                 NbtTag displaced = tags[tagIndex];
                 if (!ReferenceEquals(displaced, value)) {
@@ -237,6 +223,27 @@ namespace fNbt {
         }
 
 
+        // One checklist for every path that attaches a tag, so no mutation path can skip or
+        // reorder the guards. Takes the type the list would have, so batch validation threads
+        // its running type through the same checks.
+        void ValidateCanAttach(NbtTag tag, NbtTagType effectiveType, string paramName) {
+            if (tag == null) {
+                throw new ArgumentNullException(paramName);
+            } else if (tag.Parent != null) {
+                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+            } else if (IsDescendantOf(tag)) {
+                throw new ArgumentException(tag == this || tag == Parent
+                    ? "A list tag may not be added to itself or to its child tag."
+                    : "A tag may not be added to one of its own descendants.");
+            } else if (tag.Name != null) {
+                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
+            } else if (effectiveType != NbtTagType.Unknown && tag.TagType != effectiveType) {
+                throw new ArgumentException("Items in this list must be of type " + effectiveType +
+                                            ". Given type: " + tag.TagType);
+            }
+        }
+
+
         // Checks that every tag in the batch can be added, without changing any fields.
         // Returns the ListType the list would have after a successful add.
         NbtTagType ValidateForAdd(List<NbtTag> toAdd, string paramName) {
@@ -247,18 +254,8 @@ namespace fNbt {
                     throw new ArgumentNullException(paramName, "A tag in the collection is null.");
                 } else if (!seen.Add(tag)) {
                     throw new ArgumentException("The same tag instance was given more than once.", paramName);
-                } else if (tag.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (tag == this || tag == Parent) {
-                    throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-                } else if (IsDescendantOf(tag)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (tag.Name != null) {
-                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-                } else if (effectiveType != NbtTagType.Unknown && tag.TagType != effectiveType) {
-                    throw new ArgumentException("Items in this list must be of type " + effectiveType +
-                                                ". Given type: " + tag.TagType);
                 }
+                ValidateCanAttach(tag, effectiveType, paramName);
                 effectiveType = tag.TagType;
             }
             return effectiveType;
@@ -401,24 +398,12 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Insert(int tagIndex, NbtTag newTag) {
-            if (newTag == null) {
-                throw new ArgumentNullException(nameof(newTag));
-            }
-            if (listType != NbtTagType.Unknown && newTag.TagType != listType) {
-                throw new ArgumentException("Items in this list must be of type " + listType +
-                                            ". Given type: " + newTag.TagType);
-            } else if (newTag.Parent != null) {
-                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-            } else if (IsDescendantOf(newTag)) {
-                throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            } else if (newTag.Name != null) {
-                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-            }
+            ValidateCanAttach(newTag, listType, nameof(newTag));
             tags.Insert(tagIndex, newTag);
+            newTag.Parent = this;
             if (listType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
-            newTag.Parent = this;
         }
 
 
@@ -438,21 +423,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Add(NbtTag newTag) {
-            if (newTag == null) {
-                throw new ArgumentNullException(nameof(newTag));
-            } else if (newTag.Parent != null) {
-                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-            } else if (newTag == this || newTag == Parent) {
-                throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-            } else if (IsDescendantOf(newTag)) {
-                throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            } else if (newTag.Name != null) {
-                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-            }
-            if (listType != NbtTagType.Unknown && newTag.TagType != listType) {
-                throw new ArgumentException("Items in this list must be of type " + listType + ". Given type: " +
-                                            newTag.TagType);
-            }
+            ValidateCanAttach(newTag, listType, nameof(newTag));
             tags.Add(newTag);
             newTag.Parent = this;
             if (listType == NbtTagType.Unknown) {

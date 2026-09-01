@@ -371,13 +371,8 @@ namespace fNbt {
                     throw new ArgumentNullException(nameof(value));
                 } else if (value.Name != tagName) {
                     throw new ArgumentException("Given tag name must match tag's actual name.");
-                } else if (value.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (value == this) {
-                    throw new ArgumentException("Cannot add tag to itself");
-                } else if (IsDescendantOf(value)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
                 }
+                ValidateCanAttach(value, nameof(value));
                 int position = FindPosition(tagName);
                 if (position < 0) {
                     AppendVerified(value);
@@ -470,21 +465,33 @@ namespace fNbt {
         }
 
 
+        // One checklist for every path that attaches a tag, so no mutation path can skip or
+        // reorder the guards. The duplicate-name check stays with callers, fused into the
+        // index probe.
+        void ValidateCanAttach(NbtTag tag, string paramName) {
+            if (tag == null) {
+                throw new ArgumentNullException(paramName);
+            } else if (tag == this) {
+                throw new ArgumentException("Cannot add tag to itself");
+            } else if (tag.Name == null) {
+                throw new ArgumentException("Only named tags are allowed in compound tags.");
+            } else if (tag.Parent != null) {
+                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+            } else if (IsDescendantOf(tag)) {
+                throw new ArgumentException("A tag may not be added to one of its own descendants.");
+            }
+        }
+
+
         // Checks that every tag in the batch can be added, without changing any fields.
         void ValidateForAdd(List<NbtTag> toAdd, string paramName) {
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
                     throw new ArgumentNullException(paramName, "A tag in the collection is null.");
-                } else if (tag == this) {
-                    throw new ArgumentException("Cannot add tag to itself");
-                } else if (tag.Name == null) {
-                    throw new ArgumentException("Only named tags are allowed in compound tags.");
-                } else if (tag.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (IsDescendantOf(tag)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (Find(tag.Name) != null || !seen.Add(tag.Name)) {
+                }
+                ValidateCanAttach(tag, paramName);
+                if (Find(tag.Name!) != null || !seen.Add(tag.Name!)) {
                     throw new ArgumentException("A tag with the name '" + tag.Name + "' already exists.");
                 }
             }
@@ -700,17 +707,7 @@ namespace fNbt {
         /// or if a tag with the given name already exists in this NbtCompound;
         /// or it already has a Parent; or it is this compound or one of its ancestors. </exception>
         public void Add(NbtTag newTag) {
-            if (newTag == null) {
-                throw new ArgumentNullException(nameof(newTag));
-            } else if (newTag == this) {
-                throw new ArgumentException("Cannot add tag to itself");
-            } else if (newTag.Name == null) {
-                throw new ArgumentException("Only named tags are allowed in compound tags.");
-            } else if (newTag.Parent != null) {
-                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-            } else if (IsDescendantOf(newTag)) {
-                throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            }
+            ValidateCanAttach(newTag, nameof(newTag));
             if (!TryInsert(newTag)) {
                 throw new ArgumentException("A tag with the name '" + newTag.Name + "' already exists.");
             }
