@@ -13,9 +13,11 @@ namespace fNbt {
 
         byte[]? seekBuffer;
         const int SeekBufferSize = 8 * 1024;
+#if NET8_0_OR_GREATER
         // Byte-swapped bulk reads work this many bytes at a time, so the reversal pass runs
         // over data still in cache. 64 KiB divides evenly by every element size.
         const int ReverseChunkBytes = 64 * 1024;
+#endif
         readonly bool bigEndian;
         readonly bool useVarInt;
 

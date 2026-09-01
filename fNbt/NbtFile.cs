@@ -901,7 +901,9 @@ namespace fNbt {
         }
 #endif
 
+#if NET6_0_OR_GREATER
         // ZLibStream throws this on a bad header or checksum. We just want to re-wrap it in a nicer exception.
         const string ZLibExceptionTypeName = "System.IO.Compression.ZLibException";
+#endif
     }
 }
