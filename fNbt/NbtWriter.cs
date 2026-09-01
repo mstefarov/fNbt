@@ -822,7 +822,7 @@ namespace fNbt {
                 EnsureCanGoDown();
             }
             if (tag is NbtList list && list.ListType == NbtTagType.Unknown) {
-                throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+                throw new NbtFormatException(NbtList.UnknownListTypeError);
             }
             // Measured either way: with validation off nothing else checks them before emission
             if (tag.Name != null) MeasureString(tag.Name, nameof(tag), out _);

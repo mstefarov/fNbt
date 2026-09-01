@@ -340,6 +340,19 @@ namespace fNbt {
             return -1;
         }
 
+
+        // Re-key one entry after a rename: same position, new hash. The tombstone may push
+        // load past the threshold.
+        void RekeyEntry(string oldName, string newName) {
+            ulong[]? t = table;
+            if (t == null) return;
+            int position = FindPosition(oldName);
+            TombstoneEntry(t, oldName, position);
+            tombstones++;
+            AddTableEntry(t, NameHash(newName), position);
+            if ((count + tombstones) * 2 >= t.Length) GrowTable();
+        }
+
         #endregion
 
 
@@ -522,15 +535,7 @@ namespace fNbt {
                     "The Parent link is out of sync, most likely because the compound was modified " +
                     "from another thread.");
             }
-            ulong[]? t = table;
-            if (t != null) {
-                // Same position, new hash. The tombstone may push load past the threshold.
-                int position = FindPosition(oldName);
-                TombstoneEntry(t, oldName, position);
-                tombstones++;
-                AddTableEntry(t, NameHash(newName), position);
-                if ((count + tombstones) * 2 >= t.Length) GrowTable();
-            }
+            RekeyEntry(oldName, newName);
         }
 
 
@@ -753,9 +758,7 @@ namespace fNbt {
             if (array.Length - arrayIndex < count) {
                 throw new ArgumentException("Not enough space in the destination array.");
             }
-            if (items != null) {
-                Array.Copy(items, 0, array, arrayIndex, count);
-            }
+            Array.Copy(items, 0, array, arrayIndex, count);
         }
 
 
@@ -829,13 +832,7 @@ namespace fNbt {
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Compound");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", count);
 
             if (count > 0) {

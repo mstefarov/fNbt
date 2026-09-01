@@ -71,7 +71,7 @@ namespace fNbt {
                     var list = (NbtList)tag;
                     if (list.ListType == NbtTagType.Unknown) {
                         // The write pass would refuse this list; fail the same way before it
-                        throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+                        throw new NbtFormatException(NbtList.UnknownListTypeError);
                     }
                     long size = 1 + SizeCount(list.tags.Count, flavor);
                     foreach (NbtTag child in list.tags) {

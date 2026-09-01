@@ -285,13 +285,7 @@ namespace fNbt {
         /// <exception cref="InvalidDataException"> If file compression could not be detected or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public long LoadFromBuffer(byte[] buffer, int index, int length, NbtCompression compression) {
-            if (buffer == null) throw new ArgumentNullException(nameof(buffer));
-
-            using (var ms = new MemoryStream(buffer, index, length)) {
-                LoadFromStream(ms, compression, null);
-                FileName = null;
-                return ms.Position;
-            }
+            return LoadFromBuffer(buffer, index, length, compression, null);
         }
 
 
@@ -339,14 +333,7 @@ namespace fNbt {
             switch (FileCompression) {
                 case NbtCompression.GZip:
                     using (var decStream = new GZipStream(stream, CompressionMode.Decompress, true)) {
-                        if (bufferSize > 0) {
-                            var bufferedStream = new BufferedStream(decStream, bufferSize);
-                            LoadFromStreamInternal(bufferedStream, selector);
-                            DrainToEnd(stream, bufferedStream);
-                        } else {
-                            LoadFromStreamInternal(decStream, selector);
-                            DrainToEnd(stream, decStream);
-                        }
+                        LoadBufferedAndDrain(stream, decStream, selector);
                     }
                     FinishCompressedLoad(stream);
                     break;
@@ -360,14 +347,7 @@ namespace fNbt {
                     // Built-in ZLibStream is faster and validates the checksum too
                     try {
                         using (var decStream = new System.IO.Compression.ZLibStream(stream, CompressionMode.Decompress, true)) {
-                            if (bufferSize > 0) {
-                                var bufferedStream = new BufferedStream(decStream, bufferSize);
-                                LoadFromStreamInternal(bufferedStream, selector);
-                                DrainToEnd(stream, bufferedStream);
-                            } else {
-                                LoadFromStreamInternal(decStream, selector);
-                                DrainToEnd(stream, decStream);
-                            }
+                            LoadBufferedAndDrain(stream, decStream, selector);
                         }
                     } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
                         throw new InvalidDataException("Failed to decompress ZLib data.", ex);
@@ -376,14 +356,7 @@ namespace fNbt {
                     ValidateZLibHeader(stream);
                     // A non-seekable source's trailer is out of reach, so skip the running checksum there
                     using (var decStream = new ZLibStream(stream, CompressionMode.Decompress, true, stream.CanSeek)) {
-                        if (bufferSize > 0) {
-                            var bufferedStream = new BufferedStream(decStream, bufferSize);
-                            LoadFromStreamInternal(bufferedStream, selector);
-                            DrainToEnd(stream, bufferedStream);
-                        } else {
-                            LoadFromStreamInternal(decStream, selector);
-                            DrainToEnd(stream, decStream);
-                        }
+                        LoadBufferedAndDrain(stream, decStream, selector);
                         ValidateZLibChecksum(stream, startOffset, decStream.Checksum);
                     }
 #endif
@@ -415,6 +388,18 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public long LoadFromStream(Stream stream, NbtCompression compression) {
             return LoadFromStream(stream, compression, null);
+        }
+
+
+        void LoadBufferedAndDrain(Stream source, Stream decompressed, TagSelector? selector) {
+            if (bufferSize > 0) {
+                var bufferedStream = new BufferedStream(decompressed, bufferSize);
+                LoadFromStreamInternal(bufferedStream, selector);
+                DrainToEnd(source, bufferedStream);
+            } else {
+                LoadFromStreamInternal(decompressed, selector);
+                DrainToEnd(source, decompressed);
+            }
         }
 
 

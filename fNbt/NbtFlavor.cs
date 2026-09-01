@@ -143,7 +143,7 @@ namespace fNbt {
                     var list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
                     if (list.ListType == NbtTagType.Unknown) {
-                        throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+                        throw new NbtFormatException(NbtList.UnknownListTypeError);
                     }
                     if (list.ListType > MaxTagType) {
                         throw new NbtFormatException(

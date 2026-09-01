@@ -396,6 +396,18 @@ namespace fNbt {
 
         internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget);
 
+
+        // The indented 'TAG_X("name")' prefix shared by every PrettyPrint override
+        internal void PrettyPrintHeader(StringBuilder sb, string indentString, int indentLevel) {
+            for (int i = 0; i < indentLevel; i++) {
+                sb.Append(indentString);
+            }
+            sb.Append(GetCanonicalTagName(TagType));
+            if (!String.IsNullOrEmpty(Name)) {
+                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
+            }
+        }
+
         /// <summary> String to use for indentation in NbtTag's and NbtFile's ToString() methods by default. </summary>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         public static string DefaultIndentString {

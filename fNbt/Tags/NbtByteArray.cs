@@ -115,13 +115,7 @@ namespace fNbt {
 
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Byte_Array");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} bytes]", bytes.Length);
         }
     }
