@@ -104,7 +104,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void NamedContainerDepthFailureWritesNoHeader() {
             using (var ms = new MemoryStream()) {
-                var binaryWriter = new NbtBinaryWriter(ms, true);
+                var binaryWriter = new NbtBinaryWriter(ms, NbtFlavor.Java);
                 Assert.Throws<NbtFormatException>(
                     () => new NbtCompound("c").WriteTag(binaryWriter, 0));
                 Assert.AreEqual(0, ms.Length);

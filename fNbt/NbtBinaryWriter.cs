@@ -43,21 +43,19 @@ namespace fNbt {
         // Java flavors use modified UTF-8; clean BMP strings still take the standard path
         readonly bool modifiedUtf8;
 
-        // Lowered by NbtWriter when write validation is on for a flavor with a smaller ceiling
-        int maxStringBytes = ushort.MaxValue;
-
-        internal void SetMaxStringBytes(int value) {
-            maxStringBytes = Math.Min(ushort.MaxValue, value);
-        }
+        // The non-varint length prefix is an unsigned 16-bit byte count; validation may lower
+        // the ceiling to the flavor's. Varint prefixes ignore this and cap at int.MaxValue.
+        readonly int maxStringBytes;
 
 
-        public NbtBinaryWriter(Stream input, bool bigEndian, bool useVarInt = false, bool modifiedUtf8 = false) {
+        public NbtBinaryWriter(Stream input, NbtFlavor flavor, bool validate = false) {
             if (input == null) throw new ArgumentNullException(nameof(input));
             if (!input.CanWrite) throw new ArgumentException("Given stream must be writable", nameof(input));
             stream = input;
-            swapNeeded = (BitConverter.IsLittleEndian == bigEndian);
-            this.useVarInt = useVarInt;
-            this.modifiedUtf8 = modifiedUtf8;
+            swapNeeded = (BitConverter.IsLittleEndian == flavor.BigEndian);
+            useVarInt = flavor.UsesVarInts;
+            modifiedUtf8 = flavor.UsesModifiedUtf8;
+            maxStringBytes = validate ? Math.Min(ushort.MaxValue, flavor.MaxStringBytes) : ushort.MaxValue;
         }
 
 

@@ -427,7 +427,7 @@ namespace fNbt {
 
 
         NbtBinaryWriter CreateWriter(Stream stream) {
-            return new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
+            return new NbtBinaryWriter(stream, flavor);
         }
 
 
@@ -518,11 +518,7 @@ namespace fNbt {
 
 
         NbtBinaryReader CreateReader(Stream stream) {
-            var reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
-            if (maxAllocation != long.MaxValue || readValidationFlavor != null) {
-                reader.SetLimits(maxAllocation, readValidationFlavor);
-            }
-            return reader;
+            return new NbtBinaryReader(stream, flavor, maxAllocation, readValidationFlavor != null);
         }
 
 

@@ -76,12 +76,7 @@ namespace fNbt {
                 streamStartOffset = stream.Position;
             }
 
-            reader = new NbtBinaryReader(stream, flavor.BigEndian, flavor.UsesVarInts);
-            NbtFlavor? readValidationFlavor =
-                (resolved.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
-            if (resolved.MaxAllocation != long.MaxValue || readValidationFlavor != null) {
-                reader.SetLimits(resolved.MaxAllocation, readValidationFlavor);
-            }
+            reader = new NbtBinaryReader(stream, flavor, resolved.MaxAllocation, resolved.ValidateOnRead);
         }
 
 

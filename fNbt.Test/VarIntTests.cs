@@ -9,7 +9,7 @@ namespace fNbt.Test {
     public class VarIntTests {
         static byte[] WriteInt32(int value) {
             using (var ms = new MemoryStream()) {
-                new NbtBinaryWriter(ms, false, true).Write(value);
+                new NbtBinaryWriter(ms, NbtFlavor.BedrockNetwork).Write(value);
                 return ms.ToArray();
             }
         }
@@ -17,14 +17,14 @@ namespace fNbt.Test {
 
         static byte[] WriteInt64(long value) {
             using (var ms = new MemoryStream()) {
-                new NbtBinaryWriter(ms, false, true).Write(value);
+                new NbtBinaryWriter(ms, NbtFlavor.BedrockNetwork).Write(value);
                 return ms.ToArray();
             }
         }
 
 
         static NbtBinaryReader VarIntReader(byte[] bytes) {
-            return new NbtBinaryReader(new MemoryStream(bytes), false, true);
+            return new NbtBinaryReader(new MemoryStream(bytes), NbtFlavor.BedrockNetwork);
         }
 
 
@@ -88,14 +88,14 @@ namespace fNbt.Test {
         public void StringLengthPrefixIsUnsignedVarInt() {
             // Short string: single-byte length prefix
             using (var ms = new MemoryStream()) {
-                new NbtBinaryWriter(ms, false, true).Write("hi");
+                new NbtBinaryWriter(ms, NbtFlavor.BedrockNetwork).Write("hi");
                 CollectionAssert.AreEqual(new byte[] { 0x02, (byte)'h', (byte)'i' }, ms.ToArray());
             }
 
             // 200 bytes forces a two-byte length prefix (0xC8 0x01), NOT zigzag (which would be 0x90 0x03)
             string longString = new string('a', 200);
             using (var ms = new MemoryStream()) {
-                new NbtBinaryWriter(ms, false, true).Write(longString);
+                new NbtBinaryWriter(ms, NbtFlavor.BedrockNetwork).Write(longString);
                 byte[] doc = ms.ToArray();
                 Assert.AreEqual(0xC8, doc[0]);
                 Assert.AreEqual(0x01, doc[1]);
@@ -200,13 +200,13 @@ namespace fNbt.Test {
         public void FixedWidthTypesAreUnaffectedByVarIntMode() {
             // Shorts, floats, and doubles stay fixed-width little-endian in the varint encoding
             using (var ms = new MemoryStream()) {
-                var writer = new NbtBinaryWriter(ms, false, true);
+                var writer = new NbtBinaryWriter(ms, NbtFlavor.BedrockNetwork);
                 writer.Write((short)-2);
                 writer.Write(1.5f);
                 writer.Write(-2.5);
                 ms.Position = 0;
 
-                var reader = new NbtBinaryReader(ms, false, true);
+                var reader = new NbtBinaryReader(ms, NbtFlavor.BedrockNetwork);
                 Assert.AreEqual((short)-2, reader.ReadInt16());
                 Assert.AreEqual(1.5f, reader.ReadSingle());
                 Assert.AreEqual(-2.5, reader.ReadDouble());

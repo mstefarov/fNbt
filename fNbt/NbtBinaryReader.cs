@@ -38,27 +38,15 @@ namespace fNbt {
             public string Value;
         }
 
-        // Opt-in limits, set at most once by whichever entry point owns this reader, before
-        // any parsing. Defaults keep every check a single always-false comparison.
-        // maxStringBytes folds MaxAllocation in and guards reads, which allocate; skipped
-        // strings enforce only the flavor's own ceiling, since skips allocate nothing.
-        long maxAllocation = long.MaxValue;
-        int maxStringBytes = int.MaxValue;
-        int flavorMaxStringBytes = int.MaxValue;
-        NbtTagType maxTagType = NbtTagType.LongArray;
-        string? tagTypeLimitSource;
-
-
-        internal void SetLimits(long newMaxAllocation, NbtFlavor? readValidationFlavor) {
-            maxAllocation = newMaxAllocation;
-            maxStringBytes = (int)Math.Min(int.MaxValue, newMaxAllocation);
-            if (readValidationFlavor != null) {
-                maxTagType = readValidationFlavor.MaxTagType;
-                flavorMaxStringBytes = readValidationFlavor.MaxStringBytes;
-                maxStringBytes = Math.Min(maxStringBytes, flavorMaxStringBytes);
-                tagTypeLimitSource = readValidationFlavor.Name;
-            }
-        }
+        // Opt-in limits, fixed at construction. Defaults keep every check a single
+        // always-false comparison. maxStringBytes folds MaxAllocation in and guards reads,
+        // which allocate; skipped strings enforce only the flavor's own ceiling, since skips
+        // allocate nothing.
+        readonly NbtFlavor flavor;
+        readonly long maxAllocation;
+        readonly int maxStringBytes;
+        readonly int flavorMaxStringBytes = int.MaxValue;
+        readonly NbtTagType maxTagType = NbtTagType.LongArray;
 
 
         // Opt-in cap on any single allocation driven by a length declared in the input
@@ -70,12 +58,21 @@ namespace fNbt {
             }
         }
 
-        public NbtBinaryReader(Stream input, bool bigEndian, bool useVarInt) {
+        public NbtBinaryReader(Stream input, NbtFlavor flavor,
+                               long maxAllocation = long.MaxValue, bool validate = false) {
             if (input == null) throw new ArgumentNullException(nameof(input));
             if (!input.CanRead) throw new ArgumentException("Given stream must be readable.", nameof(input));
             stream = input;
-            this.bigEndian = bigEndian;
-            this.useVarInt = useVarInt;
+            this.flavor = flavor;
+            bigEndian = flavor.BigEndian;
+            useVarInt = flavor.UsesVarInts;
+            this.maxAllocation = maxAllocation;
+            maxStringBytes = (int)Math.Min(int.MaxValue, maxAllocation);
+            if (validate && flavor.HasRestrictions) {
+                maxTagType = flavor.MaxTagType;
+                flavorMaxStringBytes = flavor.MaxStringBytes;
+                maxStringBytes = Math.Min(maxStringBytes, flavorMaxStringBytes);
+            }
         }
 
 
@@ -110,7 +107,7 @@ namespace fNbt {
                 }
                 throw new NbtFormatException(
                     NbtTag.GetCanonicalTagName((NbtTagType)type) + " is not permitted by the " +
-                    tagTypeLimitSource + " flavor.");
+                    flavor.Name + " flavor.");
             }
             return (NbtTagType)type;
         }

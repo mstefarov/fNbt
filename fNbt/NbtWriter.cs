@@ -77,11 +77,10 @@ namespace fNbt {
         NbtWriter(Stream stream, string rootTagName, NbtOptions.Resolved resolved) {
             if (rootTagName == null) throw new ArgumentNullException(nameof(rootTagName));
             flavor = resolved.Flavor;
-            writer = new NbtBinaryWriter(stream, flavor.BigEndian, flavor.UsesVarInts, flavor.UsesModifiedUtf8);
             validates = resolved.ValidateOnWrite && flavor.HasRestrictions;
+            writer = new NbtBinaryWriter(stream, flavor, validates);
             if (validates) {
                 maxTagType = flavor.MaxTagType;
-                writer.SetMaxStringBytes(flavor.MaxStringBytes);
             }
             int nameBytes = MeasureString(rootTagName, nameof(rootTagName), out bool nameModified);
             writer.Write((byte)NbtTagType.Compound);
@@ -170,6 +169,25 @@ namespace fNbt {
         }
 
 
+        // Everything BeginList refuses regardless of the name: element type against the
+        // wire format and the flavor ceiling, size against the format
+        void ValidateListHeader(NbtTagType elementType, int size) {
+            if (size < 0) {
+                throw new ArgumentOutOfRangeException(nameof(size), "List size may not be negative.");
+            }
+            // Modern Minecraft (Java and Bedrock) uses TAG_End as the element type of an empty list.
+            if (elementType < NbtTagType.Byte || elementType > NbtTagType.LongArray) {
+                if (elementType != NbtTagType.End || size != 0) {
+                    throw new ArgumentOutOfRangeException(nameof(elementType));
+                }
+            }
+            if (elementType > maxTagType) {
+                throw new NbtFormatException(
+                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
+            }
+        }
+
+
         /// <summary> Begins an unnamed list tag. </summary>
         /// <param name="elementType"> Type of elements of this list. </param>
         /// <param name="size"> Number of elements in this list. Must not be negative. </param>
@@ -182,19 +200,7 @@ namespace fNbt {
         /// <paramref name="elementType"/> is not a valid list element type
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(NbtTagType elementType, int size) {
-            if (size < 0) {
-                throw new ArgumentOutOfRangeException(nameof(size), "List size may not be negative.");
-            }
-            // Modern Minecraft (Java and Bedrock) uses TAG_End as the element type of an empty list.
-            if (elementType < NbtTagType.Byte || elementType > NbtTagType.LongArray) {
-                if (elementType != NbtTagType.End || size != 0) {
-                    throw new ArgumentOutOfRangeException(nameof(elementType));
-                }
-            }
-            if (elementType > maxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
-            }
+            ValidateListHeader(elementType, size);
             ValidateConstraints(null, NbtTagType.List);
             EnsureCanGoDown();
             NbtTagType parentType = BeginEmission();
@@ -205,8 +211,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Begins an unnamed list tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Begins a named list tag. </summary>
+        /// <param name="tagName"> Name to give to this list tag. May not be null. </param>
         /// <param name="elementType"> Type of elements of this list. </param>
         /// <param name="size"> Number of elements in this list. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
@@ -217,19 +223,7 @@ namespace fNbt {
         /// <paramref name="elementType"/> is not a valid list element type
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(string tagName, NbtTagType elementType, int size) {
-            if (size < 0) {
-                throw new ArgumentOutOfRangeException(nameof(size), "List size may not be negative.");
-            }
-            // Modern Minecraft (Java and Bedrock) uses TAG_End as the element type of an empty list.
-            if (elementType < NbtTagType.Byte || elementType > NbtTagType.LongArray) {
-                if (elementType != NbtTagType.End || size != 0) {
-                    throw new ArgumentOutOfRangeException(nameof(elementType));
-                }
-            }
-            if (elementType > maxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
-            }
+            ValidateListHeader(elementType, size);
             ValidateConstraints(tagName, NbtTagType.List);
             int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
             EnsureCanGoDown();
@@ -553,15 +547,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="dataSource"/> is null. </exception>
         /// <exception cref="ArgumentException"> Given stream does not support reading. </exception>
         public void WriteByteArray(Stream dataSource, int count) {
-            if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
-            if (!dataSource.CanRead) {
-                throw new ArgumentException("Given stream does not support reading.", nameof(dataSource));
-            } else if (count < 0) {
-                throw new ArgumentOutOfRangeException(nameof(count), "count may not be negative");
-            }
-            int bufferSize = Math.Min(count, MaxStreamCopyBufferSize);
-            var streamCopyBuffer = new byte[bufferSize];
-            WriteByteArray(dataSource, count, streamCopyBuffer);
+            WriteByteArray(dataSource, count, AllocateStreamCopyBuffer(dataSource, count));
         }
 
 
@@ -577,15 +563,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> Given stream does not support reading -OR-
         /// <paramref name="buffer"/> size is 0. </exception>
         public void WriteByteArray(Stream dataSource, int count, byte[] buffer) {
-            if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
-            if (buffer == null) throw new ArgumentNullException(nameof(buffer));
-            if (!dataSource.CanRead) {
-                throw new ArgumentException("Given stream does not support reading.", nameof(dataSource));
-            } else if (count < 0) {
-                throw new ArgumentOutOfRangeException(nameof(count), "count may not be negative");
-            } else if (buffer.Length == 0 && count > 0) {
-                throw new ArgumentException("buffer size must be greater than 0 when count is greater than 0", nameof(buffer));
-            }
+            ValidateByteArraySource(dataSource, count, buffer);
             ValidateConstraints(null, NbtTagType.ByteArray);
             NbtTagType parentType = BeginEmission();
             WriteByteArrayFromStreamImpl(dataSource, count, buffer);
@@ -605,13 +583,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="dataSource"/> is null. </exception>
         /// <exception cref="ArgumentException"> Given stream does not support reading. </exception>
         public void WriteByteArray(string tagName, Stream dataSource, int count) {
-            if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
-            if (count < 0) {
-                throw new ArgumentOutOfRangeException(nameof(count), "count may not be negative");
-            }
-            int bufferSize = Math.Min(count, MaxStreamCopyBufferSize);
-            var streamCopyBuffer = new byte[bufferSize];
-            WriteByteArray(tagName, dataSource, count, streamCopyBuffer);
+            WriteByteArray(tagName, dataSource, count, AllocateStreamCopyBuffer(dataSource, count));
         }
 
 
@@ -628,6 +600,29 @@ namespace fNbt {
         /// <paramref name="buffer"/> size is 0. </exception>
         public void WriteByteArray(string tagName, Stream dataSource, int count,
                                    byte[] buffer) {
+            ValidateByteArraySource(dataSource, count, buffer);
+            ValidateConstraints(tagName, NbtTagType.ByteArray);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
+            WriteByteArrayFromStreamImpl(dataSource, count, buffer);
+            CommitEmission(parentType);
+        }
+
+
+        // Shared argument checks for the stream-sourced WriteByteArray pairs above
+        static byte[] AllocateStreamCopyBuffer(Stream dataSource, int count) {
+            if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
+            if (!dataSource.CanRead) {
+                throw new ArgumentException("Given stream does not support reading.", nameof(dataSource));
+            } else if (count < 0) {
+                throw new ArgumentOutOfRangeException(nameof(count), "count may not be negative");
+            }
+            return new byte[Math.Min(count, MaxStreamCopyBufferSize)];
+        }
+
+
+        static void ValidateByteArraySource(Stream dataSource, int count, byte[] buffer) {
             if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
             if (!dataSource.CanRead) {
@@ -635,14 +630,9 @@ namespace fNbt {
             } else if (count < 0) {
                 throw new ArgumentOutOfRangeException(nameof(count), "count may not be negative");
             } else if (buffer.Length == 0 && count > 0) {
-                throw new ArgumentException("buffer size must be greater than 0 when count is greater than 0", nameof(buffer));
+                throw new ArgumentException("buffer size must be greater than 0 when count is greater than 0",
+                                            nameof(buffer));
             }
-            ValidateConstraints(tagName, NbtTagType.ByteArray);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
-            WriteByteArrayFromStreamImpl(dataSource, count, buffer);
-            CommitEmission(parentType);
         }
 
 
