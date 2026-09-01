@@ -7,7 +7,9 @@ namespace fNbt {
     /// string encoding, and skipping. Multi-byte values compose directly in wire order. </summary>
     internal sealed unsafe class NbtBinaryReader {
         readonly Stream stream;
-        readonly byte[] buffer = new byte[sizeof(double)];
+        // Scratch for primitive composes (first 8 bytes) and sub-64-byte string payloads;
+        // the two uses never overlap
+        readonly byte[] buffer = new byte[64];
 
         byte[]? seekBuffer;
         const int SeekBufferSize = 8 * 1024;
@@ -16,7 +18,6 @@ namespace fNbt {
         const int ReverseChunkBytes = 64 * 1024;
         readonly bool bigEndian;
         readonly bool useVarInt;
-        readonly byte[] stringConversionBuffer = new byte[64];
 
         // Bounded name cache backing ReadTagName. Capped so that a huge all-unique document
         // cannot grow an unbounded side table, and activated late so a reader that parses
@@ -242,24 +243,12 @@ namespace fNbt {
 
         public string ReadString() {
             int length = ReadStringLength(maxStringBytes);
-            if (length < stringConversionBuffer.Length) {
-                FillStringConversionBuffer(length);
-                return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
+            if (length == 0) return "";
+            if (length < buffer.Length) {
+                FillBuffer(length);
+                return NbtStringCodec.Decode(buffer, 0, length);
             }
             return ReadLongString(length);
-        }
-
-
-        void FillStringConversionBuffer(int length) {
-            int stringBytesRead = 0;
-            while (stringBytesRead < length) {
-                int bytesToRead = length - stringBytesRead;
-                int bytesReadThisTime = BaseStream.Read(stringConversionBuffer, stringBytesRead, bytesToRead);
-                if (bytesReadThisTime == 0) {
-                    throw new EndOfStreamException();
-                }
-                stringBytesRead += bytesReadThisTime;
-            }
         }
 
 
@@ -290,14 +279,14 @@ namespace fNbt {
         public string ReadTagName() {
             int length = ReadStringLength(maxStringBytes);
             if (length == 0) return "";
-            if (length >= stringConversionBuffer.Length) {
+            if (length >= buffer.Length) {
                 return ReadLongString(length);
             }
-            FillStringConversionBuffer(length);
+            FillBuffer(length);
             if (nameCache == null) {
                 // Tiny documents never repay a table, and one that proved useless stays off
                 if (nameCacheDisabled || ++namesRead < NameCacheActivation) {
-                    return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
+                    return NbtStringCodec.Decode(buffer, 0, length);
                 }
                 nameCache = new NameCacheEntry[NameCacheInitialSlots];
             }
@@ -311,9 +300,9 @@ namespace fNbt {
             if ((++nameLookups & 1023) == 0 && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;
-                return NbtStringCodec.Decode(stringConversionBuffer, 0, length);
+                return NbtStringCodec.Decode(this.buffer, 0, length);
             }
-            byte[] buffer = stringConversionBuffer;
+            byte[] buffer = this.buffer;
             uint hash = 2166136261u;
             for (int i = 0; i < length; i++) {
                 hash = (hash ^ buffer[i]) * 16777619u;
