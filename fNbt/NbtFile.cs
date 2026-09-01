@@ -583,8 +583,8 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
-                // Sizing the tree up front buys an exact array from a single write pass, where
-                // this used to serialize twice. Validation now happens once, in the write.
+                // Sizing up front buys an exact array from a single write pass.
+                // Flavor validation happens in the write.
                 long size = NbtSizer.SizeDocument(rootTag, withName: true, flavor);
                 if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");

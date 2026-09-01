@@ -207,9 +207,8 @@ namespace fNbt.Test {
         }
 
 
-        // Skip math used 32-bit arithmetic. A length whose byte count is a multiple of 2^32
-        // wrapped to a zero-byte skip, letting the parser "cleanly" walk a document that was
-        // never actually read.
+        // A length whose byte count is a multiple of 2^32 once wrapped to a zero-byte skip,
+        // letting the parser "cleanly" walk a document that was never read.
         [TestMethod]
         public void IntArraySkipDoesNotWrapToZero() {
             // IntArray of 0x40000000 => 0x100000000 bytes, wraps to 0 in 32-bit

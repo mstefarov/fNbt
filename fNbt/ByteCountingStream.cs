@@ -2,7 +2,7 @@ using System;
 using System.IO;
 
 namespace fNbt {
-    // Class used to count bytes read-from/written-to non-seekable streams.
+    // Counts bytes read from and written to non-seekable streams.
     internal sealed class ByteCountingStream : Stream {
         readonly Stream baseStream;
 

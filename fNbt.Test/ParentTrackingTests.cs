@@ -3,7 +3,6 @@ using System;
 namespace fNbt.Test {
     [TestClass]
     public class ParentTrackingTests {
-        // Bugfix regression tests:
         // Indexer setters used to leave the displaced tag with Parent still pointing at the container.
         [TestMethod]
         public void CompoundIndexerClearsDisplacedParent() {

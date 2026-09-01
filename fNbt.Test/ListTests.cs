@@ -327,7 +327,6 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CopyConstructorSetsParents() {
-            // Bugfix regression test:
             // The copy constructor used to leave cloned children with Parent == null.
             var original = new NbtList("original", NbtTagType.Int) {
                 new NbtInt(1),
