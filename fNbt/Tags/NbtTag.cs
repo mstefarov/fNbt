@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
@@ -360,6 +361,8 @@ namespace fNbt {
 
 
         // The one tag-type-to-constructor map. Parse paths validate the type before calling.
+        // Inlined so each parse site keeps its own jump table.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static NbtTag Create(NbtTagType type) {
             switch (type) {
                 case NbtTagType.Byte: return new NbtByte();
