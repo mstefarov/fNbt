@@ -48,8 +48,6 @@ namespace fNbt {
         }
 
 
-        #region Reading / Writing
-
         internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.ReadInt64();
@@ -71,8 +69,6 @@ namespace fNbt {
         internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value);
         }
-
-        #endregion
 
 
         /// <inheritdoc />

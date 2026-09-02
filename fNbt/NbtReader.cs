@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -67,7 +66,6 @@ namespace fNbt {
             NbtFlavor flavor = resolved.Flavor;
             Flavor = flavor;
             SkipEndTags = true;
-            CacheTagValues = false;
             ParentTagType = NbtTagType.Unknown;
             TagType = NbtTagType.Unknown;
 
@@ -138,7 +136,7 @@ namespace fNbt {
             get { return (TagType == NbtTagType.List); }
         }
 
-        /// <summary> Whether the current tag has length (Lists, ByteArrays, and IntArrays have length).
+        /// <summary> Whether the current tag has length (Lists, ByteArrays, IntArrays, and LongArrays have length).
         /// Compound tags also have length, technically, but it is not known until all child tags are read. </summary>
         public bool HasLength {
             get {
@@ -175,7 +173,7 @@ namespace fNbt {
         /// <summary> If the current tag is TAG_List, returns type of the list elements. </summary>
         public NbtTagType ListType { get; private set; }
 
-        /// <summary> If the current tag is TAG_List, TAG_Byte_Array, or TAG_Int_Array, returns the number of elements. </summary>
+        /// <summary> If the current tag is TAG_List, TAG_Byte_Array, TAG_Int_Array, or TAG_Long_Array, returns the number of elements. </summary>
         public int TagLength { get; private set; }
 
         /// <summary> If the parent tag is TAG_List, returns the number of elements. </summary>
@@ -226,7 +224,6 @@ namespace fNbt {
                         TagStartOffset = (int)(reader.BaseStream.Position - streamStartOffset);
                     }
 
-                    // set state to error in case reader.ReadTagType throws.
                     TagType = reader.ReadTagType();
                     state = NbtParseState.InCompound;
 
@@ -461,7 +458,7 @@ namespace fNbt {
         /// <param name="tagName"> Name of the tag. May be null (to look for next unnamed tag). </param>
         /// <returns> <c>true</c> if a matching tag is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidOperationException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         public bool ReadToFollowing(string? tagName) {
             while (ReadToFollowing()) {
                 if (TagName == tagName) {
@@ -527,7 +524,7 @@ namespace fNbt {
         /// <param name="tagName"> The name of the sibling tag you wish to move to. </param>
         /// <returns> <c>true</c> if a matching sibling element is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidOperationException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         public bool ReadToNextSibling(string? tagName) {
             while (ReadToNextSibling()) {
                 if (TagName == tagName) {
@@ -931,7 +928,7 @@ namespace fNbt {
                     return val;
                 }
 
-                var result = new T[elementsToRead];
+                T[] result = new T[elementsToRead];
                 if (typeof(T) == typeof(short) && elementType == NbtTagType.Short) {
                     short[] typed = (short[])(object)result;
                     for (int i = 0; i < elementsToRead; i++) typed[i] = reader.ReadInt16();
@@ -1102,7 +1099,7 @@ namespace fNbt {
         /// <param name="includeValue"> If set to <c>true</c>, also reads and prints the current tag's value. </param>
         public string ToString(bool includeValue, string indentString) {
             if (indentString == null) throw new ArgumentNullException(nameof(indentString));
-            var sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             for (int i = 0; i < Depth; i++) {
                 sb.Append(indentString);
             }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -69,7 +68,7 @@ namespace fNbt {
         public NbtCompound(string? tagName, IEnumerable<NbtTag> tags) {
             if (tags == null) throw new ArgumentNullException(nameof(tags));
             name = tagName;
-            var toAdd = new List<NbtTag>(tags);
+            List<NbtTag> toAdd = new List<NbtTag>(tags);
             // Validate first, so a bad batch doesn't leave any tags pointing to a half-constructed parent.
             ValidateForAdd(toAdd, nameof(tags));
             EnsureCapacity(toAdd.Count);
@@ -94,9 +93,9 @@ namespace fNbt {
             name = other.name;
             // Sized up front, and fresh clones can't be duplicate keys or cycles: no revalidation.
             EnsureCapacity(other.count);
-            NbtTag[]? otherItems = other.items;
+            NbtTag[] otherItems = other.items;
             for (int i = 0; i < other.count; i++) {
-                NbtTag childClone = otherItems![i].Clone(childDepthBudget);
+                NbtTag childClone = otherItems[i].Clone(childDepthBudget);
                 AppendVerified(childClone);
                 childClone.Parent = this;
             }
@@ -215,7 +214,7 @@ namespace fNbt {
         [MethodImpl(MethodImplOptions.NoInlining)]
         void AppendWithResize(NbtTag tag) {
             EnsureCapacity(count + 1);
-            items![count++] = tag;
+            items[count++] = tag;
             version++;
         }
 
@@ -257,7 +256,7 @@ namespace fNbt {
 
 
         void BuildTable() {
-            var t = new ulong[InitialTableSize];
+            ulong[] t = new ulong[InitialTableSize];
             NbtTag[] local = items;
             for (int position = 0; position < count; position++) {
                 AddTableEntry(t, NameHash(local[position].name!), position);
@@ -271,7 +270,7 @@ namespace fNbt {
         void GrowTable() {
             ulong[] old = table!;
             int newSize = count * 2 >= old.Length ? old.Length * 4 : old.Length;
-            var t = new ulong[newSize];
+            ulong[] t = new ulong[newSize];
             int mask = newSize - 1;
             foreach (ulong slot in old) {
                 if (slot <= 1) continue;
@@ -455,7 +454,7 @@ namespace fNbt {
         public void AddRange(IEnumerable<NbtTag> newTags) {
             if (newTags == null) throw new ArgumentNullException(nameof(newTags));
             // Validate the whole batch first, so we don't partially add/reparent some tags on exception.
-            var toAdd = new List<NbtTag>(newTags);
+            List<NbtTag> toAdd = new List<NbtTag>(newTags);
             ValidateForAdd(toAdd, nameof(newTags));
             EnsureCapacity(count + toAdd.Count);
             foreach (NbtTag tag in toAdd) {
@@ -485,7 +484,7 @@ namespace fNbt {
 
         // Checks that every tag in the batch can be added, without changing any fields.
         void ValidateForAdd(List<NbtTag> toAdd, string paramName) {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
                     throw new ArgumentNullException(paramName, "A tag in the collection is null.");
@@ -550,7 +549,7 @@ namespace fNbt {
         public IEnumerable<string> Names {
             get {
                 for (int i = 0; i < count; i++) {
-                    yield return items![i].name!;
+                    yield return items[i].name!;
                 }
             }
         }
@@ -559,7 +558,7 @@ namespace fNbt {
         public IEnumerable<NbtTag> Tags {
             get {
                 for (int i = 0; i < count; i++) {
-                    yield return items![i];
+                    yield return items[i];
                 }
             }
         }
@@ -606,9 +605,9 @@ namespace fNbt {
 
 
         void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
-            NbtTag[]? local = items;
+            NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
-                local![i].WriteTag(writeStream, childDepthBudget);
+                local[i].WriteTag(writeStream, childDepthBudget);
             }
             writeStream.Write(NbtTagType.End);
         }
@@ -620,7 +619,7 @@ namespace fNbt {
 
         /// <summary> Returns an enumerator that iterates through all tags in this NbtCompound,
         /// in insertion order. </summary>
-        /// <returns> An IEnumerator&gt;NbtTag&lt; that can be used to iterate through the collection. </returns>
+        /// <returns> An IEnumerator&lt;NbtTag&gt; that can be used to iterate through the collection. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
             return Enumerate();
         }
@@ -637,7 +636,7 @@ namespace fNbt {
                 if (version != startVersion) {
                     throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
                 }
-                yield return items![i];
+                yield return items[i];
             }
         }
 
@@ -781,7 +780,7 @@ namespace fNbt {
             if (count > 0) {
                 sb.Append('\n');
                 for (int i = 0; i < count; i++) {
-                    items![i].PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
+                    items[i].PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
                     sb.Append('\n');
                 }
                 for (int i = 0; i < indentLevel; i++) {

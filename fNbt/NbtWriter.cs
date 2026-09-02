@@ -270,8 +270,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed byte tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named byte tag. </summary>
+        /// <param name="tagName"> Name to give to this byte tag. May not be null. </param>
         /// <param name="value"> The unsigned byte to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed byte tag was expected -OR- a tag of a different type was expected. </exception>
@@ -298,11 +298,11 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed byte tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
-        /// <param name="value"> The unsigned byte to write. </param>
+        /// <summary> Writes a named double tag. </summary>
+        /// <param name="tagName"> Name to give to this double tag. May not be null. </param>
+        /// <param name="value"> The eight-byte floating-point value to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
-        /// an unnamed byte tag was expected -OR- a tag of a different type was expected. </exception>
+        /// an unnamed double tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteDouble(string tagName, double value) {
             ValidateConstraints(tagName, NbtTagType.Double);
             int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
@@ -326,8 +326,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed float tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named float tag. </summary>
+        /// <param name="tagName"> Name to give to this float tag. May not be null. </param>
         /// <param name="value"> The four-byte floating-point value to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed float tag was expected -OR- a tag of a different type was expected. </exception>
@@ -354,8 +354,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed int tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named int tag. </summary>
+        /// <param name="tagName"> Name to give to this int tag. May not be null. </param>
         /// <param name="value"> The four-byte signed integer to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed int tag was expected -OR- a tag of a different type was expected. </exception>
@@ -382,8 +382,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed long tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named long tag. </summary>
+        /// <param name="tagName"> Name to give to this long tag. May not be null. </param>
         /// <param name="value"> The eight-byte signed integer to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed long tag was expected -OR- a tag of a different type was expected. </exception>
@@ -410,8 +410,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed short tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named short tag. </summary>
+        /// <param name="tagName"> Name to give to this short tag. May not be null. </param>
         /// <param name="value"> The two-byte signed integer to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed short tag was expected -OR- a tag of a different type was expected. </exception>
@@ -441,8 +441,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed string tag. </summary>
-        /// <param name="tagName"> Name to give to this compound tag. May not be null. </param>
+        /// <summary> Writes a named string tag. </summary>
+        /// <param name="tagName"> Name to give to this string tag. May not be null. </param>
         /// <param name="value"> The string to write. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed string tag was expected -OR- a tag of a different type was expected -OR-
@@ -587,7 +587,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Writes an unnamed byte array tag, copying data from another stream. </summary>
+        /// <summary> Writes a named byte array tag, copying data from a stream. </summary>
         /// <param name="tagName"> Name to give to this byte array tag. May not be null. </param>
         /// <param name="dataSource"> A Stream from which data will be copied. </param>
         /// <param name="count"> The number of bytes to write. Must not be negative. </param>
@@ -970,8 +970,6 @@ namespace fNbt {
 
 
         void WriteByteArrayFromStreamImpl(Stream dataSource, int count, byte[] buffer) {
-            NullableSupport.Assert(dataSource != null);
-            NullableSupport.Assert(buffer != null);
             writer.Write(count);
             int maxBytesToWrite = Math.Min(buffer.Length, NbtBinaryWriter.MaxWriteChunk);
             int bytesWritten = 0;

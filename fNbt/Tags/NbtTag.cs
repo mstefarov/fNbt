@@ -76,11 +76,11 @@ namespace fNbt {
                     return Name ?? "";
                 }
                 // Built iteratively: more efficient than recursion and no risk of stack overflow.
-                var segments = new List<NbtTag>();
+                List<NbtTag> segments = new List<NbtTag>();
                 for (NbtTag? tag = this; tag != null; tag = tag.Parent) {
                     segments.Add(tag);
                 }
-                var sb = new StringBuilder();
+                StringBuilder sb = new StringBuilder();
                 for (int i = segments.Count - 1; i >= 0; i--) {
                     NbtTag tag = segments[i];
                     if (tag.Parent is NbtList parentAsList) {
@@ -143,8 +143,8 @@ namespace fNbt {
         /// <exception cref="ArgumentOutOfRangeException"> tagIndex is not a valid index in this tag. </exception>
         /// <exception cref="ArgumentNullException"> Given tag is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> Given tag's type does not match ListType. </exception>
-        /// <exception cref="InvalidOperationException"> If used on a tag that is not NbtList, NbtByteArray, or NbtIntArray. </exception>
-        /// <remarks> ONLY APPLICABLE TO NbtList, NbtByteArray, and NbtIntArray OBJECTS!
+        /// <exception cref="InvalidOperationException"> If used on a tag that is not NbtList. </exception>
+        /// <remarks> ONLY APPLICABLE TO NbtList OBJECTS! The array tags hide this indexer with their own, so those work only through their own type.
         /// Included in NbtTag base class for programmers' convenience, to avoid extra type casts. </remarks>
         public virtual NbtTag this[int tagIndex] {
             get { throw new InvalidOperationException("Integer indexers only work on NbtList tags."); }
@@ -218,7 +218,7 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Returns the value of this tag, cast as a long (64-bit signed integer).
+        /// <summary> Returns the value of this tag, cast as a float (single-precision floating point number).
         /// Only supported by NbtFloat and, with loss of precision, by NbtDouble, NbtByte, NbtShort, NbtInt, and NbtLong. </summary>
         /// <exception cref="InvalidCastException"> When used on an unsupported tag. </exception>
         public float FloatValue {
@@ -242,7 +242,7 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Returns the value of this tag, cast as a long (64-bit signed integer).
+        /// <summary> Returns the value of this tag, cast as a double (double-precision floating point number).
         /// Only supported by NbtFloat, NbtDouble, and, with loss of precision, by NbtByte, NbtShort, NbtInt, and NbtLong. </summary>
         /// <exception cref="InvalidCastException"> When used on an unsupported tag. </exception>
         public double DoubleValue {
@@ -412,7 +412,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToString(string indentString) {
             if (indentString == null) throw new ArgumentNullException(nameof(indentString));
-            var sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             PrettyPrint(sb, indentString, 0, MaxDepth);
             return sb.ToString();
         }

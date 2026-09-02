@@ -152,7 +152,7 @@ namespace fNbt {
                 System.Buffers.ArrayPool<char>.Shared.Return(chars);
             }
 #else
-            var chars = new char[count];
+            char[] chars = new char[count];
             return new string(chars, 0, DecodeLenientCore(buffer, offset, count, chars));
 #endif
         }

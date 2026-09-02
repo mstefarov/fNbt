@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Threading;
 
 namespace fNbt {
@@ -132,15 +131,15 @@ namespace fNbt {
                 case NbtTagType.Compound:
                     int compoundChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     // Walk the storage directly, so validation allocates no enumerators
-                    var compound = (NbtCompound)tag;
-                    NbtTag[]? children = compound.ItemArray;
+                    NbtCompound compound = (NbtCompound)tag;
+                    NbtTag[] children = compound.ItemArray;
                     for (int i = 0; i < compound.Count; i++) {
-                        ValidateTree(children![i], compoundChildBudget);
+                        ValidateTree(children[i], compoundChildBudget);
                     }
                     break;
                 case NbtTagType.List:
                     int listChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
-                    var list = (NbtList)tag;
+                    NbtList list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
                     if (list.ListType == NbtTagType.Unknown) {
                         throw new NbtFormatException(NbtList.UnknownListTypeError);
@@ -197,7 +196,7 @@ namespace fNbt {
                 if (cached != null && ReferenceEquals(cached.Policy, policy)) {
                     return cached.Codec;
                 }
-                var fresh = new CachedCodec(policy, new NbtCodec(new NbtOptions(this, policy)));
+                CachedCodec fresh = new CachedCodec(policy, new NbtCodec(new NbtOptions(this, policy)));
                 // A benign race: if another thread published an equivalent pair first, share its
                 // codec; codecs are immutable, so either instance works
                 CachedCodec? witness = Interlocked.CompareExchange(ref defaultCodec, fresh, cached);

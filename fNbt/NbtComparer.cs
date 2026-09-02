@@ -2,29 +2,24 @@
 using System.Collections.Generic;
 
 namespace fNbt {
-    /// <summary>
-    ///   Compares NbtTag for equality by comparing their types, names, and values. Considers compound tags to be equal
-    ///   if they contain equal sets of tags. Considers list tags to be equal if their tags are equal and in the same order.
-    ///   Name comparisons are case-sensitive.
-    /// </summary>
+    /// <summary> Compares tags for equality by type, name, and value. Compound tags are equal
+    /// when they contain equal sets of tags; list tags when their elements are equal and in the
+    /// same order. Name comparisons are case-sensitive. </summary>
     public sealed class NbtComparer : IEqualityComparer<NbtTag> {
         /// <summary> Gets a singleton instance of the NbtComparer. </summary>
         public static NbtComparer Instance { get; } = new NbtComparer();
 
-        // Comparison recurses, and a few kilobytes of malformed input can nest thousands of levels deep.
-        // A StackOverflowException cannot be caught, so cap instead. Real NBT is nowhere near this deep.
-        private const int MaxDepth = NbtTag.MaxDepth;
 
-        private NbtComparer() { }
+        NbtComparer() { }
 
         /// <inheritdoc/>
         /// <exception cref="ArgumentException"> Either tag is nested more than 512 levels deep. </exception>
         public bool Equals(NbtTag? x, NbtTag? y) {
-            return Equals(x, y, MaxDepth);
+            return Equals(x, y, NbtTag.MaxDepth);
         }
 
 
-        private bool Equals(NbtTag? x, NbtTag? y, int depthBudget) {
+        bool Equals(NbtTag? x, NbtTag? y, int depthBudget) {
             if (ReferenceEquals(x, y)) return true;
             if (x is null || y is null) return false;
             if (x.TagType != y.TagType) return false;
@@ -43,28 +38,28 @@ namespace fNbt {
 
                 switch (tag.TagType) {
                     case NbtTagType.ByteArray:
-                        var ba = ((NbtByteArray)tag).ByteArrayValue;
+                        byte[] ba = ((NbtByteArray)tag).Value;
                         hash = (hash * 23) ^ ba.Length.GetHashCode();
                         return hash;
 
                     case NbtTagType.IntArray:
-                        var ia = ((NbtIntArray)tag).IntArrayValue;
+                        int[] ia = ((NbtIntArray)tag).Value;
                         hash = (hash * 23) ^ ia.Length.GetHashCode();
                         return hash;
 
                     case NbtTagType.LongArray:
-                        var la = ((NbtLongArray)tag).LongArrayValue;
+                        long[] la = ((NbtLongArray)tag).Value;
                         hash = (hash * 23) ^ la.Length.GetHashCode();
                         return hash;
 
                     case NbtTagType.List:
-                        var list = (NbtList)tag;
+                        NbtList list = (NbtList)tag;
                         hash = (hash * 23) ^ list.ListType.GetHashCode();
                         hash = (hash * 23) ^ list.Count.GetHashCode();
                         return hash;
 
                     case NbtTagType.Compound:
-                        var comp = (NbtCompound)tag;
+                        NbtCompound comp = (NbtCompound)tag;
                         hash = (hash * 23) ^ comp.Count.GetHashCode();
                         return hash;
 
@@ -105,7 +100,7 @@ namespace fNbt {
         }
 
         // Compare detailed attributes of two given tags
-        private bool DeepEquals(NbtTag x, NbtTag y, int depthBudget) {
+        bool DeepEquals(NbtTag x, NbtTag y, int depthBudget) {
             // Assume that tags have same type and are non-null.
             // Value comparisons stay typed so equal numeric leaves don't box.
             switch (x.TagType) {
@@ -125,8 +120,8 @@ namespace fNbt {
                 case NbtTagType.String:
                     return String.Equals(((NbtString)x).Value, ((NbtString)y).Value, StringComparison.Ordinal);
                 case NbtTagType.ByteArray: {
-                        var a1 = ((NbtByteArray)x).Value;
-                        var a2 = ((NbtByteArray)y).Value;
+                        byte[] a1 = ((NbtByteArray)x).Value;
+                        byte[] a2 = ((NbtByteArray)y).Value;
 #if NET8_0_OR_GREATER
                         return a1.AsSpan().SequenceEqual(a2);
 #else
@@ -137,8 +132,8 @@ namespace fNbt {
 #endif
                     }
                 case NbtTagType.IntArray: {
-                        var a1 = ((NbtIntArray)x).Value;
-                        var a2 = ((NbtIntArray)y).Value;
+                        int[] a1 = ((NbtIntArray)x).Value;
+                        int[] a2 = ((NbtIntArray)y).Value;
 #if NET8_0_OR_GREATER
                         return a1.AsSpan().SequenceEqual(a2);
 #else
@@ -149,8 +144,8 @@ namespace fNbt {
 #endif
                     }
                 case NbtTagType.LongArray: {
-                        var a1 = ((NbtLongArray)x).Value;
-                        var a2 = ((NbtLongArray)y).Value;
+                        long[] a1 = ((NbtLongArray)x).Value;
+                        long[] a2 = ((NbtLongArray)y).Value;
 #if NET8_0_OR_GREATER
                         return a1.AsSpan().SequenceEqual(a2);
 #else
@@ -164,12 +159,12 @@ namespace fNbt {
                         int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
                         // Child names are unique, so every child of x must have a same-named one in y.
                         // Looking them up beats a HashSet: no reliance on hash quality, and it can carry depth.
-                        var xc = (NbtCompound)x;
-                        var yc = (NbtCompound)y;
+                        NbtCompound xc = (NbtCompound)x;
+                        NbtCompound yc = (NbtCompound)y;
                         if (xc.Count != yc.Count) return false;
-                        NbtTag[]? xChildren = xc.ItemArray;
+                        NbtTag[] xChildren = xc.ItemArray;
                         for (int i = 0; i < xc.Count; i++) {
-                            NbtTag xChild = xChildren![i];
+                            NbtTag xChild = xChildren[i];
                             NbtTag? yChild = yc.Get(xChild.Name!);
                             if (yChild == null || !Equals(xChild, yChild, childDepthBudget)) return false;
                         }
@@ -178,8 +173,8 @@ namespace fNbt {
                 case NbtTagType.List: {
                         int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
                         // Lists are considered equal if their type, count, and contents are equal
-                        var xl = (NbtList)x;
-                        var yl = (NbtList)y;
+                        NbtList xl = (NbtList)x;
+                        NbtList yl = (NbtList)y;
                         if (xl.ListType != yl.ListType || xl.Count != yl.Count) return false;
                         for (int i = 0; i < xl.Count; i++)
                             if (!Equals(xl.tags[i], yl.tags[i], childDepthBudget)) return false;
@@ -192,10 +187,10 @@ namespace fNbt {
         }
 
 
-        private static int ConsumeDepthBudget(int depthBudget, string paramName) {
+        static int ConsumeDepthBudget(int depthBudget, string paramName) {
             if (depthBudget <= 0) {
                 throw new ArgumentException(
-                    "Tags are nested deeper than " + MaxDepth + " levels.", paramName);
+                    "Tags are nested deeper than " + NbtTag.MaxDepth + " levels.", paramName);
             }
             return depthBudget - 1;
         }

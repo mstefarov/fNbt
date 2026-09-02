@@ -144,7 +144,7 @@ namespace fNbt {
         NbtTag ReadBuffer(byte[] buffer, int index, int length, NbtTagType? expectedRootType,
                           out int bytesConsumed) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
-            using (var ms = new MemoryStream(buffer, index, length)) {
+            using (MemoryStream ms = new MemoryStream(buffer, index, length)) {
                 NbtTag tag = ReadTagInternal(ms, expectedRootType);
                 bytesConsumed = (int)ms.Position;
                 return tag;
@@ -193,7 +193,7 @@ namespace fNbt {
         public bool TryReadTag(byte[] buffer, int index, int length,
                                [NotNullWhen(true)] out NbtTag? tag, out int bytesConsumed) {
             if (buffer == null) throw new ArgumentNullException(nameof(buffer));
-            using (var ms = new MemoryStream(buffer, index, length)) {
+            using (MemoryStream ms = new MemoryStream(buffer, index, length)) {
                 bool result = TryReadTag(ms, out tag);
                 bytesConsumed = (int)ms.Position;
                 return result;
@@ -252,7 +252,7 @@ namespace fNbt {
             }
             unsafe {
                 fixed (byte* bytes = buffer) {
-                    using (var stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
+                    using (UnmanagedMemoryStream stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
                         bool result = TryReadTag(stream, out tag);
                         bytesConsumed = (int)stream.Position;
                         return result;
@@ -268,7 +268,7 @@ namespace fNbt {
         unsafe NbtTag ReadSpan(ReadOnlySpan<byte> buffer, NbtTagType? expectedRootType, out int bytesConsumed) {
             if (buffer.IsEmpty) throw new EndOfStreamException();
             fixed (byte* bytes = buffer) {
-                using (var stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
+                using (UnmanagedMemoryStream stream = new UnmanagedMemoryStream(bytes, buffer.Length)) {
                     NbtTag tag = ReadTagInternal(stream, expectedRootType);
                     bytesConsumed = (int)stream.Position;
                     return tag;
@@ -370,7 +370,7 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
-            var stream = new BufferWriterStream(output);
+            BufferWriterStream stream = new BufferWriterStream(output);
             try {
                 WriteTag(tag, stream);
             } finally {
@@ -395,7 +395,7 @@ namespace fNbt {
         /// are already written when this throws. </exception>
         public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
-            var stream = new BufferWriterStream(output);
+            BufferWriterStream stream = new BufferWriterStream(output);
             try {
                 WriteConcatenatedTags(tags, stream);
             } finally {
@@ -451,7 +451,7 @@ namespace fNbt {
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
-            var result = new byte[size];
+            byte[] result = new byte[size];
             WriteTag(tag, new MemoryStream(result, 0, result.Length, true));
             return result;
         }
@@ -492,7 +492,7 @@ namespace fNbt {
             if (typeByte > (int)NbtTagType.LongArray) {
                 throw new NbtFormatException("NBT tag type out of range: " + typeByte);
             }
-            var tagType = (NbtTagType)typeByte;
+            NbtTagType tagType = (NbtTagType)typeByte;
             if (expectedRootType != null && tagType != expectedRootType.Value) {
                 throw new NbtFormatException(
                     "Expected a root tag of type " + NbtTag.GetCanonicalTagName(expectedRootType.Value) +

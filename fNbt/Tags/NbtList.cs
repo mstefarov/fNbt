@@ -78,7 +78,7 @@ namespace fNbt {
         /// <summary> Creates an unnamed NbtList with empty contents and an explicitly specified ListType.
         /// If ListType is Unknown, it will be inferred from the type of the first added tag.
         /// Otherwise, all tags added to this list are expected to be of the given type. </summary>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown. </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a recognized tag type. </exception>
         public NbtList(NbtTagType givenListType)
             : this(null, null, givenListType) { }
@@ -102,7 +102,7 @@ namespace fNbt {
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType).
         /// List may be empty, but may not be <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown (to infer type from the first element of tags). </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown (to infer type from the first element of tags). </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
@@ -116,7 +116,7 @@ namespace fNbt {
 
         /// <summary> Creates an NbtList with the given name, empty contents, and an explicitly specified ListType. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag.
+        /// <param name="givenListType"> Type of the list elements.
         /// If givenListType is Unknown, ListType will be inferred from the first tag added to this NbtList. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         public NbtList(string? tagName, NbtTagType givenListType)
@@ -127,7 +127,7 @@ namespace fNbt {
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType). May be empty or <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown (to infer type from the first element of tags). </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown (to infer type from the first element of tags). </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
         /// or a tag is named, already has a Parent, or appears more than once. </exception>
@@ -248,7 +248,7 @@ namespace fNbt {
         // Returns the ListType the list would have after a successful add.
         NbtTagType ValidateForAdd(List<NbtTag> toAdd, string paramName) {
             NbtTagType effectiveType = listType;
-            var seen = new HashSet<NbtTag>();
+            HashSet<NbtTag> seen = new HashSet<NbtTag>();
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
                     throw new ArgumentNullException(paramName, "A tag in the collection is null.");
@@ -274,7 +274,7 @@ namespace fNbt {
         /// <returns> Array of NbtTags cast to the desired type. </returns>
         /// <exception cref="InvalidCastException"> If contents of this list cannot be cast to the given type. </exception>
         public T[] ToArray<T>() where T : NbtTag {
-            var result = new T[tags.Count];
+            T[] result = new T[tags.Count];
             for (int i = 0; i < result.Length; i++) {
                 result[i] = (T)tags[i];
             }
@@ -351,7 +351,7 @@ namespace fNbt {
         #region Implementation of IEnumerable<NBtTag> and IEnumerable
 
         /// <summary> Returns an enumerator that iterates through all tags in this NbtList. </summary>
-        /// <returns> An IEnumerator&gt;NbtTag&lt; that can be used to iterate through the list. </returns>
+        /// <returns> An IEnumerator&lt;NbtTag&gt; that can be used to iterate through the list. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
             return tags.GetEnumerator();
         }

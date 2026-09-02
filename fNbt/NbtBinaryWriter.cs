@@ -48,10 +48,10 @@ namespace fNbt {
         readonly int maxStringBytes;
 
 
-        public NbtBinaryWriter(Stream input, NbtFlavor flavor, bool validate = false) {
-            if (input == null) throw new ArgumentNullException(nameof(input));
-            if (!input.CanWrite) throw new ArgumentException("Given stream must be writable", nameof(input));
-            stream = input;
+        public NbtBinaryWriter(Stream output, NbtFlavor flavor, bool validate = false) {
+            if (output == null) throw new ArgumentNullException(nameof(output));
+            if (!output.CanWrite) throw new ArgumentException("Given stream must be writable.", nameof(output));
+            stream = output;
             swapNeeded = (BitConverter.IsLittleEndian == flavor.BigEndian);
             useVarInt = flavor.UsesVarInts;
             modifiedUtf8 = flavor.UsesModifiedUtf8;

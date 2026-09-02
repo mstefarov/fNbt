@@ -66,7 +66,7 @@ namespace fNbt {
 
                 case NbtTagType.List: {
                     int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
-                    var list = (NbtList)tag;
+                    NbtList list = (NbtList)tag;
                     if (list.ListType == NbtTagType.Unknown) {
                         // The write pass would refuse this list; fail the same way before it
                         throw new NbtFormatException(NbtList.UnknownListTypeError);
@@ -80,11 +80,11 @@ namespace fNbt {
 
                 case NbtTagType.Compound: {
                     int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
-                    var compound = (NbtCompound)tag;
-                    NbtTag[]? children = compound.ItemArray;
+                    NbtCompound compound = (NbtCompound)tag;
+                    NbtTag[] children = compound.ItemArray;
                     long size = 1; // the closing TAG_End
                     for (int i = 0; i < compound.Count; i++) {
-                        NbtTag child = children![i];
+                        NbtTag child = children[i];
                         if (child.Name == null) {
                             throw new NbtFormatException("Name is null");
                         }

@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 
 namespace fNbt {
@@ -258,7 +257,7 @@ namespace fNbt {
             // Varint prefixes can declare huge lengths, so check plausibility before
             // allocating. Small strings skip the check: they read at most 64 bytes.
             EnsureCanRead(length);
-            var stringData = new byte[length];
+            byte[] stringData = new byte[length];
             ReadExactly(stringData, length);
             return NbtStringCodec.Decode(stringData, 0, length);
         }
@@ -320,7 +319,7 @@ namespace fNbt {
                     // Insertion stops at half load once the table cannot grow further;
                     // lookups keep working for what was already cached
                     if (nameCacheCount * 2 < cache.Length) {
-                        var keyCopy = new byte[length];
+                        byte[] keyCopy = new byte[length];
                         Buffer.BlockCopy(buffer, 0, keyCopy, 0, length);
                         entry.Hash = hash;
                         entry.Bytes = keyCopy;
@@ -357,7 +356,7 @@ namespace fNbt {
 
         void GrowNameCache() {
             NameCacheEntry[] oldCache = nameCache!;
-            var newCache = new NameCacheEntry[oldCache.Length * 4];
+            NameCacheEntry[] newCache = new NameCacheEntry[oldCache.Length * 4];
             int mask = newCache.Length - 1;
             foreach (NameCacheEntry entry in oldCache) {
                 if (entry.Bytes == null) continue;
@@ -417,7 +416,7 @@ namespace fNbt {
 
 
         // Converts element count to a byte count here, taking care not to overflow.
-        public unsafe void Skip<T>(int elementCount) where T : unmanaged {
+        public void Skip<T>(int elementCount) where T : unmanaged {
             if (useVarInt && (typeof(T) == typeof(int) || typeof(T) == typeof(long))) {
                 // Varint elements have no fixed width, so they are decoded one at a time and
                 // discarded, which applies the read path's width and overflow rules
@@ -608,7 +607,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
-            var result = new byte[length];
+            byte[] result = new byte[length];
             ReadExactly(result, length);
             return result;
         }

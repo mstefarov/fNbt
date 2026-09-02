@@ -61,7 +61,7 @@ namespace fNbt {
             if (total > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
             }
-            var result = new byte[total];
+            byte[] result = new byte[total];
             int position = 0;
             if (fullSegments != null) {
                 foreach (byte[] segment in fullSegments) {

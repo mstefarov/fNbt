@@ -7,9 +7,7 @@ namespace fNbt {
     public sealed class NbtLongArray : NbtTag {
         /// <summary> Type of this tag (LongArray). </summary>
         public override NbtTagType TagType {
-            get {
-                return NbtTagType.LongArray;
-            }
+            get { return NbtTagType.LongArray; }
         }
 
         /// <summary> Value/payload of this tag (an array of signed 64-bit integers). Value is stored as-is and is NOT cloned. May not be <c>null</c>. </summary>
@@ -20,16 +18,17 @@ namespace fNbt {
                 if (value == null) {
                     throw new ArgumentNullException(nameof(value));
                 }
-
                 longs = value;
             }
         }
 
-        private long[] longs;
+        long[] longs;
+
 
         /// <summary> Creates an unnamed NbtLongArray tag, containing an empty array of longs. </summary>
         public NbtLongArray()
             : this((string?)null) { }
+
 
         /// <summary> Creates an unnamed NbtLongArray tag, containing the given array of longs. </summary>
         /// <param name="value"> Long array to assign to this tag's Value. May not be <c>null</c>. </param>
@@ -39,12 +38,14 @@ namespace fNbt {
         public NbtLongArray(long[] value)
             : this(null, value) { }
 
+
         /// <summary> Creates an NbtLongArray tag with the given name, containing an empty array of longs. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtLongArray(string? tagName) {
             name = tagName;
             longs = Array.Empty<long>();
         }
+
 
         /// <summary> Creates an NbtLongArray tag with the given name, containing the given array of longs. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
@@ -64,10 +65,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <remarks> Long array of given tag will be cloned. </remarks>
         public NbtLongArray(NbtLongArray other) {
-            if (other == null) {
-                throw new ArgumentNullException(nameof(other));
-            }
-
+            if (other == null) throw new ArgumentNullException(nameof(other));
             name = other.name;
             longs = (long[])other.longs.Clone();
         }
@@ -91,20 +89,14 @@ namespace fNbt {
                 readStream.Skip<long>(length);
                 return false;
             }
-
             Value = readStream.ReadInt64Array(length);
-
             return true;
         }
 
 
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(NbtTagType.LongArray);
-
-            if (Name == null) {
-                throw new NbtFormatException("Name is null");
-            }
-
+            if (Name == null) throw new NbtFormatException("Name is null");
             writeStream.Write(Name);
             WriteData(writeStream, depthBudget);
         }
@@ -125,8 +117,7 @@ namespace fNbt {
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
             PrettyPrintHeader(sb, indentString, indentLevel);
-
-            sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} longs]", Value.Length);
+            sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} longs]", longs.Length);
         }
     }
 }

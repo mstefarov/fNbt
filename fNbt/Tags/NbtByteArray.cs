@@ -25,12 +25,12 @@ namespace fNbt {
         byte[] bytes;
 
 
-        /// <summary> Creates an unnamed NbtByte tag, containing an empty array of bytes. </summary>
+        /// <summary> Creates an unnamed NbtByteArray tag, containing an empty array of bytes. </summary>
         public NbtByteArray()
             : this((string?)null) { }
 
 
-        /// <summary> Creates an unnamed NbtByte tag, containing the given array of bytes. </summary>
+        /// <summary> Creates an unnamed NbtByteArray tag, containing the given array of bytes. </summary>
         /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given byte array will be cloned. To avoid unnecessary copying, call one of the other constructor
@@ -39,7 +39,7 @@ namespace fNbt {
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtByte tag with the given name, containing an empty array of bytes. </summary>
+        /// <summary> Creates an NbtByteArray tag with the given name, containing an empty array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtByteArray(string? tagName) {
             name = tagName;
@@ -47,7 +47,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtByte tag with the given name, containing the given array of bytes. </summary>
+        /// <summary> Creates an NbtByteArray tag with the given name, containing the given array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
