@@ -747,7 +747,7 @@ namespace fNbt {
                     return new NbtString(TagName, reader.ReadString());
 
                 case NbtTagType.ByteArray:
-                    return new NbtByteArray(TagName, reader.ReadArray(TagLength));
+                    return new NbtByteArray(TagName, reader.ReadByteArray(TagLength));
 
                 case NbtTagType.IntArray:
                     return new NbtIntArray(TagName, reader.ReadInt32Array(TagLength));
@@ -833,7 +833,7 @@ namespace fNbt {
                     return reader.ReadInt64();
 
                 case NbtTagType.ByteArray:
-                    return reader.ReadArray(TagLength);
+                    return reader.ReadByteArray(TagLength);
 
                 case NbtTagType.IntArray:
                     return reader.ReadInt32Array(TagLength);
@@ -929,7 +929,7 @@ namespace fNbt {
                 // Exact-type matches skip boxing and conversion dispatch, and ints and longs
                 // reach the bulk readers. Real conversions fall through to ChangeType below.
                 if (typeof(T) == typeof(byte) && elementType == NbtTagType.Byte) {
-                    T[] val = (T[])(object)reader.ReadArray(elementsToRead);
+                    T[] val = (T[])(object)reader.ReadByteArray(elementsToRead);
                     FinishListRead(unpublished);
                     return val;
                 }

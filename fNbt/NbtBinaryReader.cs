@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace fNbt {
     /// <summary> Standalone reader for NBT primitives from a stream, taking care of endianness,
@@ -102,16 +103,18 @@ namespace fNbt {
 
         public NbtTagType RequireValidTagType(byte type) {
             // maxTagType is LongArray unless read validation lowered it, so the common case
-            // stays a single comparison
-            if (type > (byte)maxTagType) {
-                if (type > (byte)NbtTagType.LongArray) {
-                    throw new NbtFormatException("NBT tag type out of range: " + type);
-                }
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName((NbtTagType)type) + " is not permitted by the " +
-                    flavor.Name + " flavor.");
-            }
+            // stays a single comparison, small enough to inline into every per-tag caller
+            if (type > (byte)maxTagType) ThrowInvalidTagType(type);
             return (NbtTagType)type;
+        }
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void ThrowInvalidTagType(byte type) {
+            if (type > (byte)NbtTagType.LongArray) {
+                throw new NbtFormatException("NBT tag type out of range: " + type);
+            }
+            throw NbtFormatException.NotPermitted(flavor, (NbtTagType)type);
         }
 
 
@@ -390,9 +393,7 @@ namespace fNbt {
 
 
         void Skip(long bytesToSkip) {
-            if (bytesToSkip < 0) {
-                throw new ArgumentOutOfRangeException(nameof(bytesToSkip));
-            } else if (BaseStream.CanSeek) {
+            if (BaseStream.CanSeek) {
                 // Setting Position past the end succeeds silently, so a corrupt length would
                 // cause problems or corruption at some later read. Check up front so it fails here.
                 long remaining = BaseStream.Length - BaseStream.Position;
@@ -602,8 +603,9 @@ namespace fNbt {
         }
 
 
-        public byte[] ReadArray(int length) {
-            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+        // Lengths arrive non-negative: every caller clamps a wire length or passes a
+        // validated count
+        public byte[] ReadByteArray(int length) {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
@@ -614,7 +616,6 @@ namespace fNbt {
 
 
         public int[] ReadInt32Array(int length) {
-            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<int>();
             EnsureAllocation((long)length * sizeof(int));
             // Varint elements are at least one byte each; fixed-width math would over-estimate
@@ -644,7 +645,6 @@ namespace fNbt {
 
 
         public long[] ReadInt64Array(int length) {
-            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             if (length == 0) return Array.Empty<long>();
             EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));

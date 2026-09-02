@@ -38,9 +38,9 @@ namespace fNbt {
         readonly NbtFlavor flavor;
         readonly long maxAllocation;
         readonly bool validateOnWrite;
-        // Set only when read validation is on and the flavor restricts something inside a
-        // document. Root shape is not among those, so it gets its own flag.
-        readonly NbtFlavor? readValidationFlavor;
+        // Each read flag is on only when read validation is on and the flavor actually
+        // restricts that aspect: tag types and strings inside the document, or the root shape
+        readonly bool validateOnRead;
         readonly bool requireCompoundRootOnRead;
 
 
@@ -65,7 +65,7 @@ namespace fNbt {
             flavor = resolved.Flavor;
             maxAllocation = resolved.MaxAllocation;
             validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;
-            readValidationFlavor = (resolved.ValidateOnRead && flavor.HasRestrictions) ? flavor : null;
+            validateOnRead = resolved.ValidateOnRead && flavor.HasRestrictions;
             requireCompoundRootOnRead = resolved.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
         }
 
@@ -492,10 +492,8 @@ namespace fNbt {
                 if (flavor.AllowsNonCompoundRoot) return null;
                 throw new NbtFormatException("Document may not start with a TAG_End byte.");
             }
-            if (typeByte > (int)NbtTagType.LongArray) {
-                throw new NbtFormatException("NBT tag type out of range: " + typeByte);
-            }
-            NbtTagType tagType = (NbtTagType)typeByte;
+            // The same range and flavor-ceiling checks every nested tag type gets
+            NbtTagType tagType = reader.RequireValidTagType((byte)typeByte);
             if (expectedRootType != null && tagType != expectedRootType.Value) {
                 throw new NbtFormatException(
                     "Expected a root tag of type " + NbtTag.GetCanonicalTagName(expectedRootType.Value) +
@@ -505,11 +503,6 @@ namespace fNbt {
                 throw new NbtFormatException(
                     flavor.Name + " requires a TAG_Compound root, but found " +
                     NbtTag.GetCanonicalTagName(tagType) + ".");
-            }
-            if (readValidationFlavor != null && tagType > readValidationFlavor.MaxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(tagType) + " is not permitted by the " +
-                    readValidationFlavor.Name + " flavor.");
             }
             NbtTag tag = NbtTag.Create(tagType);
             if (flavor.HasRootName) {
@@ -521,7 +514,7 @@ namespace fNbt {
 
 
         NbtBinaryReader CreateReader(Stream stream) {
-            return new NbtBinaryReader(stream, flavor, maxAllocation, readValidationFlavor != null);
+            return new NbtBinaryReader(stream, flavor, maxAllocation, validateOnRead);
         }
 
 

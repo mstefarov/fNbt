@@ -89,7 +89,7 @@ namespace fNbt {
                 readStream.Skip<byte>(length);
                 return false;
             }
-            Value = readStream.ReadArray(length);
+            Value = readStream.ReadByteArray(length);
             return true;
         }
 
