@@ -126,7 +126,7 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
 
 
 ## API REFERENCE
-Online reference can be found at http://fcraft.net/fnbt/v1.1.1/
+Online reference can be found at https://fcraft.net/fnbt/v2.0.0/
 
 
 ## LICENSING
