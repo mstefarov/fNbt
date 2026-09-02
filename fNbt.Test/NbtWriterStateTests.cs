@@ -48,7 +48,6 @@ namespace fNbt.Test {
                     Assert.Throws<NbtFormatException>(() => writer.WriteInt(0));
                     writer.EndList();
 
-                    // write a null tag
                     Assert.Throws<ArgumentNullException>(() => writer.WriteTag(null));
 
                     // write an unnamed tag where a named tag is expected
@@ -147,7 +146,6 @@ namespace fNbt.Test {
                     Assert.Throws<ArgumentException>(
                         () => writer.WriteByteArray("BadLength", dummyStream, 5, new byte[0]));
 
-                    // trying to read from non-readable stream
                     Assert.Throws<ArgumentException>(
                         () => writer.WriteByteArray("ByteStream", new NonReadableStream(), 0));
 
@@ -184,7 +182,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void WriteByteArrayFromShortStreamThrows() {
-            // A source shorter than count used to spin forever returning 0. It must throw instead.
+            // A source shorter than count must throw, not spin on zero-byte reads
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
                 Assert.Throws<EndOfStreamException>(

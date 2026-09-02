@@ -10,12 +10,10 @@ namespace fNbt.Test {
     [TestClass]
     public class NbtWriterTests {
         static string GenRandomUnicodeString(Random rand) {
-            // String length is limited by number of bytes, not characters.
-            // Most bytes per char in UTF8 is 4, so max string length is therefore short.MaxValue/4
+            // The wire limit is in UTF-8 bytes, up to 4 per char, so lengths stay under short.MaxValue/4
             int len = rand.Next(8, short.MaxValue / 4);
             StringBuilder sb = new StringBuilder();
 
-            // Generate one char at a time until we filled up the StringBuilder
             while (sb.Length < len) {
                 char ch = (char)rand.Next(0, 0xFFFF);
                 if (Char.IsControl(ch) || Char.IsSurrogate(ch) || ch >= 0xE000 && ch <= 0xF8FF) {
@@ -337,7 +335,6 @@ namespace fNbt.Test {
             // Use a fixed seed for repeatability of this test
             Random rand = new Random(0);
 
-            // Generate random Unicode strings
             const int numStrings = 1024;
             List<string> writtenStrings = new List<string>();
             for (int i = 0; i < numStrings; i++) {
@@ -345,7 +342,6 @@ namespace fNbt.Test {
             }
 
             using (var ms = new MemoryStream()) {
-                // Write a list of strings
                 NbtWriter writer = new NbtWriter(ms, "test");
                 writer.BeginList("stringList", NbtTagType.String, numStrings);
                 foreach (string s in writtenStrings) {
@@ -354,14 +350,12 @@ namespace fNbt.Test {
                 writer.EndList();
                 writer.EndCompound();
 
-                // Let's read what we have written, and check contents
                 NbtFile file = TestFiles.FinishAndReload(writer, ms);
                 var readStrings =
                     file.RootTag.Get<NbtList>("stringList")
                         .ToArray<NbtString>()
                         .Select(tag => tag.StringValue);
 
-                // Make sure that all read/written strings match exactly
                 CollectionAssert.AreEqual(writtenStrings, readStrings.ToList());
             }
         }

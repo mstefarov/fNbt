@@ -107,8 +107,8 @@ public class ClassicWorldMetadataBenchmarks {
 
 
     // Worst case for the comparer, since identical trees cannot exit early.
-    // NbtComparer postdates 1.0.0. FNBT_BASELINE covers every 1.x package, so the row stays
-    // out of any 1.x comparison, not only the one against the package that lacks the type.
+    // NbtComparer postdates 1.0.0, and FNBT_BASELINE covers every 1.x package, so the row
+    // stays out of any 1.x comparison.
 #if !FNBT_BASELINE
     [AverageBenchmark]
     [BenchmarkCategory(Program.BaselineIncompatible)]

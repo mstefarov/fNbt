@@ -811,7 +811,6 @@ namespace fNbt.Test {
             Assert.IsFalse(reader.HasLength);
             Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag()); // Cannot create NbtTag from TAG_END
 
-            // We done now
             Assert.IsFalse(reader.ReadToFollowing());
             Assert.IsTrue(reader.IsAtStreamEnd);
         }

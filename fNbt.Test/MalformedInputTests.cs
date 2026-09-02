@@ -60,7 +60,7 @@ namespace fNbt.Test {
 
         void AssertBadFileFromBuffer(byte[] input) {
             // Corrupt input fails as a format error, or as a premature end of stream when a
-            // tolerated length (e.g. a negative array size read as empty) leaves the rest of
+            // tolerated length, such as a negative array size read as empty, leaves the rest of
             // the document truncated
             AssertThrowsParseError(() => TryReadBadFile(input));
             AssertThrowsParseError(() => TestFiles.Load(input));
@@ -333,7 +333,7 @@ namespace fNbt.Test {
             };
             AssertBadFileFromBuffer(badListType);
 
-            // Negative sizes read as empty since 2.0, so an impossibly large size is the bad case
+            // Negative sizes read as empty, so an impossibly large size is the bad case
             byte[] badListSize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
@@ -349,7 +349,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void BadArraySize() {
-            // Negative sizes read as empty since 2.0, so impossibly large sizes are the bad case
+            // Negative sizes read as empty, so impossibly large sizes are the bad case
             byte[] badByteArraySize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
@@ -385,7 +385,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void BadNestedArraySize() {
-            // Negative sizes read as empty since 2.0, so impossibly large sizes are the bad case
+            // Negative sizes read as empty, so impossibly large sizes are the bad case
             byte[] badNestedByteArraySize = {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'

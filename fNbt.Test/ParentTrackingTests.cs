@@ -235,7 +235,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CopyConstructorSetsParents() {
-            // The copy constructor used to leave cloned children with Parent == null.
+            // Cloned children must belong to the clone, not to the original or to nothing
             var original = new NbtList("original", NbtTagType.Int) {
                 new NbtInt(1),
                 new NbtInt(2)

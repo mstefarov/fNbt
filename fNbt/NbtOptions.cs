@@ -24,9 +24,9 @@ namespace fNbt {
         }
 
 
-        // Two independent references, each published whole. A reader that catches a flavor
-        // change mid-flight may pair it with the previous policy, which is fine: each value is
-        // valid on its own, and nothing promises atomic reconfiguration.
+        // Two independent references, each published whole. A reader may pair a new flavor with
+        // the previous policy; each value is valid on its own, and nothing promises atomic
+        // reconfiguration.
         // NbtFlavor initialization must never read this class back: the type initializers
         // stay cycle-free only because the dependency runs strictly NbtOptions -> NbtFlavor.
         static NbtFlavor defaultFlavor = NbtFlavor.Java;
