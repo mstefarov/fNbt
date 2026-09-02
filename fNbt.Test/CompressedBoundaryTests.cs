@@ -69,7 +69,7 @@ namespace fNbt.Test {
                     long bytesRead = file.LoadFromStream(ms, compression);
                     Assert.AreEqual(ms.Length, ms.Position, compression.ToString());
                     Assert.AreEqual(ms.Length, bytesRead, compression.ToString());
-                    TestFiles.AssertNbtSmallFile(file);
+                    TestFiles.AssertSmallFile(file);
                 }
             }
         }
@@ -86,7 +86,7 @@ namespace fNbt.Test {
                     var file = new NbtFile();
                     long bytesRead = file.LoadFromStream(awkward, compression);
                     Assert.IsTrue(bytesRead <= doc.Length, compression + ": counted past the document");
-                    TestFiles.AssertNbtSmallFile(file);
+                    TestFiles.AssertSmallFile(file);
                 }
             }
         }
@@ -132,7 +132,7 @@ namespace fNbt.Test {
             var gzFile = new NbtFile();
             long gzRead = gzFile.LoadFromBuffer(gz, 0, gz.Length, NbtCompression.GZip);
             Assert.AreEqual(gz.Length, gzRead);
-            TestFiles.AssertNbtSmallFile(gzFile);
+            TestFiles.AssertSmallFile(gzFile);
 
             byte[] z = MakeDoc(NbtCompression.ZLib).Concat(garbage).ToArray();
 #if NETFRAMEWORK
@@ -144,7 +144,7 @@ namespace fNbt.Test {
             var zFile = new NbtFile();
             long zRead = zFile.LoadFromBuffer(z, 0, z.Length, NbtCompression.ZLib);
             Assert.AreEqual(z.Length, zRead);
-            TestFiles.AssertNbtSmallFile(zFile);
+            TestFiles.AssertSmallFile(zFile);
 #endif
         }
 
@@ -212,7 +212,7 @@ namespace fNbt.Test {
                 byte[] doc = MakeDoc(compression);
                 var file = new NbtFile();
                 file.LoadFromStream(new ThrowOnOverreadStream(doc), compression);
-                TestFiles.AssertNbtSmallFile(file);
+                TestFiles.AssertSmallFile(file);
             }
         }
 

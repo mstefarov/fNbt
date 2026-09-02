@@ -96,7 +96,7 @@ namespace fNbt.Test {
 
 
         // creates a compound containing lists of every kind of tag
-        public static NbtCompound MakeListTest() {
+        public static NbtCompound MakeAllListsRoot() {
             return new NbtCompound("Root") {
                 new NbtList("ByteList") {
                     new NbtByte(100),
@@ -181,7 +181,7 @@ namespace fNbt.Test {
 
 
         // creates a document with lots of compounds and lists, used to test NbtReader compliance
-        public static Stream MakeReaderTest() {
+        public static Stream MakeNestedContainersStream() {
             var root = new NbtCompound("root") {
                 new NbtInt("first"),
                 new NbtInt("second"),
@@ -223,7 +223,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertNbtSmallFile(NbtFile file) {
+        public static void AssertSmallFile(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;
@@ -238,7 +238,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertNbtBigFile(NbtFile file) {
+        public static void AssertBigFile(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;
@@ -397,7 +397,7 @@ namespace fNbt.Test {
         #region Value test
 
         // creates an NbtCompound with one of tag of each value-type
-        public static NbtCompound MakeValueTest() {
+        public static NbtCompound MakeAllValuesRoot() {
             return new NbtCompound("root") {
                 new NbtByte("byte", 1),
                 new NbtShort("short", 2),
@@ -413,7 +413,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertValueTest(NbtFile file) {
+        public static void AssertAllValues(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;

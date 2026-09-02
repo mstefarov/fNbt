@@ -7,7 +7,7 @@ namespace fNbt.Test {
     [TestClass]
     public sealed class CompoundTests {
         [TestMethod]
-        public void InitializingCompoundFromCollectionTest() {
+        public void CollectionConstructorValidatesTags() {
             NbtTag[] allNamed = {
                 new NbtShort("allNamed1", 1),
                 new NbtLong("allNamed2", 2),

@@ -2,10 +2,10 @@ using System;
 using System.IO;
 
 namespace fNbt.Test {
-    // NbtOptions plumbing through NbtFile, NbtReader, and NbtWriter, and the
-    // legacy BigEndian getters reflecting flavors.
+    // Flavors and NbtOptions handed to the three named-root entry points (NbtFile, NbtReader,
+    // NbtWriter), and the legacy BigEndian getters reflecting them.
     [TestClass]
-    public class FlavorPlumbingTests {
+    public class EntryPointOptionsTests {
         static NbtCompound MakeSampleRoot(string name) {
             return new NbtCompound(name) {
                 new NbtInt("id", 42),

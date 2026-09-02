@@ -6,9 +6,9 @@ using System.Text;
 
 namespace fNbt.Test {
     [TestClass]
-    public class NbtWriterTest {
+    public class NbtWriterTests {
         [TestMethod]
-        public void ValueTest() {
+        public void WritesEveryValueType() {
             // write one named tag for every value type, and read it back
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
@@ -32,13 +32,13 @@ namespace fNbt.Test {
                 Assert.IsFalse(writer.IsInErrorState);
                 NbtFile file = TestFiles.FinishAndReload(writer, ms);
 
-                TestFiles.AssertValueTest(file);
+                TestFiles.AssertAllValues(file);
             }
         }
 
 
         [TestMethod]
-        public void HugeNbtWriterTest() {
+        public void WritesArraysLargerThanChunkSize() {
             // Tests writing byte arrays that exceed the max NbtBinaryWriter chunk size
             using (BufferedStream bs = new BufferedStream(Stream.Null)) {
                 NbtWriter writer = new NbtWriter(bs, "root");
@@ -108,7 +108,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CompoundListTest() {
+        public void WritesCompoundAndListCombinations() {
             // test writing various combinations of compound tags and list tags
             const string testString = "Come on and slam, and welcome to the jam.";
             using (var ms = new MemoryStream()) {
@@ -200,7 +200,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ListTest() {
+        public void WritesListsOfEveryType() {
             // write short (1-element) lists of every possible kind
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "Test");
@@ -290,11 +290,11 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void WriteTagTest() {
+        public void WriteTagWritesEveryValueType() {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
                 {
-                    foreach (NbtTag tag in TestFiles.MakeValueTest().Tags) {
+                    foreach (NbtTag tag in TestFiles.MakeAllValuesRoot().Tags) {
                         writer.WriteTag(tag);
                     }
                     writer.EndCompound();
@@ -305,13 +305,13 @@ namespace fNbt.Test {
                 var file = new NbtFile();
                 long bytesRead = file.LoadFromBuffer(ms.ToArray(), 0, (int)ms.Length, NbtCompression.None);
                 Assert.AreEqual(ms.Length, bytesRead);
-                TestFiles.AssertValueTest(file);
+                TestFiles.AssertAllValues(file);
             }
         }
 
 
         [TestMethod]
-        public void ErrorTest() {
+        public void ArgumentsAndStateAreValidated() {
             byte[] dummyByteArray = { 1, 2, 3, 4, 5 };
             int[] dummyIntArray = { 1, 2, 3, 4, 5 };
             long[] dummyLongArray = { 1, 2, 3, 4, 5 };
@@ -470,7 +470,7 @@ namespace fNbt.Test {
 
         // Ensure that Unicode strings of arbitrary size and content are written/read properly
         [TestMethod]
-        public void ComplexStringsTest() {
+        public void RandomUnicodeStringsRoundTrip() {
             // Use a fixed seed for repeatability of this test
             Random rand = new Random(0);
 
@@ -505,7 +505,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void MissingNameTest() {
+        public void UnnamedTagsAreRejectedInCompounds() {
             using (var ms = new MemoryStream()) {
                 NbtWriter writer = new NbtWriter(ms, "test");
                 // All tags (aside from list elements) must be named. The check is

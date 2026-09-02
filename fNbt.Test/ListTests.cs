@@ -80,7 +80,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void IndexerTest() {
+        public void IndexerRejectsBadElements() {
             NbtByte ourTag = new NbtByte(1);
             var secondList = new NbtList {
                 new NbtByte()
@@ -283,7 +283,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void Serializing1() {
+        public void ListTypeAndCountSurviveRoundTrip() {
             // check the basics of saving/loading
             const NbtTagType expectedListType = NbtTagType.Int;
             const int elements = 10;
@@ -322,13 +322,13 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void Serializing2() {
+        public void ListsOfEveryTypeRoundTrip() {
             // check saving/loading lists of all possible value types
-            var testFile = new NbtFile(TestFiles.MakeListTest());
+            var testFile = new NbtFile(TestFiles.MakeAllListsRoot());
             byte[] buffer = testFile.SaveToBuffer(NbtCompression.None);
             long bytesRead = testFile.LoadFromBuffer(buffer, 0, buffer.Length, NbtCompression.None);
             Assert.AreEqual(buffer.Length, bytesRead);
-            NbtAssert.AreEqual(TestFiles.MakeListTest(), testFile.RootTag);
+            NbtAssert.AreEqual(TestFiles.MakeAllListsRoot(), testFile.RootTag);
         }
 
 
@@ -374,7 +374,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NestedListAndCompoundTest() {
+        public void NestedListsAndCompoundsRoundTrip() {
             byte[] data;
             {
                 var root = new NbtCompound("Root");
@@ -413,7 +413,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void FirstInsertTest() {
+        public void FirstInsertSetsListType() {
             NbtList list = new NbtList();
             Assert.AreEqual(NbtTagType.Unknown, list.ListType);
             list.Insert(0, new NbtInt(123));

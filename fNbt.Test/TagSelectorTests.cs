@@ -81,7 +81,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void SkippingLists() {
-            NbtCompound root = TestFiles.Reload(TestFiles.MakeListTest(),
+            NbtCompound root = TestFiles.Reload(TestFiles.MakeAllListsRoot(),
                                                 selector: tag => tag.TagType != NbtTagType.List);
             Assert.AreEqual(0, root.Count);
 

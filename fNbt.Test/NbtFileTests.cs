@@ -8,7 +8,7 @@ namespace fNbt.Test {
 
 
         [TestInitialize]
-        public void NbtFileTestSetup() {
+        public void CreateTempDirectory() {
             Directory.CreateDirectory(TestDirName);
         }
 
@@ -20,7 +20,7 @@ namespace fNbt.Test {
             var file = new NbtFile(TestFiles.Small);
             Assert.AreEqual(TestFiles.Small, file.FileName);
             Assert.AreEqual(NbtCompression.None, file.FileCompression);
-            TestFiles.AssertNbtSmallFile(file);
+            TestFiles.AssertSmallFile(file);
         }
 
 
@@ -29,7 +29,7 @@ namespace fNbt.Test {
             var file = new NbtFile(TestFiles.SmallGZip);
             Assert.AreEqual(TestFiles.SmallGZip, file.FileName);
             Assert.AreEqual(NbtCompression.GZip, file.FileCompression);
-            TestFiles.AssertNbtSmallFile(file);
+            TestFiles.AssertSmallFile(file);
         }
 
 
@@ -38,7 +38,7 @@ namespace fNbt.Test {
             var file = new NbtFile(TestFiles.SmallZLib);
             Assert.AreEqual(TestFiles.SmallZLib, file.FileName);
             Assert.AreEqual(NbtCompression.ZLib, file.FileCompression);
-            TestFiles.AssertNbtSmallFile(file);
+            TestFiles.AssertSmallFile(file);
         }
 
         #endregion
@@ -50,7 +50,7 @@ namespace fNbt.Test {
         public void LoadingBigFileUncompressed() {
             var file = new NbtFile();
             long length = file.LoadFromFile(TestFiles.Big);
-            TestFiles.AssertNbtBigFile(file);
+            TestFiles.AssertBigFile(file);
             Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
         }
 
@@ -59,7 +59,7 @@ namespace fNbt.Test {
         public void LoadingBigFileGZip() {
             var file = new NbtFile();
             long length = file.LoadFromFile(TestFiles.BigGZip);
-            TestFiles.AssertNbtBigFile(file);
+            TestFiles.AssertBigFile(file);
             Assert.AreEqual(length, new FileInfo(TestFiles.BigGZip).Length);
         }
 
@@ -68,7 +68,7 @@ namespace fNbt.Test {
         public void LoadingBigFileZLib() {
             var file = new NbtFile();
             long length = file.LoadFromFile(TestFiles.BigZLib);
-            TestFiles.AssertNbtBigFile(file);
+            TestFiles.AssertBigFile(file);
             Assert.AreEqual(length, new FileInfo(TestFiles.BigZLib).Length);
         }
 
@@ -82,7 +82,7 @@ namespace fNbt.Test {
                 () => file.LoadFromBuffer(null, 0, fileBytes.Length, NbtCompression.AutoDetect, null));
 
             long length = file.LoadFromBuffer(fileBytes, 0, fileBytes.Length, NbtCompression.AutoDetect, null);
-            TestFiles.AssertNbtBigFile(file);
+            TestFiles.AssertBigFile(file);
             Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
         }
 
@@ -94,7 +94,7 @@ namespace fNbt.Test {
                 using (var nss = new NonSeekableStream(ms)) {
                     var file = new NbtFile();
                     long length = file.LoadFromStream(nss, NbtCompression.None, null);
-                    TestFiles.AssertNbtBigFile(file);
+                    TestFiles.AssertBigFile(file);
                     Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
                 }
             }
@@ -167,7 +167,7 @@ namespace fNbt.Test {
             long bytesRead = loadedFile.LoadFromFile(Path.Combine(TestDirName, fileName), NbtCompression.AutoDetect,
                                                      null);
             Assert.AreEqual(bytesWritten, bytesRead);
-            TestFiles.AssertNbtBigFile(loadedFile);
+            TestFiles.AssertBigFile(loadedFile);
         }
 
 
@@ -184,7 +184,7 @@ namespace fNbt.Test {
                     ms.Position = 0;
                     long bytesRead = loadedFile.LoadFromStream(nss, NbtCompression.None);
                     Assert.AreEqual(bytesWritten, bytesRead);
-                    TestFiles.AssertNbtBigFile(loadedFile);
+                    TestFiles.AssertBigFile(loadedFile);
                 }
             }
         }
@@ -298,7 +298,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void GlobalsTest() {
+        public void DefaultBufferSizeAppliesToNewFiles() {
             Assert.AreEqual(NbtFile.DefaultBufferSize, new NbtFile(new NbtCompound("Foo")).BufferSize);
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.DefaultBufferSize = -1);
             NbtFile.DefaultBufferSize = 12345;
@@ -332,7 +332,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void RootTagTest() {
+        public void RootTagSetterRejectsNullAndUnnamed() {
             NbtCompound oldRoot = new NbtCompound("defaultRoot");
             NbtFile newFile = new NbtFile(oldRoot);
 
@@ -350,7 +350,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NullParameterTest() {
+        public void NullArgumentsThrow() {
             Assert.Throws<ArgumentNullException>(() => new NbtFile((NbtCompound)null));
             Assert.Throws<ArgumentNullException>(() => new NbtFile((string)null));
 
@@ -374,7 +374,7 @@ namespace fNbt.Test {
 
 
         [TestCleanup]
-        public void NbtFileTestTearDown() {
+        public void DeleteTempDirectory() {
             if (Directory.Exists(TestDirName)) {
                 foreach (string file in Directory.GetFiles(TestDirName)) {
                     File.Delete(file);

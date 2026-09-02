@@ -3,8 +3,10 @@ using System.IO;
 using System.IO.Compression;
 
 namespace fNbt.Test {
+    // NbtOptions on NbtCodec: the validation toggles, MaxAllocation, and the snapshot taken
+    // at construction.
     [TestClass]
-    public class NbtCodecTests {
+    public class NbtCodecOptionsTests {
         [TestMethod]
         public void MaxAllocationCapsArrayAllocations() {
             var root = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
