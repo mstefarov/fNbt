@@ -80,9 +80,7 @@ namespace fNbt.Test {
         public void FlavorlessEntryPointsUseDefaultFlavor() {
             NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
             Assert.AreSame(NbtFlavor.Bedrock, new NbtFile().Flavor);
-            using (var ms = new MemoryStream(new byte[] { 0x0A })) {
-                Assert.AreSame(NbtFlavor.Bedrock, new NbtReader(ms).Flavor);
-            }
+            Assert.AreSame(NbtFlavor.Bedrock, TestFiles.OpenReader(new byte[] { 0x0A }).Flavor);
             using (var ms = new MemoryStream()) {
                 Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r").Flavor);
             }
@@ -112,9 +110,7 @@ namespace fNbt.Test {
             var bigRoot = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
             byte[] bigDoc = new NbtFile(bigRoot, NbtFlavor.Java).SaveToBuffer(NbtCompression.None);
             NbtOptions.DefaultMaxAllocation = 65536;
-            var capped = new NbtFile(NbtFlavor.Java);
-            Assert.Throws<NbtFormatException>(
-                () => capped.LoadFromBuffer(bigDoc, 0, bigDoc.Length, NbtCompression.None));
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(bigDoc, NbtFlavor.Java));
         }
 
 

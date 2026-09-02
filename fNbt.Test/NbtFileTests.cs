@@ -198,8 +198,7 @@ namespace fNbt.Test {
                 var root = new NbtCompound("root") { new NbtString("s", value) };
                 byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.None);
 
-                var file = new NbtFile();
-                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+                NbtFile file = TestFiles.Load(doc);
                 Assert.AreEqual(value, file.RootTag.Get<NbtString>("s").Value);
             }
         }

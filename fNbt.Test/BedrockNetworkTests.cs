@@ -70,7 +70,7 @@ namespace fNbt.Test {
             NbtTag root = NbtCodec.For(NbtFlavor.BedrockNetwork)
                                   .ReadTag(GoldenDoc, 0, GoldenDoc.Length, out int bytesConsumed);
             Assert.AreEqual(GoldenDoc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(MakeGoldenTree(), root));
+            NbtAssert.AreEqual(MakeGoldenTree(), root);
         }
 
 
@@ -98,7 +98,7 @@ namespace fNbt.Test {
             byte[] doc = codec.WriteTag(root);
             NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
         }
 
 
@@ -106,21 +106,17 @@ namespace fNbt.Test {
         public void NbtReaderSkipsVarIntValues() {
             // Reaching "sh" skips an int, a long, a string, a list of ints, a byte array,
             // and an int array, all with varint-encoded values or lengths
-            using (var ms = new MemoryStream(GoldenDoc)) {
-                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
-                Assert.IsTrue(reader.ReadToFollowing("sh"));
-                Assert.AreEqual((short)-2, reader.ReadValueAs<short>());
-            }
+            NbtReader reader = TestFiles.OpenReader(GoldenDoc, NbtFlavor.BedrockNetwork);
+            Assert.IsTrue(reader.ReadToFollowing("sh"));
+            Assert.AreEqual((short)-2, reader.ReadValueAs<short>());
         }
 
 
         [TestMethod]
         public void NbtReaderReadsListAsArray() {
-            using (var ms = new MemoryStream(GoldenDoc)) {
-                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
-                Assert.IsTrue(reader.ReadToFollowing("list"));
-                CollectionAssert.AreEqual(new[] { 1, -1, 64 }, reader.ReadListAsArray<int>());
-            }
+            NbtReader reader = TestFiles.OpenReader(GoldenDoc, NbtFlavor.BedrockNetwork);
+            Assert.IsTrue(reader.ReadToFollowing("list"));
+            CollectionAssert.AreEqual(new[] { 1, -1, 64 }, reader.ReadListAsArray<int>());
         }
 
 
@@ -134,16 +130,15 @@ namespace fNbt.Test {
             var reloaded = new NbtFile(NbtFlavor.BedrockNetwork);
             long bytesRead = reloaded.LoadFromBuffer(saved, 0, saved.Length, NbtCompression.None);
             Assert.AreEqual(saved.Length, bytesRead);
-            Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, reloaded.RootTag));
+            NbtAssert.AreEqual(file.RootTag, reloaded.RootTag);
         }
 
 
         [TestMethod]
         public void SelectorSkipsVarIntArrays() {
             // The tree-loading skip path must walk varint elements one at a time
-            var file = new NbtFile(NbtFlavor.BedrockNetwork);
-            file.LoadFromBuffer(GoldenDoc, 0, GoldenDoc.Length, NbtCompression.None,
-                                tag => tag.Name != "ia" && tag.Name != "list" && tag.Name != "L");
+            NbtFile file = TestFiles.Load(GoldenDoc, NbtFlavor.BedrockNetwork,
+                                          tag => tag.Name != "ia" && tag.Name != "list" && tag.Name != "L");
             Assert.IsFalse(file.RootTag.Contains("ia"));
             Assert.IsFalse(file.RootTag.Contains("list"));
             Assert.IsFalse(file.RootTag.Contains("L"));
@@ -179,7 +174,7 @@ namespace fNbt.Test {
 
             // Reads are generous and accept it without any opt-out
             NbtTag read = NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
         }
 
 
@@ -192,15 +187,12 @@ namespace fNbt.Test {
                 0x0B, 0x01, (byte)'x', 0x02, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
                 0x00
             };
-            using (var ms = new MemoryStream(doc)) {
-                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
-                reader.ReadToFollowing(); // root
-                reader.ReadToFollowing(); // "x"
-                Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
-            }
-            var file = new NbtFile(NbtFlavor.BedrockNetwork);
+            NbtReader reader = TestFiles.OpenReader(doc, NbtFlavor.BedrockNetwork);
+            reader.ReadToFollowing(); // root
+            reader.ReadToFollowing(); // "x"
+            Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
             Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => false));
+                () => TestFiles.Load(doc, NbtFlavor.BedrockNetwork, tag => false));
         }
 
 
@@ -211,13 +203,9 @@ namespace fNbt.Test {
             byte[] doc = { 0x0A, 0x80, 0x80, 0x80, 0x80, 0x10, 0x00 };
             Assert.Throws<NbtFormatException>(
                 () => NbtCodec.For(NbtFlavor.BedrockNetwork).ReadTag(doc, 0, doc.Length, out _));
-            var file = new NbtFile(NbtFlavor.BedrockNetwork);
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, NbtFlavor.BedrockNetwork));
             Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
-            using (var ms = new MemoryStream(doc)) {
-                Assert.Throws<NbtFormatException>(
-                    () => new NbtReader(ms, NbtFlavor.BedrockNetwork).ReadToFollowing());
-            }
+                () => TestFiles.OpenReader(doc, NbtFlavor.BedrockNetwork).ReadToFollowing());
             using (var ms = new MemoryStream(doc)) {
                 Assert.Throws<NbtFormatException>(
                     () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
@@ -230,13 +218,11 @@ namespace fNbt.Test {
                 0x00
             };
             Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(arrayDoc, 0, arrayDoc.Length, NbtCompression.None, tag => false));
-            using (var ms = new MemoryStream(arrayDoc)) {
-                var reader = new NbtReader(ms, NbtFlavor.BedrockNetwork);
-                reader.ReadToFollowing(); // root
-                reader.ReadToFollowing(); // "x"
-                Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
-            }
+                () => TestFiles.Load(arrayDoc, NbtFlavor.BedrockNetwork, tag => false));
+            NbtReader reader = TestFiles.OpenReader(arrayDoc, NbtFlavor.BedrockNetwork);
+            reader.ReadToFollowing(); // root
+            reader.ReadToFollowing(); // "x"
+            Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
         }
 
 

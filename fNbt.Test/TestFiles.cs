@@ -50,6 +50,51 @@ namespace fNbt.Test {
         }
 
 
+        // Loads an uncompressed document into a fresh NbtFile
+        public static NbtFile Load(byte[] doc, NbtOptions options = null, TagSelector selector = null) {
+            NbtFile file = options == null ? new NbtFile() : new NbtFile(options);
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, selector);
+            return file;
+        }
+
+
+        public static NbtFile Load(byte[] doc, NbtFlavor flavor, TagSelector selector = null) {
+            return Load(doc, new NbtOptions(flavor), selector);
+        }
+
+
+        // Saves a tree uncompressed and loads it back
+        public static NbtCompound Reload(NbtCompound root, NbtOptions options = null, TagSelector selector = null) {
+            NbtFile file = options == null ? new NbtFile(root) : new NbtFile(root, options);
+            return Load(file.SaveToBuffer(NbtCompression.None), options, selector).RootTag;
+        }
+
+
+        // Finishes a streaming writer and loads what it wrote
+        public static NbtFile FinishAndReload(NbtWriter writer, MemoryStream ms, NbtOptions options = null) {
+            writer.Finish();
+            return Load(ms.ToArray(), options);
+        }
+
+
+        // Opens a streaming reader over an uncompressed document
+        public static NbtReader OpenReader(byte[] doc, NbtOptions options = null) {
+            var ms = new MemoryStream(doc);
+            return options == null ? new NbtReader(ms) : new NbtReader(ms, options);
+        }
+
+
+        public static NbtReader OpenReader(byte[] doc, NbtFlavor flavor) {
+            return new NbtReader(new MemoryStream(doc), flavor);
+        }
+
+
+        public static NbtReader OpenReader(NbtCompound root, NbtOptions options = null) {
+            NbtFile file = options == null ? new NbtFile(root) : new NbtFile(root, options);
+            return OpenReader(file.SaveToBuffer(NbtCompression.None), options);
+        }
+
+
         // creates a compound containing lists of every kind of tag
         public static NbtCompound MakeListTest() {
             return new NbtCompound("Root") {

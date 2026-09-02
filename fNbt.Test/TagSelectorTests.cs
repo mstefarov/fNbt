@@ -46,10 +46,8 @@ namespace fNbt.Test {
                 ms.WriteByte(0x00); // root's TAG_End
                 doc = ms.ToArray();
             }
-            var file = new NbtFile();
             Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None,
-                                          tag => tag.Name != "skipme"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "skipme"));
         }
 
 
@@ -83,30 +81,22 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void SkippingLists() {
-            {
-                var file = new NbtFile(TestFiles.MakeListTest());
-                byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-                file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
-                                    tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(0, file.RootTag.Count);
-            }
-            {
-                // Check list-compound interaction
-                NbtCompound comp = new NbtCompound("root") {
-                    new NbtCompound("compOfLists") {
-                        new NbtList("listOfComps") {
-                            new NbtCompound {
-                                new NbtList("emptyList", NbtTagType.Compound)
-                            }
+            NbtCompound root = TestFiles.Reload(TestFiles.MakeListTest(),
+                                                selector: tag => tag.TagType != NbtTagType.List);
+            Assert.AreEqual(0, root.Count);
+
+            // Check list-compound interaction
+            NbtCompound comp = new NbtCompound("root") {
+                new NbtCompound("compOfLists") {
+                    new NbtList("listOfComps") {
+                        new NbtCompound {
+                            new NbtList("emptyList", NbtTagType.Compound)
                         }
                     }
-                };
-                var file = new NbtFile(comp);
-                byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-                file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
-                                    tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(1, file.RootTag.Count);
-            }
+                }
+            };
+            root = TestFiles.Reload(comp, selector: tag => tag.TagType != NbtTagType.List);
+            Assert.AreEqual(1, root.Count);
         }
 
 
@@ -122,20 +112,17 @@ namespace fNbt.Test {
 
             // Read validation enforces the flavor's own ceiling on skipped strings too:
             // conformance is about the document, not about whether the value was kept
-            var strict = new NbtFile(new NbtOptions { Flavor = NbtFlavor.ClassiCube, ValidateOnRead = true });
             Assert.Throws<NbtFormatException>(
-                () => strict.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "s"));
+                () => TestFiles.Load(doc, new NbtOptions { Flavor = NbtFlavor.ClassiCube, ValidateOnRead = true },
+                                     tag => tag.Name != "s"));
 
             // MaxAllocation does not apply to skips, which allocate nothing
-            var capped = new NbtFile(new NbtOptions { MaxAllocation = 100 });
-            capped.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "s");
+            NbtFile capped = TestFiles.Load(doc, new NbtOptions { MaxAllocation = 100 }, tag => tag.Name != "s");
             Assert.IsFalse(capped.RootTag.Contains("s"));
             Assert.AreEqual((short)5, capped.RootTag["k"].ShortValue);
 
             // Reading the same string with that cap still throws
-            var cappedRead = new NbtFile(new NbtOptions { MaxAllocation = 100 });
-            Assert.Throws<NbtFormatException>(
-                () => cappedRead.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, new NbtOptions { MaxAllocation = 100 }));
         }
     }
 }

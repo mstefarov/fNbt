@@ -139,12 +139,10 @@ namespace fNbt.Test {
             compound.Remove("t3");
             compound.Remove("t17");
             compound.Add(new NbtInt("t3", 333));
-            byte[] doc = new NbtFile(compound).SaveToBuffer(NbtCompression.None);
-            var file = new NbtFile();
-            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
+            NbtCompound root = TestFiles.Reload(compound);
             CollectionAssert.AreEqual(
-                compound.Names.ToList(), file.RootTag.Names.ToList());
-            Assert.AreEqual("t3", file.RootTag.Names.Last());
+                compound.Names.ToList(), root.Names.ToList());
+            Assert.AreEqual("t3", root.Names.Last());
         }
 
 

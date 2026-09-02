@@ -62,9 +62,7 @@ namespace fNbt.Test {
         public void DuplicateCompoundNamesThrowFormatException() {
             byte[] doc = { 0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01,
                            0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00 };
-            var file = new NbtFile();
-            Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc));
         }
 
 
@@ -72,7 +70,7 @@ namespace fNbt.Test {
         public void DuplicateCompoundNamesPutReaderIntoErrorState() {
             byte[] doc = { 0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01,
                            0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00 };
-            var reader = new NbtReader(new MemoryStream(doc));
+            NbtReader reader = TestFiles.OpenReader(doc);
             Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
             Assert.IsTrue(reader.IsInErrorState);
         }
@@ -96,9 +94,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void ByteArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x07, 0x08000000); // 128 MiB claimed, 13-byte doc
-            var file = new NbtFile();
-            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(() => TestFiles.Load(doc));
             // The up-front bound must reject it, not the read after a huge allocation
             StringAssert.Contains(ex.Message, "Declared");
         }
@@ -107,9 +103,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void IntArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x08000000);
-            var file = new NbtFile();
-            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(() => TestFiles.Load(doc));
             // The up-front bound must reject it, not the read after a huge allocation
             StringAssert.Contains(ex.Message, "Declared");
         }
@@ -118,9 +112,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void LongArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x0C, 0x08000000);
-            var file = new NbtFile();
-            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(() => TestFiles.Load(doc));
             // The up-front bound must reject it, not the read after a huge allocation
             StringAssert.Contains(ex.Message, "Declared");
         }
@@ -180,8 +172,7 @@ namespace fNbt.Test {
             };
             byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.None);
 
-            var seekable = new NbtFile();
-            seekable.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+            NbtFile seekable = TestFiles.Load(doc);
             Assert.AreEqual(5000, seekable.RootTag.Get<NbtByteArray>("bytes").Value.Length);
             Assert.AreEqual(1000, seekable.RootTag.Get<NbtIntArray>("ints").Value.Length);
             Assert.AreEqual(500, seekable.RootTag.Get<NbtLongArray>("longs").Value.Length);
@@ -203,9 +194,8 @@ namespace fNbt.Test {
         public void IntArraySkipDoesNotWrapToZero() {
             // IntArray of 0x40000000 => 0x100000000 bytes, wraps to 0 in 32-bit
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x40000000);
-            var file = new NbtFile();
             Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "a"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "a"));
         }
 
 
@@ -213,9 +203,8 @@ namespace fNbt.Test {
         public void LongArraySkipDoesNotWrapToZero() {
             // LongArray of 0x20000000 => 0x100000000 bytes, wraps to 0 in 32-bit
             byte[] doc = MakeArrayHeaderDoc(0x0C, 0x20000000);
-            var file = new NbtFile();
             Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "a"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "a"));
         }
 
 
@@ -223,9 +212,8 @@ namespace fNbt.Test {
         public void ListOfLongSkipDoesNotWrapToZero() {
             // List of Long with count 0x20000000 => 0x100000000 bytes, wraps to 0
             byte[] doc = MakeListHeaderDoc(0x04, 0x20000000);
-            var file = new NbtFile();
             Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "a"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "a"));
         }
 
 
@@ -233,24 +221,20 @@ namespace fNbt.Test {
         [TestMethod]
         public void NbtReaderIntArrayDoesNotWrapToZero() {
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x40000000);
-            using (var ms = new MemoryStream(doc)) {
-                var reader = new NbtReader(ms);
-                Assert.Throws<EndOfStreamException>(() => {
-                    while (reader.ReadToFollowing()) { }
-                });
-            }
+            NbtReader reader = TestFiles.OpenReader(doc);
+            Assert.Throws<EndOfStreamException>(() => {
+                while (reader.ReadToFollowing()) { }
+            });
         }
 
 
         [TestMethod]
         public void NbtReaderLongArrayDoesNotWrapToZero() {
             byte[] doc = MakeArrayHeaderDoc(0x0C, 0x20000000);
-            using (var ms = new MemoryStream(doc)) {
-                var reader = new NbtReader(ms);
-                Assert.Throws<EndOfStreamException>(() => {
-                    while (reader.ReadToFollowing()) { }
-                });
-            }
+            NbtReader reader = TestFiles.OpenReader(doc);
+            Assert.Throws<EndOfStreamException>(() => {
+                while (reader.ReadToFollowing()) { }
+            });
         }
 
 
@@ -258,9 +242,8 @@ namespace fNbt.Test {
         [TestMethod]
         public void HugeIntArraySkipThrowsStreamError() {
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x0FFFFFFF);
-            var file = new NbtFile();
             Assert.Throws<EndOfStreamException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, tag => tag.Name != "a"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "a"));
         }
     }
 }

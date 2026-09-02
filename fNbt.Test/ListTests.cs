@@ -328,7 +328,7 @@ namespace fNbt.Test {
             byte[] buffer = testFile.SaveToBuffer(NbtCompression.None);
             long bytesRead = testFile.LoadFromBuffer(buffer, 0, buffer.Length, NbtCompression.None);
             Assert.AreEqual(buffer.Length, bytesRead);
-            Assert.IsTrue(NbtComparer.Instance.Equals(TestFiles.MakeListTest(), testFile.RootTag));
+            NbtAssert.AreEqual(TestFiles.MakeListTest(), testFile.RootTag);
         }
 
 
@@ -354,21 +354,18 @@ namespace fNbt.Test {
         [TestMethod]
         public void SerializingEmpty() {
             // check saving/loading an empty list and a list holding one empty list
-            var testFile = new NbtFile(new NbtCompound("root") {
+            NbtCompound root = TestFiles.Reload(new NbtCompound("root") {
                 new NbtList("emptyList", NbtTagType.End),
                 new NbtList("listyList", NbtTagType.List) {
                     new NbtList(NbtTagType.End)
                 }
             });
-            byte[] buffer = testFile.SaveToBuffer(NbtCompression.None);
 
-            testFile.LoadFromBuffer(buffer, 0, buffer.Length, NbtCompression.None);
-
-            NbtList list1 = testFile.RootTag.Get<NbtList>("emptyList");
+            NbtList list1 = root.Get<NbtList>("emptyList");
             Assert.AreEqual(list1.Count, 0);
             Assert.AreEqual(list1.ListType, NbtTagType.End);
 
-            NbtList list2 = testFile.RootTag.Get<NbtList>("listyList");
+            NbtList list2 = root.Get<NbtList>("listyList");
             Assert.AreEqual(list2.Count, 1);
             Assert.AreEqual(list2.ListType, NbtTagType.List);
             Assert.AreEqual(list2.Get<NbtList>(0).Count, 0);

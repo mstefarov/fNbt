@@ -30,11 +30,7 @@ namespace fNbt.Test {
                 writer.EndCompound();
                 Assert.IsTrue(writer.IsDone);
                 Assert.IsFalse(writer.IsInErrorState);
-                writer.Finish();
-
-                ms.Position = 0;
-                var file = new NbtFile();
-                file.LoadFromStream(ms, NbtCompression.None);
+                NbtFile file = TestFiles.FinishAndReload(writer, ms);
 
                 TestFiles.AssertValueTest(file);
             }
@@ -93,11 +89,7 @@ namespace fNbt.Test {
                     writer.EndList();
                 }
                 writer.EndCompound();
-                writer.Finish();
-
-                ms.Position = 0;
-                var file = new NbtFile();
-                file.LoadFromStream(ms, NbtCompression.None);
+                NbtFile file = TestFiles.FinishAndReload(writer, ms);
                 CollectionAssert.AreEqual(data, file.RootTag["byteArray1"].ByteArrayValue);
                 CollectionAssert.AreEqual(data, file.RootTag["byteArray2"].ByteArrayValue);
                 Assert.AreEqual(1, file.RootTag["byteArray3"].ByteArrayValue.Length);
@@ -498,14 +490,9 @@ namespace fNbt.Test {
                 }
                 writer.EndList();
                 writer.EndCompound();
-                writer.Finish();
-
-                // Rewind!
-                ms.Position = 0;
 
                 // Let's read what we have written, and check contents
-                NbtFile file = new NbtFile();
-                file.LoadFromStream(ms, NbtCompression.None);
+                NbtFile file = TestFiles.FinishAndReload(writer, ms);
                 var readStrings =
                     file.RootTag.Get<NbtList>("stringList")
                         .ToArray<NbtString>()
@@ -559,18 +546,12 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root", NbtFlavor.Bedrock);
                 writer.BeginList("strings", NbtTagType.String, 1);
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(() => writer.WriteString("\uD800"));
-                Assert.AreEqual(before, ms.Length);
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteString("\uD800"));
                 writer.WriteString("ok");
                 writer.EndList();
 
-                before = ms.Length;
-                Assert.Throws<NbtFormatException>(() => writer.WriteInt("\uD800", 1));
-                Assert.AreEqual(before, ms.Length);
-                writer.WriteInt("ok", 1);
-                writer.EndCompound();
-                writer.Finish();
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteInt("\uD800", 1));
+                NbtAssert.WriterStillUsable(writer);
             }
 
             using (var ms = new MemoryStream()) {
@@ -590,28 +571,20 @@ namespace fNbt.Test {
                 var writer = new NbtWriter(ms, "root", new NbtOptions(NbtFlavor.Bedrock) {
                     ValidateOnWrite = false
                 });
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(
+                NbtAssert.WritesNothing<NbtFormatException>(ms,
                     () => writer.WriteTag(new NbtInt(loneSurrogate, 1)));
-                Assert.AreEqual(before, ms.Length);
-                writer.WriteInt("ok", 1);
-                writer.EndCompound();
-                writer.Finish();
+                NbtAssert.WriterStillUsable(writer);
             }
 
             // With validation on, the pre-walk counts the exact bytes under standard UTF-8, so
             // a nested lone surrogate is refused before anything is written
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root", NbtFlavor.Bedrock);
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(
+                NbtAssert.WritesNothing<NbtFormatException>(ms,
                     () => writer.WriteTag(new NbtCompound("nested") {
                         new NbtString("value", loneSurrogate)
                     }));
-                Assert.AreEqual(before, ms.Length);
-                writer.WriteInt("afterRefusal", 1);
-                writer.EndCompound();
-                writer.Finish();
+                NbtAssert.WriterStillUsable(writer);
             }
 
             // NbtFile and NbtCodec share the validation walk
@@ -631,12 +604,8 @@ namespace fNbt.Test {
             // the tag layer would refuse it, so nothing is written and the writer goes on
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtList("l")));
-                Assert.AreEqual(before, ms.Length);
-                writer.WriteInt("i", 1);
-                writer.EndCompound();
-                writer.Finish();
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteTag(new NbtList("l")));
+                NbtAssert.WriterStillUsable(writer);
             }
         }
 
@@ -651,10 +620,7 @@ namespace fNbt.Test {
                 long before = ms.Length;
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(partialTree));
                 Assert.IsTrue(ms.Length > before);
-                Assert.IsTrue(writer.IsInErrorState);
-                Assert.Throws<NbtFormatException>(() => writer.WriteInt("afterFailure", 1));
-                Assert.Throws<NbtFormatException>(writer.EndCompound);
-                Assert.Throws<NbtFormatException>(writer.Finish);
+                NbtAssert.WriterIsPoisoned(writer);
             }
         }
 
@@ -761,8 +727,7 @@ namespace fNbt.Test {
             byte[] tree = objectModel.SaveToBuffer(NbtCompression.None);
             CollectionAssert.AreEqual(tree, granular);
 
-            var reloaded = new NbtFile();
-            reloaded.LoadFromBuffer(granular, 0, granular.Length, NbtCompression.None);
+            NbtFile reloaded = TestFiles.Load(granular);
             NbtList list = reloaded.RootTag.Get<NbtList>("emptyList");
             Assert.AreEqual(0, list.Count);
             Assert.AreEqual(NbtTagType.End, list.ListType);
@@ -785,8 +750,7 @@ namespace fNbt.Test {
                 granular = ms.ToArray();
             }
 
-            var reloaded = new NbtFile();
-            reloaded.LoadFromBuffer(granular, 0, granular.Length, NbtCompression.None);
+            NbtFile reloaded = TestFiles.Load(granular);
             NbtList outer = reloaded.RootTag.Get<NbtList>("listOfLists");
             Assert.AreEqual(1, outer.Count);
             Assert.AreEqual(0, outer.Get<NbtList>(0).Count);
@@ -893,19 +857,13 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
                 writer.BeginList("l", NbtTagType.String, 1);
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(() => writer.WriteString(new string('x', 300)));
-                Assert.AreEqual(before, ms.Length);
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteString(new string('x', 300)));
                 // The slot is still open, so the list cannot close short
                 Assert.Throws<NbtFormatException>(() => writer.EndList());
                 writer.WriteString("ok");
                 writer.EndList();
                 writer.EndCompound();
-                writer.Finish();
-
-                byte[] doc = ms.ToArray();
-                var file = new NbtFile();
-                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
+                NbtFile file = TestFiles.FinishAndReload(writer, ms, new NbtOptions(NbtFlavor.ClassiCube));
                 Assert.AreEqual("ok", file.RootTag["l"][0].StringValue);
             }
 
@@ -924,24 +882,17 @@ namespace fNbt.Test {
             string over = new string('x', 300);
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
-                long before = ms.Length;
-                Assert.Throws<NbtFormatException>(() => writer.WriteString("s", over));
-                Assert.Throws<NbtFormatException>(() => writer.WriteInt(over, 1));
-                Assert.Throws<NbtFormatException>(() => writer.BeginCompound(over));
-                Assert.Throws<NbtFormatException>(() => writer.BeginList(over, NbtTagType.Int, 0));
-                Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtInt(over, 1)));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteString("s", over));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteInt(over, 1));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.BeginCompound(over));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.BeginList(over, NbtTagType.Int, 0));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteTag(new NbtInt(over, 1)));
                 // No type byte or name reached the stream, no container was left open, and
                 // nothing that wrote nothing counts as an error
-                Assert.AreEqual(before, ms.Length);
-                Assert.IsFalse(writer.IsInErrorState);
-                writer.WriteInt("i", 1);
-                writer.EndCompound();
-                writer.Finish();
+                NbtAssert.WriterStillUsable(writer);
 
-                byte[] doc = ms.ToArray();
-                var file = new NbtFile();
-                file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
-                Assert.AreEqual(1, file.RootTag["i"].IntValue);
+                NbtFile file = TestFiles.Load(ms.ToArray(), NbtFlavor.ClassiCube);
+                Assert.AreEqual(1, file.RootTag["afterRefusal"].IntValue);
             }
 
             // A root name over the limit writes nothing at all
@@ -954,9 +905,7 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "r");
                 writer.BeginList("l", NbtTagType.Int, 1);
-                long before = ms.Length;
-                Assert.Throws<ArgumentNullException>(() => writer.WriteInt(null, 5));
-                Assert.AreEqual(before, ms.Length);
+                NbtAssert.WritesNothing<ArgumentNullException>(ms, () => writer.WriteInt(null, 5));
                 Assert.Throws<NbtFormatException>(() => writer.EndList());
                 writer.WriteInt(5);
                 writer.EndList();
@@ -980,11 +929,7 @@ namespace fNbt.Test {
                 writer.WriteIntArray(ints, 1, 4);
                 writer.EndList();
                 writer.EndCompound();
-                writer.Finish();
-
-                ms.Position = 0;
-                var file = new NbtFile();
-                file.LoadFromStream(ms, NbtCompression.None);
+                NbtFile file = TestFiles.FinishAndReload(writer, ms);
                 CollectionAssert.AreEqual(new[] { 12, 13, 14 }, file.RootTag["ia"].IntArrayValue);
                 CollectionAssert.AreEqual(new[] { 13, 14 }, file.RootTag["iaTail"].IntArrayValue);
                 CollectionAssert.AreEqual(new long[] { 22, 23, 24 }, file.RootTag["la"].LongArrayValue);

@@ -88,7 +88,7 @@ namespace fNbt.Test {
             NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual("hello", read.Name);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
         }
 
 
@@ -100,7 +100,7 @@ namespace fNbt.Test {
             byte[] doc = codec.WriteTag(root);
             NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
         }
 
 
@@ -179,7 +179,7 @@ namespace fNbt.Test {
             // The stream overload behaves the same
             using (var ms = new MemoryStream(doc)) {
                 Assert.IsTrue(codec.TryReadTag(ms, out NbtTag streamTag));
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, streamTag));
+                NbtAssert.AreEqual(root, streamTag);
                 Assert.IsFalse(codec.TryReadTag(ms, out NbtTag missing));
                 Assert.IsNull(missing);
             }
@@ -276,7 +276,7 @@ namespace fNbt.Test {
                     List<NbtTag> readBack = codec.ReadConcatenatedTags(concatenated).ToList();
                     Assert.AreEqual(roots.Length, readBack.Count);
                     for (int i = 0; i < roots.Length; i++) {
-                        Assert.IsTrue(NbtComparer.Instance.Equals(roots[i], readBack[i]), flavor.Name);
+                        NbtAssert.AreEqual(roots[i], readBack[i], flavor.Name);
                     }
                 }
             }
@@ -482,7 +482,7 @@ namespace fNbt.Test {
             using (FileStream fs = File.OpenRead(TestFiles.Small)) {
                 NbtTag codecRoot = NbtCodec.For(NbtFlavor.Java).ReadTag(fs);
                 Assert.AreEqual(fs.Length, fs.Position);
-                Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, codecRoot));
+                NbtAssert.AreEqual(file.RootTag, codecRoot);
             }
         }
 
@@ -495,7 +495,7 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream(doc)) {
                 var awkward = new PartialReadStream(new NonSeekableStream(ms), 1);
                 NbtTag read = codec.ReadTag(awkward);
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+                NbtAssert.AreEqual(root, read);
             }
         }
 
@@ -509,11 +509,11 @@ namespace fNbt.Test {
 
             NbtTag read = codec.ReadTag(padded, 3, doc.Length + 1, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
 
             Assert.IsTrue(codec.TryReadTag(padded, 3, doc.Length, out NbtTag tag, out bytesConsumed));
             Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, tag));
+            NbtAssert.AreEqual(root, tag);
         }
 
 

@@ -23,9 +23,8 @@ namespace fNbt.Test {
             // Bytes match the codec's little-endian output exactly
             CollectionAssert.AreEqual(NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root), doc);
 
-            var reloaded = new NbtFile(NbtFlavor.Bedrock);
-            reloaded.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, reloaded.RootTag));
+            NbtFile reloaded = TestFiles.Load(doc, NbtFlavor.Bedrock);
+            NbtAssert.AreEqual(root, reloaded.RootTag);
         }
 
 
@@ -58,9 +57,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void EntryPointsExposeTheirFlavor() {
             Assert.AreSame(NbtFlavor.Bedrock, NbtCodec.For(NbtFlavor.Bedrock).Flavor);
-            using (var ms = new MemoryStream(new byte[] { 0x0A })) {
-                Assert.AreSame(NbtFlavor.Bedrock, new NbtReader(ms, NbtFlavor.Bedrock).Flavor);
-            }
+            Assert.AreSame(NbtFlavor.Bedrock, TestFiles.OpenReader(new byte[] { 0x0A }, NbtFlavor.Bedrock).Flavor);
             using (var ms = new MemoryStream()) {
                 Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r", NbtFlavor.Bedrock).Flavor);
                 Assert.AreSame(NbtFlavor.Java, new NbtWriter(ms, "r").Flavor);
@@ -148,20 +145,20 @@ namespace fNbt.Test {
             var bigRoot = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
             byte[] bigDoc = new NbtFile(bigRoot).SaveToBuffer(NbtCompression.None);
 
-            var capped = new NbtFile(new NbtOptions { MaxAllocation = 65536 });
             Assert.Throws<NbtFormatException>(
-                () => capped.LoadFromBuffer(bigDoc, 0, bigDoc.Length, NbtCompression.None));
+                () => TestFiles.Load(bigDoc, new NbtOptions { MaxAllocation = 65536 }));
 
             // Read validation on load
             var longArrayRoot = new NbtCompound("r") { new NbtLongArray("longs", new long[] { 1 }) };
             byte[] laDoc = new NbtFile(longArrayRoot).SaveToBuffer(NbtCompression.None);
 
-            var generous = new NbtFile(new NbtOptions { Flavor = NbtFlavor.JavaLegacy });
-            generous.LoadFromBuffer(laDoc, 0, laDoc.Length, NbtCompression.None);
+            TestFiles.Load(laDoc, new NbtOptions { Flavor = NbtFlavor.JavaLegacy });
 
-            var strict = new NbtFile(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnRead = true });
             Assert.Throws<NbtFormatException>(
-                () => strict.LoadFromBuffer(laDoc, 0, laDoc.Length, NbtCompression.None));
+                () => TestFiles.Load(laDoc, new NbtOptions {
+                    Flavor = NbtFlavor.JavaLegacy,
+                    ValidateOnRead = true
+                }));
         }
 
 
@@ -170,17 +167,14 @@ namespace fNbt.Test {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] doc = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
 
-            using (var ms = new MemoryStream(doc)) {
-                var reader = new NbtReader(ms, NbtFlavor.Bedrock);
-                NbtTag read = reader.ReadAsTag();
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
-            }
+            NbtTag read = TestFiles.OpenReader(doc, NbtFlavor.Bedrock).ReadAsTag();
+            NbtAssert.AreEqual(root, read);
 
             // The obsolete bool ctor still maps correctly
 #pragma warning disable 618
             using (var ms = new MemoryStream(doc)) {
                 var reader = new NbtReader(ms, false);
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, reader.ReadAsTag()));
+                NbtAssert.AreEqual(root, reader.ReadAsTag());
             }
 #pragma warning restore 618
         }
@@ -191,20 +185,16 @@ namespace fNbt.Test {
             var bigRoot = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
             byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(bigRoot);
 
-            using (var ms = new MemoryStream(doc)) {
-                var reader = new NbtReader(ms, new NbtOptions { MaxAllocation = 65536 });
-                Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
-            }
+            NbtReader capped = TestFiles.OpenReader(doc, new NbtOptions { MaxAllocation = 65536 });
+            Assert.Throws<NbtFormatException>(() => capped.ReadAsTag());
 
             var laRoot = new NbtCompound("r") { new NbtLongArray("longs", new long[] { 1 }) };
             byte[] laDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(laRoot);
-            using (var ms = new MemoryStream(laDoc)) {
-                var reader = new NbtReader(ms, new NbtOptions {
-                    Flavor = NbtFlavor.JavaLegacy,
-                    ValidateOnRead = true
-                });
-                Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
-            }
+            NbtReader strict = TestFiles.OpenReader(laDoc, new NbtOptions {
+                Flavor = NbtFlavor.JavaLegacy,
+                ValidateOnRead = true
+            });
+            Assert.Throws<NbtFormatException>(() => strict.ReadAsTag());
         }
 
 

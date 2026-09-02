@@ -27,7 +27,7 @@ namespace fNbt.Test {
 
             NbtTag tag = codec.ReadTag(padded.AsSpan(2, doc.Length + 1), out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(MakeRoot(), tag));
+            NbtAssert.AreEqual(MakeRoot(), tag);
 
             // Stack memory works too, since nothing outlives the call
             Span<byte> stack = stackalloc byte[doc.Length];
@@ -115,7 +115,7 @@ namespace fNbt.Test {
             codec.WriteTag(root, output);
             NbtTag read = codec.ReadTag(output.WrittenSpan, out int bytesConsumed);
             Assert.AreEqual(output.WrittenCount, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+            NbtAssert.AreEqual(root, read);
         }
 
 

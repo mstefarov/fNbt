@@ -19,21 +19,13 @@ namespace fNbt.Test {
         }
 
 
-        static NbtFile Roundtrip(NbtCompound root) {
-            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.None);
-            var file = new NbtFile();
-            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
-            return file;
-        }
-
-
         [TestMethod]
         public void RepeatedNamesShareOneInstance() {
             // Names repeated across compounds may come back as one string instance. That is
             // intended, so pin it.
             string[] names = { "alpha", "beta", "gamma" };
-            NbtFile file = Roundtrip(MakeSchemaDoc(60, (i, f) => names[f]));
-            var items = (NbtList)file.RootTag["Items"];
+            NbtCompound root = TestFiles.Reload(MakeSchemaDoc(60, (i, f) => names[f]));
+            var items = (NbtList)root["Items"];
             string name30 = ((NbtCompound)items[30]).Tags.First().Name;
             string name50 = ((NbtCompound)items[50]).Tags.First().Name;
             Assert.AreEqual("alpha", name30);
@@ -44,8 +36,8 @@ namespace fNbt.Test {
         [TestMethod]
         public void ManyUniqueNamesStillParse() {
             // Far more unique names than the cache retains
-            NbtFile file = Roundtrip(MakeSchemaDoc(2000, (i, f) => "n" + i + "_" + f));
-            var items = (NbtList)file.RootTag["Items"];
+            NbtCompound root = TestFiles.Reload(MakeSchemaDoc(2000, (i, f) => "n" + i + "_" + f));
+            var items = (NbtList)root["Items"];
             Assert.AreEqual(2000, items.Count);
             Assert.AreEqual(1500 * 3 + 2, ((NbtCompound)items[1500])["n1500_2"].IntValue);
         }
@@ -54,8 +46,8 @@ namespace fNbt.Test {
         [TestMethod]
         public void LongNamesStillParse() {
             string longName = new string('x', 100);
-            NbtFile file = Roundtrip(MakeSchemaDoc(20, (i, f) => longName + f));
-            var items = (NbtList)file.RootTag["Items"];
+            NbtCompound root = TestFiles.Reload(MakeSchemaDoc(20, (i, f) => longName + f));
+            var items = (NbtList)root["Items"];
             Assert.AreEqual(15 * 3 + 1, ((NbtCompound)items[15])[longName + "1"].IntValue);
         }
 
@@ -89,8 +81,7 @@ namespace fNbt.Test {
                 ms.WriteByte(0x00); // end root
                 doc = ms.ToArray();
             }
-            var file = new NbtFile();
-            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
+            NbtFile file = TestFiles.Load(doc);
             string nameA = ((NbtCompound)file.RootTag["first"]).Tags.First().Name;
             string nameB = ((NbtCompound)file.RootTag["second"]).Tags.First().Name;
             Assert.AreEqual(nameA, nameB);
@@ -116,9 +107,7 @@ namespace fNbt.Test {
                 ms.WriteByte(0x00);
                 doc = ms.ToArray();
             }
-            var file = new NbtFile();
-            Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null));
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc));
         }
 
 
@@ -126,8 +115,7 @@ namespace fNbt.Test {
         public void NbtReaderNamesAreCachedToo() {
             byte[] doc = new NbtFile(MakeSchemaDoc(60, (i, f) => "field" + f))
                 .SaveToBuffer(NbtCompression.None);
-            using var ms = new MemoryStream(doc);
-            var reader = new NbtReader(ms);
+            NbtReader reader = TestFiles.OpenReader(doc);
             var occurrences = new List<string>();
             while (reader.ReadToFollowing()) {
                 if (reader.TagName == "field1") {

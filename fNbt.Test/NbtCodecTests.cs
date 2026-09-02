@@ -12,7 +12,7 @@ namespace fNbt.Test {
 
             // Without the cap, the same document loads fine
             var openCodec = new NbtCodec(NbtFlavor.Java);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, openCodec.ReadTag(doc, 0, doc.Length, out _)));
+            NbtAssert.AreEqual(root, openCodec.ReadTag(doc, 0, doc.Length, out _));
 
             var cappedCodec = new NbtCodec(new NbtOptions { MaxAllocation = 65536 });
             Assert.Throws<NbtFormatException>(() => cappedCodec.ReadTag(doc, 0, doc.Length, out _));
@@ -35,8 +35,7 @@ namespace fNbt.Test {
             // A small document loads fine under the same cap
             var smallRoot = new NbtCompound("r") { new NbtString("s", "short") };
             byte[] smallDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(smallRoot);
-            Assert.IsTrue(NbtComparer.Instance.Equals(
-                smallRoot, cappedCodec.ReadTag(smallDoc, 0, smallDoc.Length, out _)));
+            NbtAssert.AreEqual(smallRoot, cappedCodec.ReadTag(smallDoc, 0, smallDoc.Length, out _));
         }
 
 
@@ -83,7 +82,7 @@ namespace fNbt.Test {
             byte[] doc = codec.WriteTag(root);
 
             // Reads are generous regardless, so the same flavor loads it back
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, codec.ReadTag(doc, 0, doc.Length, out _)));
+            NbtAssert.AreEqual(root, codec.ReadTag(doc, 0, doc.Length, out _));
         }
 
 
