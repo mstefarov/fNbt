@@ -314,9 +314,7 @@ namespace fNbt {
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             EnsureListType();
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(NbtTagType.List);
-            writeStream.Write(Name);
+            writeStream.WriteTagHeader(NbtTagType.List, Name);
             WritePayload(writeStream, childDepthBudget);
         }
 

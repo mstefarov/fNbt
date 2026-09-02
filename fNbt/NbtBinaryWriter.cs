@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
@@ -101,6 +102,16 @@ namespace fNbt {
 
         public void Write(NbtTagType value) {
             stream.WriteByte((byte)value);
+        }
+
+
+        // The type byte and name that open every named tag. Compound children are always
+        // named, so a null name is an invariant break rather than a caller error.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteTagHeader(NbtTagType type, string? name) {
+            if (name == null) throw NbtFormatException.UnnamedChild();
+            stream.WriteByte((byte)type);
+            Write(name);
         }
 
 

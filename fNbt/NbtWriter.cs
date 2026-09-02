@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace fNbt {
     /// <summary> An efficient writer for writing NBT data directly to streams.
@@ -162,11 +163,8 @@ namespace fNbt {
         /// an unnamed compound tag was expected -OR- a tag of a different type was expected -OR-
         /// tags are nested more than 512 levels deep. </exception>
         public void BeginCompound(string tagName) {
-            ValidateConstraints(tagName, NbtTagType.Compound);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
             EnsureCanGoDown();
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Compound, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Compound);
             CommitEmission(parentType);
             GoDown(new Node(NbtTagType.Compound));
         }
@@ -218,9 +216,8 @@ namespace fNbt {
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(NbtTagType elementType, int size) {
             ValidateListHeader(elementType, size);
-            ValidateConstraints(null, NbtTagType.List);
             EnsureCanGoDown();
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.List);
             writer.Write((byte)elementType);
             writer.Write(size);
             CommitEmission(parentType);
@@ -241,11 +238,8 @@ namespace fNbt {
         /// (End is allowed only when <paramref name="size"/> is 0). </exception>
         public void BeginList(string tagName, NbtTagType elementType, int size) {
             ValidateListHeader(elementType, size);
-            ValidateConstraints(tagName, NbtTagType.List);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
             EnsureCanGoDown();
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.List, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.List);
             writer.Write((byte)elementType);
             writer.Write(size);
             CommitEmission(parentType);
@@ -280,8 +274,7 @@ namespace fNbt {
         /// a named byte tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteByte(byte value) {
-            ValidateConstraints(null, NbtTagType.Byte);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Byte);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -293,10 +286,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed byte tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteByte(string tagName, byte value) {
-            ValidateConstraints(tagName, NbtTagType.Byte);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Byte, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Byte);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -308,8 +298,7 @@ namespace fNbt {
         /// a named double tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteDouble(double value) {
-            ValidateConstraints(null, NbtTagType.Double);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Double);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -321,10 +310,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed double tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteDouble(string tagName, double value) {
-            ValidateConstraints(tagName, NbtTagType.Double);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Double, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Double);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -336,8 +322,7 @@ namespace fNbt {
         /// a named float tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteFloat(float value) {
-            ValidateConstraints(null, NbtTagType.Float);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Float);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -349,10 +334,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed float tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteFloat(string tagName, float value) {
-            ValidateConstraints(tagName, NbtTagType.Float);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Float, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Float);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -364,8 +346,7 @@ namespace fNbt {
         /// a named int tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteInt(int value) {
-            ValidateConstraints(null, NbtTagType.Int);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Int);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -377,10 +358,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed int tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteInt(string tagName, int value) {
-            ValidateConstraints(tagName, NbtTagType.Int);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Int, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Int);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -392,8 +370,7 @@ namespace fNbt {
         /// a named long tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteLong(long value) {
-            ValidateConstraints(null, NbtTagType.Long);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Long);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -405,10 +382,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed long tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteLong(string tagName, long value) {
-            ValidateConstraints(tagName, NbtTagType.Long);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Long, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Long);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -420,8 +394,7 @@ namespace fNbt {
         /// a named short tag was expected -OR- a tag of a different type was expected -OR-
         /// the size of a parent list has been exceeded. </exception>
         public void WriteShort(short value) {
-            ValidateConstraints(null, NbtTagType.Short);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.Short);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -433,10 +406,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
         /// an unnamed short tag was expected -OR- a tag of a different type was expected. </exception>
         public void WriteShort(string tagName, short value) {
-            ValidateConstraints(tagName, NbtTagType.Short);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.Short, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.Short);
             writer.Write(value);
             CommitEmission(parentType);
         }
@@ -506,8 +476,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteByteArray(byte[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(null, NbtTagType.ByteArray);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.ByteArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -542,10 +511,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteByteArray(string tagName, byte[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(tagName, NbtTagType.ByteArray);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.ByteArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -581,8 +547,7 @@ namespace fNbt {
         /// <paramref name="buffer"/> size is 0. </exception>
         public void WriteByteArray(Stream dataSource, int count, byte[] buffer) {
             ValidateByteArraySource(dataSource, count, buffer);
-            ValidateConstraints(null, NbtTagType.ByteArray);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.ByteArray);
             WriteByteArrayFromStreamImpl(dataSource, count, buffer);
             CommitEmission(parentType);
         }
@@ -618,10 +583,7 @@ namespace fNbt {
         public void WriteByteArray(string tagName, Stream dataSource, int count,
                                    byte[] buffer) {
             ValidateByteArraySource(dataSource, count, buffer);
-            ValidateConstraints(tagName, NbtTagType.ByteArray);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.ByteArray, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.ByteArray);
             WriteByteArrayFromStreamImpl(dataSource, count, buffer);
             CommitEmission(parentType);
         }
@@ -681,8 +643,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteIntArray(int[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(null, NbtTagType.IntArray);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.IntArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -719,10 +680,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteIntArray(string tagName, int[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(tagName, NbtTagType.IntArray);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.IntArray, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.IntArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -756,8 +714,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteLongArray(long[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(null, NbtTagType.LongArray);
-            NbtTagType parentType = BeginEmission();
+            NbtTagType parentType = BeginUnnamedTag(NbtTagType.LongArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -794,10 +751,7 @@ namespace fNbt {
         /// <paramref name="offset"/> subtracted from the array length. </exception>
         public void WriteLongArray(string tagName, long[] data, int offset, int count) {
             CheckArray(data, offset, count);
-            ValidateConstraints(tagName, NbtTagType.LongArray);
-            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
-            NbtTagType parentType = BeginEmission();
-            WriteHeader(NbtTagType.LongArray, tagName, nameBytes, nameModified);
+            NbtTagType parentType = BeginNamedTag(tagName, NbtTagType.LongArray);
             writer.Write(count);
             writer.Write(data, offset, count);
             CommitEmission(parentType);
@@ -922,6 +876,25 @@ namespace fNbt {
             } else if (name == null) {
                 throw new NbtFormatException("Expecting a named tag.");
             }
+        }
+
+
+        // The prologue every named write shares. Every refusal happens before the emission
+        // window opens, and the window opens with the type byte and name already measured.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        NbtTagType BeginNamedTag(string tagName, NbtTagType type) {
+            ValidateConstraints(tagName, type);
+            int nameBytes = MeasureString(tagName, nameof(tagName), out bool nameModified);
+            NbtTagType parentType = BeginEmission();
+            WriteHeader(type, tagName, nameBytes, nameModified);
+            return parentType;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        NbtTagType BeginUnnamedTag(NbtTagType type) {
+            ValidateConstraints(null, type);
+            return BeginEmission();
         }
 
 

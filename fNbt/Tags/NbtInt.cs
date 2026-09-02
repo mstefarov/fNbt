@@ -59,9 +59,7 @@ namespace fNbt {
 
 
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
-            writeStream.Write(NbtTagType.Int);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
+            writeStream.WriteTagHeader(NbtTagType.Int, Name);
             writeStream.Write(Value);
         }
 
