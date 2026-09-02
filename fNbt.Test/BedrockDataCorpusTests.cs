@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,16 +13,6 @@ namespace fNbt.Test {
         const int PaletteRootCount = 16913;
 
         static readonly NbtCodec Codec = NbtCodec.For(NbtFlavor.BedrockNetwork);
-
-
-        static void AssertBytesEqual(byte[] expected, byte[] actual) {
-            Assert.AreEqual(expected.Length, actual.Length, "re-encoded length differs");
-            for (int i = 0; i < expected.Length; i++) {
-                if (expected[i] != actual[i]) {
-                    Assert.Fail("re-encoded bytes differ at offset " + i);
-                }
-            }
-        }
 
 
         [TestMethod]
@@ -54,7 +43,7 @@ namespace fNbt.Test {
             using (var input = new MemoryStream(doc))
             using (var output = new MemoryStream(doc.Length)) {
                 Codec.WriteConcatenatedTags(Codec.ReadConcatenatedTags(input), output);
-                AssertBytesEqual(doc, output.ToArray());
+                CollectionAssert.AreEqual(doc, output.ToArray());
             }
         }
 
@@ -88,7 +77,7 @@ namespace fNbt.Test {
 
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual(136, ((NbtList)root["idlist"]).Count);
-            AssertBytesEqual(doc, Codec.WriteTag(root));
+            CollectionAssert.AreEqual(doc, Codec.WriteTag(root));
         }
     }
 }

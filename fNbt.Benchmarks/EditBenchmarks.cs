@@ -4,8 +4,8 @@ namespace fNbt.Benchmarks;
 
 public class EditBenchmarks {
 
-    private NbtTag bigFileRoot = null!;
-    private string[] addNames = null!;
+    NbtTag bigFileRoot = null!;
+    string[] addNames = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {

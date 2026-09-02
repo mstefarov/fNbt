@@ -4,8 +4,7 @@ using System.IO;
 namespace fNbt.Test {
     [TestClass]
     public class DepthLimitTests {
-        // Same as the internal cap shared by all recursive walks.
-        const int MaxDepth = 512;
+        const int MaxDepth = NbtTag.MaxDepth;
 
 
         // Builds an uncompressed doc: root compound "" holding recursively nested TAG_List "l".

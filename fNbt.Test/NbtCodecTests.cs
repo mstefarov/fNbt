@@ -1,22 +1,10 @@
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 
 namespace fNbt.Test {
     [TestClass]
     public class NbtCodecTests {
-        static NbtCompound MakeSampleRoot(string name) {
-            return new NbtCompound(name) {
-                new NbtInt("id", 42),
-                new NbtString("motd", "Hello, world!"),
-                new NbtCompound("nested") {
-                    new NbtLong("big", 1234567890123L)
-                }
-            };
-        }
-
-
         [TestMethod]
         public void MaxAllocationCapsArrayAllocations() {
             var root = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };

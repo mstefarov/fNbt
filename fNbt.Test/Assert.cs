@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-// Extra asserts that were in NUnit but not in MSTest2
+// Asserts NUnit had and MSTest does not
 namespace fNbt.Test {
     internal class FileAssert {
         const int BufferSize = 8 * 1024; // 8 KiB

@@ -1,6 +1,4 @@
-using System;
 using System.IO;
-using System.Linq;
 
 namespace fNbt.Test {
     // Wire-format coverage for the BedrockNetwork flavor: TAG_Int/TAG_Long values and container

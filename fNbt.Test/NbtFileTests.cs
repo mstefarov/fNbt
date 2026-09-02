@@ -120,9 +120,10 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentException>(() => file.SaveToStream(nbtStream, NbtCompression.AutoDetect));
             Assert.Throws<ArgumentOutOfRangeException>(() => file.SaveToStream(nbtStream, (NbtCompression)255));
             file.SaveToStream(nbtStream, NbtCompression.None);
-            FileStream testFileStream = File.OpenRead(TestFiles.Small);
             nbtStream.Position = 0;
-            FileAssert.AreEqual(testFileStream, nbtStream);
+            using (FileStream testFileStream = File.OpenRead(TestFiles.Small)) {
+                FileAssert.AreEqual(testFileStream, nbtStream);
+            }
         }
 
 

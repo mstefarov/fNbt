@@ -353,7 +353,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void SerializingEmpty() {
-            // check saving/loading lists of all possible value types
+            // check saving/loading an empty list and a list holding one empty list
             var testFile = new NbtFile(new NbtCompound("root") {
                 new NbtList("emptyList", NbtTagType.End),
                 new NbtList("listyList", NbtTagType.List) {

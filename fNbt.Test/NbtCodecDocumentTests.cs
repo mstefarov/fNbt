@@ -334,10 +334,7 @@ namespace fNbt.Test {
         public void ReadingNonCompoundRootIsGenerous() {
             // TAG_String root named "s" with value "hi": not something Minecraft writes,
             // but the reader accepts what it can parse.
-            byte[] doc = {
-                0x08, 0x00, 0x01, (byte)'s', // TAG_String "s"
-                0x00, 0x02, (byte)'h', (byte)'i'
-            };
+            byte[] doc = StringRootDoc;
             NbtTag read = NbtCodec.For(NbtFlavor.Java).ReadTag(doc, 0, doc.Length, out int bytesConsumed);
             Assert.AreEqual(doc.Length, bytesConsumed);
             Assert.AreEqual("s", read.Name);
@@ -435,7 +432,7 @@ namespace fNbt.Test {
         }
 
 
-[TestMethod]
+        [TestMethod]
         public void TruncatedDocumentThrows() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
             byte[] doc = codec.WriteTag(MakeSampleRoot("r"));
@@ -453,16 +450,15 @@ namespace fNbt.Test {
         }
 
 
-        // Builds an uncompressed Java doc of compounds nested totalLevels deep (including root)
         [TestMethod]
         public void DepthLimitIsEnforced() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
 
-            byte[] okDoc = TestFiles.MakeNestedCompoundDoc(512);
+            byte[] okDoc = TestFiles.MakeNestedCompoundDoc(NbtTag.MaxDepth);
             NbtTag read = codec.ReadTag(okDoc, 0, okDoc.Length, out _);
             Assert.IsNotNull(((NbtCompound)read).Get<NbtCompound>("c"));
 
-            byte[] deepDoc = TestFiles.MakeNestedCompoundDoc(513);
+            byte[] deepDoc = TestFiles.MakeNestedCompoundDoc(NbtTag.MaxDepth + 1);
             Assert.Throws<NbtFormatException>(() => codec.ReadTag(deepDoc, 0, deepDoc.Length, out _));
         }
 

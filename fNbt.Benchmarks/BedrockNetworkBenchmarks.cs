@@ -10,9 +10,9 @@ namespace fNbt.Benchmarks;
 // build or run against a released baseline.
 [BenchmarkCategory(Program.BaselineIncompatible)]
 public class BedrockNetworkBenchmarks {
-    private byte[] paletteBytes = null!;
-    private NbtTag[] paletteRoots = null!;
-    private NbtCodec codec = null!;
+    byte[] paletteBytes = null!;
+    NbtTag[] paletteRoots = null!;
+    NbtCodec codec = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {

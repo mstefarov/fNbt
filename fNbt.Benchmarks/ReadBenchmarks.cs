@@ -3,7 +3,7 @@ using BenchmarkDotNet.Attributes;
 namespace fNbt.Benchmarks;
 
 public class ReadBenchmarks {
-    private byte[] serializedLargeByteArrayNbt = null!;
+    byte[] serializedLargeByteArrayNbt = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {

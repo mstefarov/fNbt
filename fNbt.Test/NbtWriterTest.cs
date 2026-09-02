@@ -395,7 +395,7 @@ namespace fNbt.Test {
                     Assert.Throws<ArgumentNullException>(() => writer.WriteIntArray("NullIntArray", null));
                     Assert.Throws<ArgumentNullException>(() => writer.WriteIntArray("NullIntArray", null, 0, 5));
 
-                    // unacceptable nulls: WriteIntArray
+                    // unacceptable nulls: WriteLongArray
                     Assert.Throws<ArgumentNullException>(() => writer.WriteLongArray(null));
                     Assert.Throws<ArgumentNullException>(() => writer.WriteLongArray(null, 0, 5));
                     Assert.Throws<ArgumentNullException>(() => writer.WriteLongArray("NullLongArray", null));
@@ -824,23 +824,6 @@ namespace fNbt.Test {
         }
 
 
-        class NonWritableStream : MemoryStream {
-            public override bool CanWrite {
-                get { return false; }
-            }
-
-
-            public override void WriteByte(byte value) {
-                throw new NotSupportedException();
-            }
-
-
-            public override void Write(byte[] buffer, int offset, int count) {
-                throw new NotSupportedException();
-            }
-        }
-
-
         sealed class FailAfterBytesStream : MemoryStream {
             int bytesBeforeFailure = int.MaxValue;
 
@@ -1007,23 +990,6 @@ namespace fNbt.Test {
                 CollectionAssert.AreEqual(new long[] { 22, 23, 24 }, file.RootTag["la"].LongArrayValue);
                 CollectionAssert.AreEqual(new long[] { 23, 24 }, file.RootTag["laTail"].LongArrayValue);
                 CollectionAssert.AreEqual(new[] { 11, 12, 13, 14 }, file.RootTag["list"][0].IntArrayValue);
-            }
-        }
-
-
-        class NonReadableStream : MemoryStream {
-            public override bool CanRead {
-                get { return false; }
-            }
-
-
-            public override int ReadByte() {
-                throw new NotSupportedException();
-            }
-
-
-            public override int Read(byte[] buffer, int offset, int count) {
-                throw new NotSupportedException();
             }
         }
     }

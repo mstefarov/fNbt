@@ -3,7 +3,6 @@
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net48;net8.0</TargetFrameworks>
     <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('Windows'))">net8.0</TargetFrameworks>
     <OutputType>Library</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <IsTestProject>true</IsTestProject>
     <LangVersion>12</LangVersion>
     <OutputPath>..\bin\$(Configuration)\Tests\</OutputPath>

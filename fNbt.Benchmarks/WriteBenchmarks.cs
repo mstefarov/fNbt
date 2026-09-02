@@ -3,7 +3,7 @@ using BenchmarkDotNet.Attributes;
 namespace fNbt.Benchmarks;
 
 public class WriteBenchmarks {
-    private NbtCompound complexCompound = null!;
+    NbtCompound complexCompound = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {

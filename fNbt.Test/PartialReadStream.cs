@@ -6,10 +6,6 @@ namespace fNbt.Test {
         readonly Stream baseStream;
         readonly int increment;
 
-        public PartialReadStream(Stream baseStream)
-            : this(baseStream, 1) { }
-
-
         public PartialReadStream(Stream baseStream, int increment) {
             if (baseStream == null) throw new ArgumentNullException(nameof(baseStream));
             this.baseStream = baseStream;

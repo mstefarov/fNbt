@@ -135,7 +135,7 @@ namespace fNbt.Test {
         }
 
 
-        // creates a file with lots of compounds and lists, used to test NbtReader compliance
+        // creates a document with lots of compounds and lists, used to test NbtReader compliance
         public static Stream MakeReaderTest() {
             var root = new NbtCompound("root") {
                 new NbtInt("first"),

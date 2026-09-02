@@ -126,7 +126,7 @@ public class CustomArguments {
     public string? BaselineSource { get; private set; }
     public bool ReverseOrder { get; private set; }
     public bool ServerGc { get; private set; }
-    private readonly string[] remainingArgs;
+    readonly string[] remainingArgs;
 
     public CustomArguments(string[] args) {
         var argsList = args.ToList();

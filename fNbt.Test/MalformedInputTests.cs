@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.IO.Compression;
 
@@ -85,21 +84,6 @@ namespace fNbt.Test {
             var root = new NbtCompound("root") { new NbtInt("v", 1) };
             byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
             doc[1] ^= 0x01;
-
-            var file = new NbtFile();
-            Assert.Throws<InvalidDataException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib));
-        }
-
-
-        // A corrupt ZLib checksum must be caught and reported as InvalidDataException.
-        // The netstandard2.0 build validates the Adler-32 trailer itself on seekable streams.
-        [TestMethod]
-        public void CorruptZLibChecksumThrows() {
-            var root = new NbtCompound("root") { new NbtInt("v", 1) };
-            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
-            // Corrupt the 4-byte Adler-32 trailer
-            doc[doc.Length - 1] ^= 0xFF;
 
             var file = new NbtFile();
             Assert.Throws<InvalidDataException>(

@@ -4,11 +4,13 @@ using System.IO;
 namespace fNbt.Test {
     // The process-wide NbtOptions defaults: setter validation, entry points and new options
     // copying the current values, and the policy-keyed NbtCodec.For cache.
-    // Every test that changes a default restores it in finally; these tests must not
-    // run in parallel with each other.
+    // The defaults are process-wide, so a cleanup restores them after every test and the
+    // class never runs in parallel.
     [TestClass]
+    [DoNotParallelize]
     public class OptionsDefaultsTests {
-        static void RestoreDefaults() {
+        [TestCleanup]
+        public void RestoreDefaults() {
             NbtOptions.DefaultFlavor = NbtFlavor.Java;
             NbtOptions.DefaultValidateOnRead = false;
             NbtOptions.DefaultValidateOnWrite = true;
@@ -47,50 +49,42 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void NewOptionsCopyCurrentDefaults() {
-            try {
-                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
-                NbtOptions.DefaultValidateOnRead = true;
-                NbtOptions.DefaultValidateOnWrite = false;
-                NbtOptions.DefaultMaxAllocation = 12345;
+            NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+            NbtOptions.DefaultValidateOnRead = true;
+            NbtOptions.DefaultValidateOnWrite = false;
+            NbtOptions.DefaultMaxAllocation = 12345;
 
-                var options = new NbtOptions();
-                Assert.AreSame(NbtFlavor.Bedrock, options.Flavor);
-                Assert.IsTrue(options.ValidateOnRead);
-                Assert.IsFalse(options.ValidateOnWrite);
-                Assert.AreEqual(12345, options.MaxAllocation);
+            var options = new NbtOptions();
+            Assert.AreSame(NbtFlavor.Bedrock, options.Flavor);
+            Assert.IsTrue(options.ValidateOnRead);
+            Assert.IsFalse(options.ValidateOnWrite);
+            Assert.AreEqual(12345, options.MaxAllocation);
 
-                // The flavor constructor copies only the policy defaults
-                var flavored = new NbtOptions(NbtFlavor.ClassiCube);
-                Assert.AreSame(NbtFlavor.ClassiCube, flavored.Flavor);
-                Assert.IsTrue(flavored.ValidateOnRead);
-                Assert.IsFalse(flavored.ValidateOnWrite);
-                Assert.AreEqual(12345, flavored.MaxAllocation);
+            // The flavor constructor copies only the policy defaults
+            var flavored = new NbtOptions(NbtFlavor.ClassiCube);
+            Assert.AreSame(NbtFlavor.ClassiCube, flavored.Flavor);
+            Assert.IsTrue(flavored.ValidateOnRead);
+            Assert.IsFalse(flavored.ValidateOnWrite);
+            Assert.AreEqual(12345, flavored.MaxAllocation);
 
-                // Later default changes do not reach existing instances
-                RestoreDefaults();
-                Assert.AreSame(NbtFlavor.Bedrock, options.Flavor);
-                Assert.IsTrue(options.ValidateOnRead);
-                Assert.IsFalse(options.ValidateOnWrite);
-                Assert.AreEqual(12345, options.MaxAllocation);
-            } finally {
-                RestoreDefaults();
-            }
+            // Later default changes do not reach existing instances
+            RestoreDefaults();
+            Assert.AreSame(NbtFlavor.Bedrock, options.Flavor);
+            Assert.IsTrue(options.ValidateOnRead);
+            Assert.IsFalse(options.ValidateOnWrite);
+            Assert.AreEqual(12345, options.MaxAllocation);
         }
 
 
         [TestMethod]
         public void FlavorlessEntryPointsUseDefaultFlavor() {
-            try {
-                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
-                Assert.AreSame(NbtFlavor.Bedrock, new NbtFile().Flavor);
-                using (var ms = new MemoryStream(new byte[] { 0x0A })) {
-                    Assert.AreSame(NbtFlavor.Bedrock, new NbtReader(ms).Flavor);
-                }
-                using (var ms = new MemoryStream()) {
-                    Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r").Flavor);
-                }
-            } finally {
-                RestoreDefaults();
+            NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+            Assert.AreSame(NbtFlavor.Bedrock, new NbtFile().Flavor);
+            using (var ms = new MemoryStream(new byte[] { 0x0A })) {
+                Assert.AreSame(NbtFlavor.Bedrock, new NbtReader(ms).Flavor);
+            }
+            using (var ms = new MemoryStream()) {
+                Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r").Flavor);
             }
         }
 
@@ -98,41 +92,29 @@ namespace fNbt.Test {
         [TestMethod]
         public void EntryPointsSnapshotDefaultsAtConstruction() {
             var file = new NbtFile();
-            try {
-                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
-                Assert.AreSame(NbtFlavor.Java, file.Flavor);
-            } finally {
-                RestoreDefaults();
-            }
+            NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+            Assert.AreSame(NbtFlavor.Java, file.Flavor);
         }
 
 
         [TestMethod]
         public void FlavorEntryPointsUseCurrentPolicyDefaults() {
             // Write validation: ClassiCube normally refuses TAG_Int_Array
-            try {
-                NbtOptions.DefaultValidateOnWrite = false;
-                using (var ms = new MemoryStream()) {
-                    var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
-                    writer.WriteIntArray("ints", new int[] { 1 });
-                    writer.EndCompound();
-                    writer.Finish();
-                }
-            } finally {
-                RestoreDefaults();
+            NbtOptions.DefaultValidateOnWrite = false;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
+                writer.WriteIntArray("ints", new int[] { 1 });
+                writer.EndCompound();
+                writer.Finish();
             }
 
             // Allocation cap through the flavor overload
             var bigRoot = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
             byte[] bigDoc = new NbtFile(bigRoot, NbtFlavor.Java).SaveToBuffer(NbtCompression.None);
-            try {
-                NbtOptions.DefaultMaxAllocation = 65536;
-                var capped = new NbtFile(NbtFlavor.Java);
-                Assert.Throws<NbtFormatException>(
-                    () => capped.LoadFromBuffer(bigDoc, 0, bigDoc.Length, NbtCompression.None));
-            } finally {
-                RestoreDefaults();
-            }
+            NbtOptions.DefaultMaxAllocation = 65536;
+            var capped = new NbtFile(NbtFlavor.Java);
+            Assert.Throws<NbtFormatException>(
+                () => capped.LoadFromBuffer(bigDoc, 0, bigDoc.Length, NbtCompression.None));
         }
 
 
@@ -140,17 +122,13 @@ namespace fNbt.Test {
         public void ObsoleteBoolCtorsUseCurrentPolicyDefaults() {
             // The bool ctors chain through the flavor ctors, so ambient policy reaches them
 #pragma warning disable 618
-            try {
-                NbtOptions.DefaultValidateOnWrite = false;
-                using (var ms = new MemoryStream()) {
-                    var writer = new NbtWriter(ms, "r", false);
-                    // Bedrock normally refuses TAG_Long_Array
-                    writer.WriteLongArray("longs", new long[] { 1 });
-                    writer.EndCompound();
-                    writer.Finish();
-                }
-            } finally {
-                RestoreDefaults();
+            NbtOptions.DefaultValidateOnWrite = false;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r", false);
+                // Bedrock normally refuses TAG_Long_Array
+                writer.WriteLongArray("longs", new long[] { 1 });
+                writer.EndCompound();
+                writer.Finish();
             }
 #pragma warning restore 618
         }
@@ -158,29 +136,25 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CodecForIsKeyedByPolicyDefaultsOnly() {
-            try {
-                NbtCodec before = NbtCodec.For(NbtFlavor.Bedrock);
+            NbtCodec before = NbtCodec.For(NbtFlavor.Bedrock);
 
-                // A flavor-default change must not invalidate an explicit-flavor codec
-                NbtOptions.DefaultFlavor = NbtFlavor.ClassiCube;
-                Assert.AreSame(before, NbtCodec.For(NbtFlavor.Bedrock));
+            // A flavor-default change must not invalidate an explicit-flavor codec
+            NbtOptions.DefaultFlavor = NbtFlavor.ClassiCube;
+            Assert.AreSame(before, NbtCodec.For(NbtFlavor.Bedrock));
 
-                // A policy change makes later calls return a fresh instance
-                NbtOptions.DefaultValidateOnWrite = false;
-                NbtCodec after = NbtCodec.For(NbtFlavor.Bedrock);
-                Assert.AreNotSame(before, after);
+            // A policy change makes later calls return a fresh instance
+            NbtOptions.DefaultValidateOnWrite = false;
+            NbtCodec after = NbtCodec.For(NbtFlavor.Bedrock);
+            Assert.AreNotSame(before, after);
 
-                // The returned codecs themselves never change
-                var tree = new NbtCompound("c") { new NbtLongArray("longs", new long[] { 1 }) };
-                Assert.Throws<NbtFormatException>(() => before.WriteTag(tree));
-                Assert.IsTrue(after.WriteTag(tree).Length > 0);
+            // The returned codecs themselves never change
+            var tree = new NbtCompound("c") { new NbtLongArray("longs", new long[] { 1 }) };
+            Assert.Throws<NbtFormatException>(() => before.WriteTag(tree));
+            Assert.IsTrue(after.WriteTag(tree).Length > 0);
 
-                // A same-value set keeps the cached instance
-                NbtOptions.DefaultValidateOnWrite = false;
-                Assert.AreSame(after, NbtCodec.For(NbtFlavor.Bedrock));
-            } finally {
-                RestoreDefaults();
-            }
+            // A same-value set keeps the cached instance
+            NbtOptions.DefaultValidateOnWrite = false;
+            Assert.AreSame(after, NbtCodec.For(NbtFlavor.Bedrock));
         }
 
 
@@ -194,7 +168,6 @@ namespace fNbt.Test {
                 NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
                 Assert.AreEqual("rootName", NbtFile.ReadRootTagName(path));
             } finally {
-                RestoreDefaults();
                 File.Delete(path);
             }
         }
@@ -221,14 +194,10 @@ namespace fNbt.Test {
         [TestMethod]
         public void ObsoleteBigEndianByDefaultReflectsDefaultFlavor() {
 #pragma warning disable 618
-            try {
-                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
-                Assert.IsFalse(NbtFile.BigEndianByDefault);
-                NbtOptions.DefaultFlavor = NbtFlavor.Java;
-                Assert.IsTrue(NbtFile.BigEndianByDefault);
-            } finally {
-                RestoreDefaults();
-            }
+            NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+            Assert.IsFalse(NbtFile.BigEndianByDefault);
+            NbtOptions.DefaultFlavor = NbtFlavor.Java;
+            Assert.IsTrue(NbtFile.BigEndianByDefault);
 #pragma warning restore 618
         }
 

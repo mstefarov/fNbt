@@ -435,7 +435,7 @@ namespace fNbt.Test {
             short[] shorts = reader.ReadListAsArray<short>();
             CollectionAssert.AreEqual(new short[] { 1, 200, -30000 }, shorts);
 
-            // test short values
+            // test string values
             reader.ReadToFollowing("StringList");
             string[] strings = reader.ReadListAsArray<string>();
             CollectionAssert.AreEqual(new[] { "one", "two thousand", "negative three million" }, strings);
@@ -932,7 +932,7 @@ namespace fNbt.Test {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x0b, // IntArray tag
-                0x00, 0x01, 0x66, // IntArray tag name: 'g'
+                0x00, 0x01, 0x66, // IntArray tag name: 'f'
                 0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
                 0x00 // end tag
             };
@@ -942,7 +942,7 @@ namespace fNbt.Test {
                 0x0A, // Compound tag
                 0x00, 0x01, 0x66, // Root name: 'f'
                 0x0c, // LongArray tag
-                0x00, 0x01, 0x66, // LongArray tag name: 'g'
+                0x00, 0x01, 0x66, // LongArray tag name: 'f'
                 0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
                 0x00 // end tag
             };
@@ -1088,23 +1088,6 @@ namespace fNbt.Test {
                     Assert.IsTrue(reader.IsInErrorState);
                     throw;
                 }
-            }
-        }
-
-
-        class NonReadableStream : MemoryStream {
-            public override bool CanRead {
-                get { return false; }
-            }
-
-
-            public override int ReadByte() {
-                throw new NotSupportedException();
-            }
-
-
-            public override int Read(byte[] buffer, int offset, int count) {
-                throw new NotSupportedException();
             }
         }
     }

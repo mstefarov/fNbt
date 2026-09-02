@@ -7,7 +7,7 @@
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net48;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>10</LangVersion>
+    <LangVersion>12</LangVersion>
     
     <DebugType>pdbonly</DebugType>
     <DebugSymbols>true</DebugSymbols>
