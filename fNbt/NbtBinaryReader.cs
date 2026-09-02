@@ -476,11 +476,13 @@ namespace fNbt {
                     break;
 
                 case NbtTagType.Float:
-                    Skip<float>(1);
+                    // Fixed width: pulling the bytes through the scratch buffer beats a seek,
+                    // and never touches the 8 KiB skip buffer on a non-seekable stream
+                    FillBuffer(sizeof(float));
                     break;
 
                 case NbtTagType.Double:
-                    Skip<double>(1);
+                    FillBuffer(sizeof(double));
                     break;
 
                 case NbtTagType.String:
