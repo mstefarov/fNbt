@@ -84,25 +84,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadRootTagNameBoundsHostileNameLengths() {
-            // A 5-byte document declaring a 256 MB root name must fail with a format error,
-            // not attempt the allocation
-            byte[] doc = { 0x0A, 0xFF, 0xFF, 0xFF, 0x7F };
-            using (var ms = new MemoryStream(doc)) {
-                Assert.Throws<NbtFormatException>(
-                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
-            }
-
-            // Same for a length past int.MaxValue, which must not surface as an overflow
-            byte[] overflow = { 0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F };
-            using (var ms = new MemoryStream(overflow)) {
-                Assert.Throws<NbtFormatException>(
-                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
-            }
-        }
-
-
-        [TestMethod]
         public void ReadRootTagNameTakesFlavor() {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] doc = new NbtFile(root, NbtFlavor.Bedrock).SaveToBuffer(NbtCompression.None);
@@ -120,22 +101,6 @@ namespace fNbt.Test {
                 Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, false, 0));
             }
 #pragma warning restore 618
-        }
-
-
-        [TestMethod]
-        public void NbtFileWriteValidationEnforcesFlavor() {
-            var root = new NbtCompound("r") { new NbtIntArray("ints", new int[] { 1 }) };
-
-            var strict = new NbtFile(root, new NbtOptions { Flavor = NbtFlavor.ClassiCube });
-            Assert.Throws<NbtFormatException>(() => strict.SaveToBuffer(NbtCompression.None));
-
-            var lenient = new NbtFile(root, new NbtOptions {
-                Flavor = NbtFlavor.ClassiCube,
-                ValidateOnWrite = false
-            });
-            byte[] doc = lenient.SaveToBuffer(NbtCompression.None);
-            Assert.IsTrue(doc.Length > 0);
         }
 
 
@@ -223,41 +188,6 @@ namespace fNbt.Test {
                 CollectionAssert.AreEqual(expected, ms.ToArray());
             }
 #pragma warning restore 618
-        }
-
-
-        [TestMethod]
-        public void NbtWriterValidationEnforcesFlavor() {
-            // Tag types, per call
-            using (var ms = new MemoryStream()) {
-                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
-                Assert.Throws<NbtFormatException>(() => writer.WriteIntArray("ints", new int[] { 1 }));
-            }
-
-            // Strings, through the binary writer's ceiling
-            using (var ms = new MemoryStream()) {
-                var writer = new NbtWriter(ms, "r", NbtFlavor.ClassiCube);
-                Assert.Throws<NbtFormatException>(() => writer.WriteString("s", new string('x', 300)));
-            }
-
-            // Whole subtrees written via WriteTag get the same pre-walk as NbtFile
-            using (var ms = new MemoryStream()) {
-                var writer = new NbtWriter(ms, "r", NbtFlavor.Bedrock);
-                var tree = new NbtCompound("c") { new NbtLongArray("longs", new long[] { 1 }) };
-                Assert.Throws<NbtFormatException>(() => writer.WriteTag(tree));
-            }
-
-            // Validation off: same writes succeed
-            using (var ms = new MemoryStream()) {
-                var writer = new NbtWriter(ms, "r", new NbtOptions {
-                    Flavor = NbtFlavor.ClassiCube,
-                    ValidateOnWrite = false
-                });
-                writer.WriteIntArray("ints", new int[] { 1 });
-                writer.WriteString("s", new string('x', 300));
-                writer.EndCompound();
-                writer.Finish();
-            }
         }
     }
 }

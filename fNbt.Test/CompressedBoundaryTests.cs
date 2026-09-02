@@ -240,6 +240,19 @@ namespace fNbt.Test {
         }
 
 
+        [TestMethod]
+        public void BadZLibHeaderThrows() {
+            // A header with bad check bits must fail up front on every target
+            var root = new NbtCompound("root") { new NbtInt("v", 1) };
+            byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
+            doc[1] ^= 0x01;
+
+            var file = new NbtFile();
+            Assert.Throws<InvalidDataException>(
+                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib));
+        }
+
+
         // Stands in for a source that would block rather than report end-of-stream.
         sealed class ThrowOnOverreadStream : Stream {
             readonly byte[] data;

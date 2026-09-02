@@ -73,5 +73,17 @@ namespace fNbt.Test {
             Assert.AreEqual(int.MaxValue, NbtFlavor.BedrockNetwork.MaxStringBytes);
             Assert.AreEqual(256, NbtFlavor.ClassiCube.MaxStringBytes);
         }
+
+
+        [TestMethod]
+        public void FlavorsDeclareStringEncoding() {
+            Assert.IsTrue(NbtFlavor.Java.UsesModifiedUtf8);
+            Assert.IsTrue(NbtFlavor.JavaAnvil.UsesModifiedUtf8);
+            Assert.IsTrue(NbtFlavor.JavaLegacy.UsesModifiedUtf8);
+            Assert.IsTrue(NbtFlavor.JavaNetwork.UsesModifiedUtf8);
+            Assert.IsTrue(NbtFlavor.ClassiCube.UsesModifiedUtf8);
+            Assert.IsFalse(NbtFlavor.Bedrock.UsesModifiedUtf8);
+            Assert.IsFalse(NbtFlavor.BedrockNetwork.UsesModifiedUtf8);
+        }
     }
 }

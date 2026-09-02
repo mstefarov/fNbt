@@ -333,25 +333,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CopyConstructorSetsParents() {
-            // The copy constructor used to leave cloned children with Parent == null.
-            var original = new NbtList("original", NbtTagType.Int) {
-                new NbtInt(1),
-                new NbtInt(2)
-            };
-            var root = new NbtCompound("root") { original };
-
-            var clone = (NbtList)original.Clone();
-            Assert.AreSame(clone, clone[0].Parent);
-            Assert.AreSame(clone, clone[1].Parent);
-            Assert.AreEqual("original[0]", clone[0].Path);
-
-            var thief = new NbtList("thief", NbtTagType.Int);
-            Assert.Throws<ArgumentException>(() => thief.Add(clone[0]));
-        }
-
-
-        [TestMethod]
         public void SerializingEmpty() {
             // check saving/loading an empty list and a list holding one empty list
             NbtCompound root = TestFiles.Reload(new NbtCompound("root") {

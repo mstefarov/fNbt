@@ -223,5 +223,13 @@ namespace fNbt.Test {
         }
 
 
+        [TestMethod]
+        public void PrettyPrint() {
+            var loadedFile = new NbtFile(TestFiles.Big);
+            Assert.AreEqual(loadedFile.RootTag.ToString(), loadedFile.ToString());
+            Assert.AreEqual(loadedFile.RootTag.ToString("   "), loadedFile.ToString("   "));
+            Assert.Throws<ArgumentNullException>(() => loadedFile.ToString(null));
+            Assert.Throws<ArgumentNullException>(() => NbtTag.DefaultIndentString = null);
+        }
     }
 }

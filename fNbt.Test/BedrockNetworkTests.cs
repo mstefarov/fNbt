@@ -282,5 +282,24 @@ namespace fNbt.Test {
                                 NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
             }
         }
+
+
+        [TestMethod]
+        public void ReadRootTagNameBoundsHostileNameLengths() {
+            // A 5-byte document declaring a 256 MB root name must fail with a format error,
+            // not attempt the allocation
+            byte[] doc = { 0x0A, 0xFF, 0xFF, 0xFF, 0x7F };
+            using (var ms = new MemoryStream(doc)) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
+            }
+
+            // Same for a length past int.MaxValue, which must not surface as an overflow
+            byte[] overflow = { 0x0A, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F };
+            using (var ms = new MemoryStream(overflow)) {
+                Assert.Throws<NbtFormatException>(
+                    () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.BedrockNetwork));
+            }
+        }
     }
 }

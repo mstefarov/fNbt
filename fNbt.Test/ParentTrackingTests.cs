@@ -231,5 +231,24 @@ namespace fNbt.Test {
             list.AddRange(new NbtTag[] { new NbtInt(1), new NbtInt(2), new NbtInt(3) });
             Assert.AreEqual(3, list.Count);
         }
+
+
+        [TestMethod]
+        public void CopyConstructorSetsParents() {
+            // The copy constructor used to leave cloned children with Parent == null.
+            var original = new NbtList("original", NbtTagType.Int) {
+                new NbtInt(1),
+                new NbtInt(2)
+            };
+            var root = new NbtCompound("root") { original };
+
+            var clone = (NbtList)original.Clone();
+            Assert.AreSame(clone, clone[0].Parent);
+            Assert.AreSame(clone, clone[1].Parent);
+            Assert.AreEqual("original[0]", clone[0].Path);
+
+            var thief = new NbtList("thief", NbtTagType.Int);
+            Assert.Throws<ArgumentException>(() => thief.Add(clone[0]));
+        }
     }
 }

@@ -204,6 +204,23 @@ namespace fNbt.Test {
         }
 
 
+        // A string over 65,535 bytes can't fit the unsigned prefix. Writing must throw instead
+        // of wrapping the length and forging a shorter tag.
+        [TestMethod]
+        public void OverlongStringThrowsOnWrite() {
+            var value = new string('a', 70000);
+            var root = new NbtCompound("root") { new NbtString("s", value) };
+            Assert.Throws<NbtFormatException>(() => new NbtFile(root).SaveToBuffer(NbtCompression.None));
+        }
+
+
+        [TestMethod]
+        public void OverlongTagNameThrowsOnWrite() {
+            var longName = new string('n', 70000);
+            var root = new NbtCompound("root") { new NbtInt(longName, 1) };
+            Assert.Throws<NbtFormatException>(() => new NbtFile(root).SaveToBuffer(NbtCompression.None));
+        }
+
 
         [TestMethod]
         public void SaveToBuffer() {
@@ -248,16 +265,6 @@ namespace fNbt.Test {
             file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.ZLib);
             Assert.AreEqual(12345, file.RootTag["v"].IntValue);
             Assert.AreEqual("hello", file.RootTag.Get<NbtString>("s").Value);
-        }
-
-
-        [TestMethod]
-        public void PrettyPrint() {
-            var loadedFile = new NbtFile(TestFiles.Big);
-            Assert.AreEqual(loadedFile.RootTag.ToString(), loadedFile.ToString());
-            Assert.AreEqual(loadedFile.RootTag.ToString("   "), loadedFile.ToString("   "));
-            Assert.Throws<ArgumentNullException>(() => loadedFile.ToString(null));
-            Assert.Throws<ArgumentNullException>(() => NbtTag.DefaultIndentString = null);
         }
 
 
