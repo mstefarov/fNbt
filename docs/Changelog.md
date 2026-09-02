@@ -1,4 +1,4 @@
-﻿## 2.0.0 (fNbt, unreleased)
+## 2.0.0 (fNbt, unreleased)
 - Add support for all variants of NBT via new NbtFlavor type. It includes
     Java (the default), JavaAnvil, JavaLegacy, JavaNetwork, Bedrock,
     BedrockNetwork, and ClassiCube. A flavor defines which tag types,

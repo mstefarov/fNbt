@@ -1,4 +1,4 @@
-﻿namespace fNbt {
+namespace fNbt {
     /// <summary> Enumeration of named binary tag types, and their corresponding codes. </summary>
     public enum NbtTagType : byte {
         /// <summary> Placeholder TagType used to indicate unknown/undefined tag type in NbtList. </summary>

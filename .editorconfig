@@ -1,6 +1,21 @@
 # Rules in this file were initially inferred by Visual Studio IntelliCode from the C:\Users\matv8981.AVWORLD\source\fNbt codebase based on best match to current usage at 8/10/2021
 # You can modify the rules from these initially generated values to suit your own policies
 # You can learn more about editorconfig here: https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference
+root = true
+
+# Encoding and line endings for every file here. .gitattributes enforces the same
+# thing for Git; change the two together.
+[*]
+charset = utf-8
+end_of_line = crlf
+
+# Visual Studio and ReSharper rewrite these with a BOM whatever we ask for.
+[*.sln]
+charset = utf-8-bom
+
+[*.DotSettings]
+charset = utf-8-bom
+
 [*.cs]
 
 

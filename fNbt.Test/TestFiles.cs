@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace fNbt.Test {
@@ -213,7 +213,7 @@ namespace fNbt.Test {
             Assert.IsInstanceOfType<NbtString>(root["stringTest"]);
             node = root["stringTest"];
             Assert.AreEqual("stringTest", node.Name);
-            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!", ((NbtString)node).Value);
+            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!", ((NbtString)node).Value);
 
             Assert.IsInstanceOfType<NbtFloat>(root["floatTest"]);
             node = root["floatTest"];

@@ -1,4 +1,4 @@
-﻿namespace fNbt.Benchmarks;
+namespace fNbt.Benchmarks;
 
 public enum CwSize {
     Small,  // 1 MiB of block data

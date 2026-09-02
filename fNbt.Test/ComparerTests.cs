@@ -1,4 +1,4 @@
-﻿namespace fNbt.Test {
+namespace fNbt.Test {
     [TestClass]
     public class ComparerTests {
         private readonly NbtComparer comparer = NbtComparer.Instance;

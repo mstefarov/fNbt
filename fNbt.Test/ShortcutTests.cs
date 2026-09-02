@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 
 namespace fNbt.Test {
@@ -189,7 +189,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void NbtStringTest() {
             object dummy;
-            NbtTag test = new NbtString("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!");
+            NbtTag test = new NbtString("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!");
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.DoubleValue);
@@ -198,7 +198,7 @@ namespace fNbt.Test {
             Assert.Throws<InvalidCastException>(() => dummy = test.IntValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.LongValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.ShortValue);
-            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!", test.StringValue);
+            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!", test.StringValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.LongArrayValue);
             Assert.IsTrue(test.HasValue);
         }

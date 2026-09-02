@@ -10,7 +10,7 @@ public class ParseControlBenchmarks {
     const int FieldCount = 5;
 
     static readonly string[] RepeatedNames = { "Version", "Name", "Value", "States", "Extra" };
-    static readonly string[] NonAsciiNames = { "Версия", "Имя", "Значение", "Состояния", "Прочее" };
+    static readonly string[] NonAsciiNames = { "\u0412\u0435\u0440\u0441\u0438\u044F", "\u0418\u043C\u044F", "\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435", "\u0421\u043E\u0441\u0442\u043E\u044F\u043D\u0438\u044F", "\u041F\u0440\u043E\u0447\u0435\u0435" };
 
     byte[] uniqueNameBytes = null!;
     byte[] repeatedNameBytes = null!;

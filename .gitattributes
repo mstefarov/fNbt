@@ -1,0 +1,14 @@
+# Line endings are decided here, not by each machine's core.autocrlf, which the
+# Git for Windows installer sets and Linux CI leaves off. Repo stores LF; every
+# working tree gets CRLF. Keep in step with .editorconfig.
+* text=auto eol=crlf
+
+# CRLF breaks a shebang.
+*.sh text eol=lf
+
+# NBT fixtures and the icon. Never convert, never diff as text.
+*.nbt binary
+*.cw binary
+*.gz binary
+*.z binary
+*.png binary

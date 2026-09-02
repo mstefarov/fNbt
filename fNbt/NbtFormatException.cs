@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace fNbt {
     /// <summary> Exception thrown when a format violation is detected while
