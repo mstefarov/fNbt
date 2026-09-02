@@ -118,8 +118,7 @@ namespace fNbt {
         // spend the same depth budget as the write walk, so what writes cleanly also validates.
         internal void ValidateTree(NbtTag tag, int depthBudget) {
             if (tag.TagType > MaxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(tag.TagType) + " is not permitted by the " + Name + " flavor.");
+                throw NbtFormatException.NotPermitted(this, tag.TagType);
             }
             if (tag.Name != null) {
                 ValidateString(tag.Name);
@@ -142,12 +141,10 @@ namespace fNbt {
                     NbtList list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
                     if (list.ListType == NbtTagType.Unknown) {
-                        throw new NbtFormatException(NbtList.UnknownListTypeError);
+                        throw NbtFormatException.UnknownListType();
                     }
                     if (list.ListType > MaxTagType) {
-                        throw new NbtFormatException(
-                            NbtTag.GetCanonicalTagName(list.ListType) + " is not permitted by the " +
-                            Name + " flavor.");
+                        throw NbtFormatException.NotPermitted(this, list.ListType);
                     }
                     foreach (NbtTag child in list.tags) {
                         ValidateTree(child, listChildBudget);
@@ -196,7 +193,7 @@ namespace fNbt {
                 if (cached != null && ReferenceEquals(cached.Policy, policy)) {
                     return cached.Codec;
                 }
-                CachedCodec fresh = new CachedCodec(policy, new NbtCodec(new NbtOptions(this, policy)));
+                CachedCodec fresh = new CachedCodec(policy, new NbtCodec(new NbtOptions.Resolved(this, policy)));
                 // A benign race: if another thread published an equivalent pair first, share its
                 // codec; codecs are immutable, so either instance works
                 CachedCodec? witness = Interlocked.CompareExchange(ref defaultCodec, fresh, cached);

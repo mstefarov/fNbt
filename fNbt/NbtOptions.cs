@@ -24,22 +24,14 @@ namespace fNbt {
         }
 
 
-        sealed class DefaultsSnapshot {
-            public readonly NbtFlavor Flavor;
-            public readonly PolicySnapshot Policy;
-
-            public DefaultsSnapshot(NbtFlavor flavor, PolicySnapshot policy) {
-                Flavor = flavor;
-                Policy = policy;
-            }
-        }
-
-
+        // Two independent references, each published whole. A reader that catches a flavor
+        // change mid-flight may pair it with the previous policy, which is fine: each value is
+        // valid on its own, and nothing promises atomic reconfiguration.
         // NbtFlavor initialization must never read this class back: the type initializers
         // stay cycle-free only because the dependency runs strictly NbtOptions -> NbtFlavor.
-        static DefaultsSnapshot defaults =
-            new DefaultsSnapshot(NbtFlavor.Java, new PolicySnapshot(
-                validateOnRead: false, validateOnWrite: true, maxAllocation: long.MaxValue));
+        static NbtFlavor defaultFlavor = NbtFlavor.Java;
+        static PolicySnapshot defaultPolicy =
+            new PolicySnapshot(validateOnRead: false, validateOnWrite: true, maxAllocation: long.MaxValue);
 
 
         /// <summary> The flavor used by entry points constructed without one: <see cref="NbtFile"/>,
@@ -50,7 +42,7 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> value is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> value is a flavor without a root name. </exception>
         public static NbtFlavor DefaultFlavor {
-            get { return Volatile.Read(ref defaults).Flavor; }
+            get { return Volatile.Read(ref defaultFlavor); }
             set {
                 if (value == null) throw new ArgumentNullException(nameof(value));
                 if (!value.HasRootName) {
@@ -59,12 +51,7 @@ namespace fNbt {
                         "NbtFile, NbtReader, and NbtWriter all use named roots. " +
                         "Use NbtCodec.For(NbtFlavor." + value.Name + ") instead.", nameof(value));
                 }
-                DefaultsSnapshot old, updated;
-                do {
-                    old = Volatile.Read(ref defaults);
-                    if (old.Flavor == value) return;
-                    updated = new DefaultsSnapshot(value, old.Policy);
-                } while (Interlocked.CompareExchange(ref defaults, updated, old) != old);
+                Volatile.Write(ref defaultFlavor, value);
             }
         }
 
@@ -73,7 +60,7 @@ namespace fNbt {
         /// makes documents that merely bend a flavor's rules throw where they previously loaded,
         /// even in code that did not opt in. </summary>
         public static bool DefaultValidateOnRead {
-            get { return Volatile.Read(ref defaults).Policy.ValidateOnRead; }
+            get { return CurrentPolicy.ValidateOnRead; }
             set { ReplacePolicy(value, null, null); }
         }
 
@@ -82,7 +69,7 @@ namespace fNbt {
         /// trades conformance checking away for restricted flavors: writes that relied on the
         /// refusal start producing nonconformant documents silently. </summary>
         public static bool DefaultValidateOnWrite {
-            get { return Volatile.Read(ref defaults).Policy.ValidateOnWrite; }
+            get { return CurrentPolicy.ValidateOnWrite; }
             set { ReplacePolicy(null, value, null); }
         }
 
@@ -91,7 +78,7 @@ namespace fNbt {
         /// limit. </summary>
         /// <exception cref="ArgumentOutOfRangeException"> value is zero or negative. </exception>
         public static long DefaultMaxAllocation {
-            get { return Volatile.Read(ref defaults).Policy.MaxAllocation; }
+            get { return CurrentPolicy.MaxAllocation; }
             set {
                 if (value <= 0) {
                     throw new ArgumentOutOfRangeException(nameof(value), value,
@@ -105,24 +92,20 @@ namespace fNbt {
         // The no-op early-out keeps the policy object's identity stable, so a same-value set
         // does not rebuild NbtCodec.For's cached codecs.
         static void ReplacePolicy(bool? validateOnRead, bool? validateOnWrite, long? maxAllocation) {
-            DefaultsSnapshot old, updated;
-            do {
-                old = Volatile.Read(ref defaults);
-                PolicySnapshot policy = old.Policy;
-                bool newRead = validateOnRead ?? policy.ValidateOnRead;
-                bool newWrite = validateOnWrite ?? policy.ValidateOnWrite;
-                long newMax = maxAllocation ?? policy.MaxAllocation;
-                if (newRead == policy.ValidateOnRead && newWrite == policy.ValidateOnWrite &&
-                    newMax == policy.MaxAllocation) {
-                    return;
-                }
-                updated = new DefaultsSnapshot(old.Flavor, new PolicySnapshot(newRead, newWrite, newMax));
-            } while (Interlocked.CompareExchange(ref defaults, updated, old) != old);
+            PolicySnapshot policy = CurrentPolicy;
+            bool newRead = validateOnRead ?? policy.ValidateOnRead;
+            bool newWrite = validateOnWrite ?? policy.ValidateOnWrite;
+            long newMax = maxAllocation ?? policy.MaxAllocation;
+            if (newRead == policy.ValidateOnRead && newWrite == policy.ValidateOnWrite &&
+                newMax == policy.MaxAllocation) {
+                return;
+            }
+            Volatile.Write(ref defaultPolicy, new PolicySnapshot(newRead, newWrite, newMax));
         }
 
 
         internal static PolicySnapshot CurrentPolicy {
-            get { return Volatile.Read(ref defaults).Policy; }
+            get { return Volatile.Read(ref defaultPolicy); }
         }
 
 
@@ -130,11 +113,11 @@ namespace fNbt {
         /// (<see cref="DefaultFlavor"/> and the other <c>Default*</c> properties).
         /// Later changes to the defaults do not affect this instance. </summary>
         public NbtOptions() {
-            DefaultsSnapshot state = Volatile.Read(ref defaults);
-            Flavor = state.Flavor;
-            ValidateOnRead = state.Policy.ValidateOnRead;
-            ValidateOnWrite = state.Policy.ValidateOnWrite;
-            MaxAllocation = state.Policy.MaxAllocation;
+            Flavor = Volatile.Read(ref defaultFlavor);
+            PolicySnapshot policy = CurrentPolicy;
+            ValidateOnRead = policy.ValidateOnRead;
+            ValidateOnWrite = policy.ValidateOnWrite;
+            MaxAllocation = policy.MaxAllocation;
         }
 
 
@@ -147,16 +130,6 @@ namespace fNbt {
             : this() {
             if (flavor == null) throw new ArgumentNullException(nameof(flavor));
             Flavor = flavor;
-        }
-
-
-        // For NbtCodec.For: builds from the captured policy, not a fresh read, so the cached
-        // (policy, codec) pair stays coherent.
-        internal NbtOptions(NbtFlavor flavor, PolicySnapshot policy) {
-            Flavor = flavor;
-            ValidateOnRead = policy.ValidateOnRead;
-            ValidateOnWrite = policy.ValidateOnWrite;
-            MaxAllocation = policy.MaxAllocation;
         }
 
 
@@ -202,6 +175,9 @@ namespace fNbt {
                 ValidateOnWrite = validateOnWrite;
                 MaxAllocation = maxAllocation;
             }
+
+            public Resolved(NbtFlavor flavor, PolicySnapshot policy)
+                : this(flavor, policy.ValidateOnRead, policy.ValidateOnWrite, policy.MaxAllocation) { }
         }
 
 
@@ -215,19 +191,15 @@ namespace fNbt {
 
         // For flavor-overload entry points: the given flavor plus the current policy defaults
         internal static Resolved ResolveForFile(NbtFlavor flavor, string paramName) {
-            if (flavor == null) throw new ArgumentNullException(paramName);
+            Resolved resolved = ResolveForCodec(flavor, paramName);
             flavor.EnsureUsableForFiles(paramName);
-            PolicySnapshot policy = CurrentPolicy;
-            return new Resolved(flavor, policy.ValidateOnRead, policy.ValidateOnWrite,
-                                policy.MaxAllocation);
+            return resolved;
         }
 
 
         // For flavorless entry points. DefaultFlavor is always usable for files, so no check.
         internal static Resolved ResolveDefaults() {
-            DefaultsSnapshot state = Volatile.Read(ref defaults);
-            return new Resolved(state.Flavor, state.Policy.ValidateOnRead,
-                                state.Policy.ValidateOnWrite, state.Policy.MaxAllocation);
+            return new Resolved(Volatile.Read(ref defaultFlavor), CurrentPolicy);
         }
 
 
@@ -245,6 +217,12 @@ namespace fNbt {
             }
             return new Resolved(flavor, options.ValidateOnRead, options.ValidateOnWrite,
                                 maxAllocation);
+        }
+
+
+        internal static Resolved ResolveForCodec(NbtFlavor flavor, string paramName) {
+            if (flavor == null) throw new ArgumentNullException(paramName);
+            return new Resolved(flavor, CurrentPolicy);
         }
     }
 }

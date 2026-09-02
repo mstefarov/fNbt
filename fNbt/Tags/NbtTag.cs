@@ -432,6 +432,26 @@ namespace fNbt {
             }
         }
 
+
+        // The header plus a brace-wrapped, indented child list, shared by compound and list tags
+        internal void PrettyPrintContainer(StringBuilder sb, string indentString, int indentLevel, int depthBudget,
+                                           ICollection<NbtTag> children) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            PrettyPrintHeader(sb, indentString, indentLevel);
+            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", children.Count);
+            if (children.Count > 0) {
+                sb.Append('\n');
+                foreach (NbtTag child in children) {
+                    child.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
+                    sb.Append('\n');
+                }
+                for (int i = 0; i < indentLevel; i++) {
+                    sb.Append(indentString);
+                }
+            }
+            sb.Append('}');
+        }
+
         /// <summary> String to use for indentation in NbtTag's and NbtFile's ToString() methods by default. </summary>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         public static string DefaultIndentString {

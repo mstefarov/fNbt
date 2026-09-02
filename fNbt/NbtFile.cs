@@ -481,21 +481,21 @@ namespace fNbt {
 
 
         void LoadFromStreamInternal(Stream stream, TagSelector? tagSelector) {
-            // Make sure the first byte in this file is the tag for a TAG_Compound
-            int firstByte = stream.ReadByte();
-            if (firstByte < 0) {
-                throw new EndOfStreamException();
-            }
-            if (firstByte != (int)NbtTagType.Compound) {
-                throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
-            }
+            ReadCompoundHeader(stream);
             NbtBinaryReader reader = new NbtBinaryReader(stream, flavor, maxAllocation, validateOnRead) {
                 Selector = tagSelector
             };
-
             NbtCompound rootCompound = new NbtCompound(reader.ReadString());
             rootCompound.ReadTag(reader, NbtTag.MaxDepth);
             RootTag = rootCompound;
+        }
+
+
+        // Every file flavor opens a document with a TAG_Compound type byte
+        static void ReadCompoundHeader(Stream stream) {
+            int firstByte = stream.ReadByte();
+            if (firstByte < 0) throw new EndOfStreamException();
+            if (firstByte != (int)NbtTagType.Compound) throw NbtFormatException.NotCompoundRoot();
         }
 
         #endregion
@@ -647,18 +647,15 @@ namespace fNbt {
                     // The framework stream writes the zlib header and Adler-32 trailer itself,
                     // with the checksum computed in native code
                     using (ZLibStream compressStream = new ZLibStream(stream, CompressionMode.Compress, true)) {
-                        BufferedStream bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor), NbtTag.MaxDepth);
-                        bufferedStream.Flush();
+                        WriteRootBuffered(compressStream);
                     }
 #else
-                    stream.WriteByte(0x78);
-                    stream.WriteByte(0x01);
                     int checksum;
                     using (ZLibStream compressStream = new ZLibStream(stream, CompressionMode.Compress, true)) {
-                        BufferedStream bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor), NbtTag.MaxDepth);
-                        bufferedStream.Flush();
+                        // The header goes out once the compressor has accepted the stream
+                        stream.WriteByte(0x78);
+                        stream.WriteByte(0x01);
+                        WriteRootBuffered(compressStream);
                         checksum = compressStream.Checksum;
                     }
                     byte[] checksumBytes = BitConverter.GetBytes(checksum);
@@ -672,16 +669,12 @@ namespace fNbt {
 
                 case NbtCompression.GZip:
                     using (GZipStream compressStream = new GZipStream(stream, CompressionMode.Compress, true)) {
-                        // use a buffered stream to avoid GZipping in small increments (which has a lot of overhead)
-                        BufferedStream bufferedStream = new BufferedStream(compressStream, WriteBufferSize);
-                        RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor), NbtTag.MaxDepth);
-                        bufferedStream.Flush();
+                        WriteRootBuffered(compressStream);
                     }
                     break;
 
                 case NbtCompression.None:
-                    NbtBinaryWriter writer = new NbtBinaryWriter(stream, flavor);
-                    RootTag.WriteTag(writer, NbtTag.MaxDepth);
+                    RootTag.WriteTag(new NbtBinaryWriter(stream, flavor), NbtTag.MaxDepth);
                     break;
 
                     // Can't be AutoDetect or unknown: parameter is already validated
@@ -692,6 +685,14 @@ namespace fNbt {
             } else {
                 return ((ByteCountingStream)stream).BytesWritten;
             }
+        }
+
+
+        // Compressors do badly with many small writes, so the tree is fed through a buffer
+        void WriteRootBuffered(Stream compressor) {
+            BufferedStream bufferedStream = new BufferedStream(compressor, WriteBufferSize);
+            RootTag.WriteTag(new NbtBinaryWriter(bufferedStream, flavor), NbtTag.MaxDepth);
+            bufferedStream.Flush();
         }
 
         #endregion
@@ -841,17 +842,10 @@ namespace fNbt {
 
 
         static string GetRootNameInternal(Stream stream, NbtFlavor flavor) {
-            NullableSupport.Assert(stream != null);
-            int firstByte = stream.ReadByte();
-            if (firstByte < 0) {
-                throw new EndOfStreamException();
-            } else if (firstByte != (int)NbtTagType.Compound) {
-                throw new NbtFormatException("Given NBT stream does not start with a TAG_Compound");
-            }
+            ReadCompoundHeader(stream);
             // No options reach this API, so bound the name by the largest file-flavor ceiling.
             // Otherwise a varint prefix could demand an arbitrarily large allocation.
-            NbtBinaryReader reader = new NbtBinaryReader(stream, flavor, maxAllocation: ushort.MaxValue);
-            return reader.ReadString();
+            return new NbtBinaryReader(stream, flavor, maxAllocation: ushort.MaxValue).ReadString();
         }
 
 

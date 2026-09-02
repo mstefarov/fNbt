@@ -69,7 +69,7 @@ namespace fNbt {
                     NbtList list = (NbtList)tag;
                     if (list.ListType == NbtTagType.Unknown) {
                         // The write pass would refuse this list; fail the same way before it
-                        throw new NbtFormatException(NbtList.UnknownListTypeError);
+                        throw NbtFormatException.UnknownListType();
                     }
                     long size = 1 + SizeCount(list.tags.Count, flavor);
                     foreach (NbtTag child in list.tags) {
@@ -86,7 +86,7 @@ namespace fNbt {
                     for (int i = 0; i < compound.Count; i++) {
                         NbtTag child = children[i];
                         if (child.Name == null) {
-                            throw new NbtFormatException("Name is null");
+                            throw NbtFormatException.UnnamedChild();
                         }
                         size += 1 + SizeString(child.Name, flavor)
                                   + SizePayload(child, flavor, childDepthBudget);

@@ -49,7 +49,7 @@ namespace fNbt {
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtFlavor flavor)
-            : this(new NbtOptions(flavor)) { }
+            : this(NbtOptions.ResolveForCodec(flavor, nameof(flavor))) { }
 
 
         /// <summary> Creates a codec with the given options. </summary>
@@ -57,8 +57,11 @@ namespace fNbt {
         /// instance do not affect this codec. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
-        public NbtCodec(NbtOptions options) {
-            NbtOptions.Resolved resolved = NbtOptions.ResolveForCodec(options, nameof(options));
+        public NbtCodec(NbtOptions options)
+            : this(NbtOptions.ResolveForCodec(options, nameof(options))) { }
+
+
+        internal NbtCodec(NbtOptions.Resolved resolved) {
             flavor = resolved.Flavor;
             maxAllocation = resolved.MaxAllocation;
             validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;

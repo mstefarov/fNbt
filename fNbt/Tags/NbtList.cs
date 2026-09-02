@@ -18,8 +18,6 @@ namespace fNbt {
         // of a corrupt length. Longer lists just grow as before.
         const int MaxPresizedCapacity = 16;
 
-        internal const string UnknownListTypeError = "NbtList had no elements and an Unknown ListType";
-
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
         /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is not a recognized tag type. </exception>
@@ -332,7 +330,7 @@ namespace fNbt {
 
         void EnsureListType() {
             if (ListType == NbtTagType.Unknown) {
-                throw new NbtFormatException(UnknownListTypeError);
+                throw NbtFormatException.UnknownListType();
             }
         }
 
@@ -548,21 +546,7 @@ namespace fNbt {
         }
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
-            int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            PrettyPrintHeader(sb, indentString, indentLevel);
-            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", tags.Count);
-
-            if (Count > 0) {
-                sb.Append('\n');
-                foreach (NbtTag tag in tags) {
-                    tag.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
-                    sb.Append('\n');
-                }
-                for (int i = 0; i < indentLevel; i++) {
-                    sb.Append(indentString);
-                }
-            }
-            sb.Append('}');
+            PrettyPrintContainer(sb, indentString, indentLevel, depthBudget, this);
         }
     }
 }

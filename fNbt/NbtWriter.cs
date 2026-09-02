@@ -20,8 +20,26 @@ namespace fNbt {
         readonly bool validates;
         // Lowered from LongArray only when write validation is on for a restricting flavor
         readonly NbtTagType maxTagType = NbtTagType.LongArray;
-        NbtWriterNode container;
-        Stack<NbtWriterNode>? ancestors;
+
+        // One entered compound or list. The hot parent context lives in a field and only its
+        // ancestors are stacked, so nesting allocates no per-level objects.
+        struct Node {
+            public NbtTagType Type;
+            public NbtTagType ElementType;
+            public int Length;
+            // Index of the next list element to be committed
+            public int NextIndex;
+
+            public Node(NbtTagType type, NbtTagType elementType = NbtTagType.Unknown, int length = 0) {
+                Type = type;
+                ElementType = elementType;
+                Length = length;
+                NextIndex = 0;
+            }
+        }
+
+        Node container;
+        Stack<Node>? ancestors;
 
 
         /// <summary> Initializes a new instance of the NbtWriter class with the current defaults
@@ -85,7 +103,7 @@ namespace fNbt {
             int nameBytes = MeasureString(rootTagName, nameof(rootTagName), out bool nameModified);
             writer.Write((byte)NbtTagType.Compound);
             writer.Write(rootTagName, nameBytes, nameModified);
-            container = new NbtWriterNode(NbtTagType.Compound);
+            container = new Node(NbtTagType.Compound);
         }
 
 
@@ -134,7 +152,7 @@ namespace fNbt {
             ValidateConstraints(null, NbtTagType.Compound);
             EnsureCanGoDown();
             CommitTag();
-            GoDown(new NbtWriterNode(NbtTagType.Compound));
+            GoDown(new Node(NbtTagType.Compound));
         }
 
 
@@ -150,7 +168,7 @@ namespace fNbt {
             NbtTagType parentType = BeginEmission();
             WriteHeader(NbtTagType.Compound, tagName, nameBytes, nameModified);
             CommitEmission(parentType);
-            GoDown(new NbtWriterNode(NbtTagType.Compound));
+            GoDown(new Node(NbtTagType.Compound));
         }
 
 
@@ -182,8 +200,7 @@ namespace fNbt {
                 }
             }
             if (elementType > maxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(elementType) + " is not permitted by the " + flavor.Name + " flavor.");
+                throw NbtFormatException.NotPermitted(flavor, elementType);
             }
         }
 
@@ -207,7 +224,7 @@ namespace fNbt {
             writer.Write((byte)elementType);
             writer.Write(size);
             CommitEmission(parentType);
-            GoDown(new NbtWriterNode(NbtTagType.List, elementType, size));
+            GoDown(new Node(NbtTagType.List, elementType, size));
         }
 
 
@@ -232,7 +249,7 @@ namespace fNbt {
             writer.Write((byte)elementType);
             writer.Write(size);
             CommitEmission(parentType);
-            GoDown(new NbtWriterNode(NbtTagType.List, elementType, size));
+            GoDown(new Node(NbtTagType.List, elementType, size));
         }
 
 
@@ -812,7 +829,7 @@ namespace fNbt {
                 EnsureCanGoDown();
             }
             if (tag is NbtList list && list.ListType == NbtTagType.Unknown) {
-                throw new NbtFormatException(NbtList.UnknownListTypeError);
+                throw NbtFormatException.UnknownListType();
             }
             // Measured either way: with validation off nothing else checks them before emission
             if (tag.Name != null) MeasureString(tag.Name, nameof(tag), out _);
@@ -866,9 +883,9 @@ namespace fNbt {
         }
 
 
-        void GoDown(NbtWriterNode newNode) {
+        void GoDown(Node newNode) {
             if (ancestors == null) {
-                ancestors = new Stack<NbtWriterNode>();
+                ancestors = new Stack<Node>();
             }
             ancestors.Push(container);
             container = newNode;
@@ -877,7 +894,7 @@ namespace fNbt {
 
         void GoUp() {
             if (ancestors == null || ancestors.Count == 0) {
-                // default(NbtWriterNode).Type is TAG_End, our closed sentinel.
+                // default(Node).Type is TAG_End, our closed sentinel.
                 container = default;
             } else {
                 container = ancestors.Pop();
@@ -891,8 +908,7 @@ namespace fNbt {
                 throw new NbtFormatException("Cannot write any more tags: root tag has been closed.");
             }
             if (desiredType > maxTagType) {
-                throw new NbtFormatException(
-                    NbtTag.GetCanonicalTagName(desiredType) + " is not permitted by the " + flavor.Name + " flavor.");
+                throw NbtFormatException.NotPermitted(flavor, desiredType);
             }
             if (container.Type == NbtTagType.List) {
                 if (name != null) {

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -548,19 +547,15 @@ namespace fNbt {
         /// <summary> Gets a collection containing all tag names in this NbtCompound, in insertion order. </summary>
         public IEnumerable<string> Names {
             get {
-                for (int i = 0; i < count; i++) {
-                    yield return items[i].name!;
+                foreach (NbtTag tag in this) {
+                    yield return tag.name!;
                 }
             }
         }
 
         /// <summary> Gets a collection containing all tags in this NbtCompound, in insertion order. </summary>
         public IEnumerable<NbtTag> Tags {
-            get {
-                for (int i = 0; i < count; i++) {
-                    yield return items[i];
-                }
-            }
+            get { return this; }
         }
 
 
@@ -773,21 +768,7 @@ namespace fNbt {
         }
 
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
-            int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            PrettyPrintHeader(sb, indentString, indentLevel);
-            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", count);
-
-            if (count > 0) {
-                sb.Append('\n');
-                for (int i = 0; i < count; i++) {
-                    items[i].PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
-                    sb.Append('\n');
-                }
-                for (int i = 0; i < indentLevel; i++) {
-                    sb.Append(indentString);
-                }
-            }
-            sb.Append('}');
+            PrettyPrintContainer(sb, indentString, indentLevel, depthBudget, this);
         }
     }
 }

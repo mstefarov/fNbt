@@ -84,11 +84,5 @@ namespace fNbt {
 
         public long BytesRead { get; private set; }
         public long BytesWritten { get; private set; }
-
-
-        protected override void Dispose(bool disposing) {
-            base.Dispose(disposing);
-            baseStream.Dispose();
-        }
     }
 }
