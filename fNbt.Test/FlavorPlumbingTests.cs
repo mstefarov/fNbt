@@ -40,23 +40,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ObsoleteBigEndianByDefaultReflectsDefaultFlavor() {
-#pragma warning disable 618
-            try {
-                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
-                Assert.IsFalse(NbtFile.BigEndianByDefault);
-                Assert.AreSame(NbtFlavor.Bedrock, new NbtFile().Flavor);
-
-                NbtOptions.DefaultFlavor = NbtFlavor.Java;
-                Assert.IsTrue(NbtFile.BigEndianByDefault);
-            } finally {
-                NbtOptions.DefaultFlavor = NbtFlavor.Java;
-            }
-#pragma warning restore 618
-        }
-
-
-        [TestMethod]
         public void FileApisRejectUnnamedRootFlavors() {
             // JavaNetwork has no root name, which the named-root APIs cannot express
             Assert.Throws<ArgumentException>(() => new NbtFile(NbtFlavor.JavaNetwork));
@@ -68,8 +51,6 @@ namespace fNbt.Test {
             }
             using (var ms = new MemoryStream()) {
                 Assert.Throws<ArgumentException>(() => new NbtWriter(ms, "r", NbtFlavor.JavaNetwork));
-                Assert.Throws<ArgumentOutOfRangeException>(
-                    () => new NbtWriter(ms, "r", new NbtOptions { MaxAllocation = 0 }));
             }
         }
 

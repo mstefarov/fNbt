@@ -47,7 +47,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void RenameRejectsStaleParent() {
+        public void RenamingDisplacedTagLeavesOldParentAlone() {
             // After a tag is displaced, its stale Parent link must not let a rename re-key the live tag
             var root = new NbtCompound("root");
             var first = new NbtInt("x", 1);

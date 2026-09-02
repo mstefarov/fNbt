@@ -18,53 +18,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void OptionsDefaultsAreCorrect() {
-            var options = new NbtOptions();
-            Assert.AreSame(NbtFlavor.Java, options.Flavor);
-            Assert.IsFalse(options.ValidateOnRead);
-            Assert.IsTrue(options.ValidateOnWrite);
-            Assert.AreEqual(long.MaxValue, options.MaxAllocation);
-
-            // The flavor constructor keeps every other default
-            var flavored = new NbtOptions(NbtFlavor.Bedrock);
-            Assert.AreSame(NbtFlavor.Bedrock, flavored.Flavor);
-            Assert.IsFalse(flavored.ValidateOnRead);
-            Assert.IsTrue(flavored.ValidateOnWrite);
-            Assert.AreEqual(long.MaxValue, flavored.MaxAllocation);
-            Assert.Throws<ArgumentNullException>(() => new NbtOptions(null));
-        }
-
-
-        [TestMethod]
-        public void FlavorsCarryFormatData() {
-            Assert.AreEqual(NbtTagType.LongArray, NbtFlavor.Java.MaxTagType);
-            Assert.AreEqual(NbtTagType.LongArray, NbtFlavor.JavaNetwork.MaxTagType);
-            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.JavaAnvil.MaxTagType);
-            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.Bedrock.MaxTagType);
-            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.BedrockNetwork.MaxTagType);
-            Assert.AreEqual(NbtTagType.Compound, NbtFlavor.JavaLegacy.MaxTagType);
-            Assert.AreEqual(NbtTagType.Compound, NbtFlavor.ClassiCube.MaxTagType);
-
-            Assert.AreEqual(65535, NbtFlavor.Java.MaxStringBytes);
-            Assert.AreEqual(32767, NbtFlavor.Bedrock.MaxStringBytes);
-            Assert.AreEqual(int.MaxValue, NbtFlavor.BedrockNetwork.MaxStringBytes);
-            Assert.AreEqual(256, NbtFlavor.ClassiCube.MaxStringBytes);
-        }
-
-
-        [TestMethod]
-        public void CodecRoundTripPreservesTree() {
-            NbtCompound root = MakeSampleRoot("hello");
-            var codec = new NbtCodec(NbtFlavor.Bedrock);
-
-            byte[] codecBytes = codec.WriteTag(root);
-            NbtTag read = codec.ReadTag(codecBytes, 0, codecBytes.Length, out int bytesConsumed);
-            Assert.AreEqual(codecBytes.Length, bytesConsumed);
-            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
-        }
-
-
-        [TestMethod]
         public void MaxAllocationCapsArrayAllocations() {
             var root = new NbtCompound("r") { new NbtByteArray("blob", new byte[200_000]) };
             byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);

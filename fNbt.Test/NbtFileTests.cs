@@ -16,7 +16,7 @@ namespace fNbt.Test {
         #region Loading Small Nbt Test File
 
         [TestMethod]
-        public void TestNbtSmallFileLoadingUncompressed() {
+        public void LoadingSmallFileUncompressed() {
             var file = new NbtFile(TestFiles.Small);
             Assert.AreEqual(TestFiles.Small, file.FileName);
             Assert.AreEqual(NbtCompression.None, file.FileCompression);
@@ -104,7 +104,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void TestNbtSmallFileSavingUncompressed() {
+        public void SavingSmallFileUncompressed() {
             NbtFile file = TestFiles.MakeSmallFile();
             string testFileName = Path.Combine(TestDirName, "test.nbt");
             file.SaveToFile(testFileName, NbtCompression.None);
@@ -113,7 +113,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void TestNbtSmallFileSavingUncompressedStream() {
+        public void SavingSmallFileUncompressedStream() {
             NbtFile file = TestFiles.MakeSmallFile();
             var nbtStream = new MemoryStream();
             Assert.Throws<ArgumentNullException>(() => file.SaveToStream(null, NbtCompression.None));
@@ -318,7 +318,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void HugeNbtFileTest() {
+        public void WritingArrayLargerThanChunkSizeDoesNotThrow() {
             // Tests writing byte arrays that exceed the max NbtBinaryWriter chunk size
             byte[] val = new byte[5 * 1024 * 1024];
             NbtCompound root = new NbtCompound("root") {

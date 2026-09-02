@@ -198,5 +198,48 @@ namespace fNbt.Test {
                 File.Delete(path);
             }
         }
+
+
+        [TestMethod]
+        public void NewOptionsCarryInitialDefaults() {
+            var options = new NbtOptions();
+            Assert.AreSame(NbtFlavor.Java, options.Flavor);
+            Assert.IsFalse(options.ValidateOnRead);
+            Assert.IsTrue(options.ValidateOnWrite);
+            Assert.AreEqual(long.MaxValue, options.MaxAllocation);
+
+            // The flavor constructor keeps every other default
+            var flavored = new NbtOptions(NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, flavored.Flavor);
+            Assert.IsFalse(flavored.ValidateOnRead);
+            Assert.IsTrue(flavored.ValidateOnWrite);
+            Assert.AreEqual(long.MaxValue, flavored.MaxAllocation);
+            Assert.Throws<ArgumentNullException>(() => new NbtOptions(null));
+        }
+
+
+        [TestMethod]
+        public void ObsoleteBigEndianByDefaultReflectsDefaultFlavor() {
+#pragma warning disable 618
+            try {
+                NbtOptions.DefaultFlavor = NbtFlavor.Bedrock;
+                Assert.IsFalse(NbtFile.BigEndianByDefault);
+                NbtOptions.DefaultFlavor = NbtFlavor.Java;
+                Assert.IsTrue(NbtFile.BigEndianByDefault);
+            } finally {
+                RestoreDefaults();
+            }
+#pragma warning restore 618
+        }
+
+
+        [TestMethod]
+        public void InstanceMaxAllocationValidatedAtUse() {
+            // Instance setters are unchecked; the entry point's resolve rejects the value
+            using (var ms = new MemoryStream()) {
+                Assert.Throws<ArgumentOutOfRangeException>(
+                    () => new NbtWriter(ms, "r", new NbtOptions { MaxAllocation = 0 }));
+            }
+        }
     }
 }

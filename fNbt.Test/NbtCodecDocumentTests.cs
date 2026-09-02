@@ -93,6 +93,18 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void BedrockRoundTripPreservesTree() {
+            NbtCompound root = MakeSampleRoot("hello");
+            var codec = new NbtCodec(NbtFlavor.Bedrock);
+
+            byte[] doc = codec.WriteTag(root);
+            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
+            Assert.AreEqual(doc.Length, bytesConsumed);
+            Assert.IsTrue(NbtComparer.Instance.Equals(root, read));
+        }
+
+
+        [TestMethod]
         public void JavaNetworkOmitsRootName() {
             var root = new NbtCompound("ignored") { new NbtByte("b", 7) };
             NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
@@ -442,32 +454,15 @@ namespace fNbt.Test {
 
 
         // Builds an uncompressed Java doc of compounds nested totalLevels deep (including root)
-        static byte[] MakeNestedCompoundDoc(int totalLevels) {
-            using (var ms = new MemoryStream()) {
-                ms.WriteByte(0x0A);
-                TestFiles.WriteBEShort(ms, 0); // root name: ""
-                for (int i = 1; i < totalLevels; i++) {
-                    ms.WriteByte(0x0A);
-                    TestFiles.WriteBEShort(ms, 1);
-                    ms.WriteByte((byte)'c');
-                }
-                for (int i = 0; i < totalLevels; i++) {
-                    ms.WriteByte(0x00);
-                }
-                return ms.ToArray();
-            }
-        }
-
-
         [TestMethod]
         public void DepthLimitIsEnforced() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
 
-            byte[] okDoc = MakeNestedCompoundDoc(512);
+            byte[] okDoc = TestFiles.MakeNestedCompoundDoc(512);
             NbtTag read = codec.ReadTag(okDoc, 0, okDoc.Length, out _);
             Assert.IsNotNull(((NbtCompound)read).Get<NbtCompound>("c"));
 
-            byte[] deepDoc = MakeNestedCompoundDoc(513);
+            byte[] deepDoc = TestFiles.MakeNestedCompoundDoc(513);
             Assert.Throws<NbtFormatException>(() => codec.ReadTag(deepDoc, 0, deepDoc.Length, out _));
         }
 

@@ -57,5 +57,22 @@ namespace fNbt.Test {
             Assert.AreEqual("BedrockNetwork", NbtFlavor.BedrockNetwork.Name);
             Assert.AreEqual("ClassiCube", NbtFlavor.ClassiCube.Name);
         }
+
+
+        [TestMethod]
+        public void FlavorsCarryFormatData() {
+            Assert.AreEqual(NbtTagType.LongArray, NbtFlavor.Java.MaxTagType);
+            Assert.AreEqual(NbtTagType.LongArray, NbtFlavor.JavaNetwork.MaxTagType);
+            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.JavaAnvil.MaxTagType);
+            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.Bedrock.MaxTagType);
+            Assert.AreEqual(NbtTagType.IntArray, NbtFlavor.BedrockNetwork.MaxTagType);
+            Assert.AreEqual(NbtTagType.Compound, NbtFlavor.JavaLegacy.MaxTagType);
+            Assert.AreEqual(NbtTagType.Compound, NbtFlavor.ClassiCube.MaxTagType);
+
+            Assert.AreEqual(65535, NbtFlavor.Java.MaxStringBytes);
+            Assert.AreEqual(32767, NbtFlavor.Bedrock.MaxStringBytes);
+            Assert.AreEqual(int.MaxValue, NbtFlavor.BedrockNetwork.MaxStringBytes);
+            Assert.AreEqual(256, NbtFlavor.ClassiCube.MaxStringBytes);
+        }
     }
 }

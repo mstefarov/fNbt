@@ -24,6 +24,24 @@ namespace fNbt.Test {
         }
 
 
+        // Builds an uncompressed doc of compounds nested totalLevels deep (including root).
+        public static byte[] MakeNestedCompoundDoc(int totalLevels) {
+            using (var ms = new MemoryStream()) {
+                ms.WriteByte(0x0A);
+                WriteBEShort(ms, 0); // root name: ""
+                for (int i = 1; i < totalLevels; i++) {
+                    ms.WriteByte(0x0A);
+                    WriteBEShort(ms, 1);
+                    ms.WriteByte((byte)'c');
+                }
+                for (int i = 0; i < totalLevels; i++) {
+                    ms.WriteByte(0x00);
+                }
+                return ms.ToArray();
+            }
+        }
+
+
         public static void WriteBEInt(Stream s, int value) {
             s.WriteByte((byte)(value >> 24));
             s.WriteByte((byte)(value >> 16));

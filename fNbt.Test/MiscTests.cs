@@ -164,15 +164,21 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void NullValueTest() {
+            // via the setter
             Assert.Throws<ArgumentNullException>(() => new NbtByteArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtIntArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtLongArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtString().Value = null);
+            // via the constructor
+            Assert.Throws<ArgumentNullException>(() => new NbtByteArray((byte[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtIntArray((int[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtLongArray((long[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtString((string)null));
         }
 
 
         [TestMethod]
-        public void NbtTagNameTest() {
+        public void GetCanonicalTagNameTest() {
             Assert.AreEqual("TAG_End", NbtTag.GetCanonicalTagName(NbtTagType.End));
             Assert.AreEqual("TAG_Byte", NbtTag.GetCanonicalTagName(NbtTagType.Byte));
             Assert.AreEqual("TAG_Short", NbtTag.GetCanonicalTagName(NbtTagType.Short));
@@ -216,12 +222,5 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void BadParamsTest() {
-            Assert.Throws<ArgumentNullException>(() => new NbtByteArray((byte[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtIntArray((int[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtLongArray((long[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtString((string)null));
-        }
     }
 }

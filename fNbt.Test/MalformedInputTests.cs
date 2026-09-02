@@ -272,7 +272,7 @@ namespace fNbt.Test {
 
         // A huge length that stays positive must also throw a stream error.
         [TestMethod]
-        public void HugeIntArraySkipThrowsFormatError() {
+        public void HugeIntArraySkipThrowsStreamError() {
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x0FFFFFFF);
             var file = new NbtFile();
             Assert.Throws<EndOfStreamException>(

@@ -29,24 +29,6 @@ namespace fNbt.Test {
         }
 
 
-        // Builds an uncompressed doc of compounds nested totalLevels deep (including root).
-        static byte[] MakeNestedCompoundDoc(int totalLevels) {
-            using (var ms = new MemoryStream()) {
-                ms.WriteByte(0x0A);
-                TestFiles.WriteBEShort(ms, 0); // root name: ""
-                for (int i = 1; i < totalLevels; i++) {
-                    ms.WriteByte(0x0A);
-                    TestFiles.WriteBEShort(ms, 1);
-                    ms.WriteByte((byte)'c');
-                }
-                for (int i = 0; i < totalLevels; i++) {
-                    ms.WriteByte(0x00);
-                }
-                return ms.ToArray();
-            }
-        }
-
-
         // Builds an in-memory chain of compounds nested totalLevels deep (including root).
         static NbtCompound MakeNestedCompoundTree(int totalLevels) {
             var root = new NbtCompound("root");
@@ -123,7 +105,7 @@ namespace fNbt.Test {
             file.LoadFromBuffer(listDoc, 0, listDoc.Length, NbtCompression.None);
             Assert.IsNotNull(file.RootTag.Get<NbtList>("l"));
 
-            byte[] compoundDoc = MakeNestedCompoundDoc(MaxDepth);
+            byte[] compoundDoc = TestFiles.MakeNestedCompoundDoc(MaxDepth);
             file.LoadFromBuffer(compoundDoc, 0, compoundDoc.Length, NbtCompression.None);
             Assert.IsNotNull(file.RootTag.Get<NbtCompound>("c"));
         }
@@ -136,7 +118,7 @@ namespace fNbt.Test {
             Assert.Throws<NbtFormatException>(
                 () => file.LoadFromBuffer(listDoc, 0, listDoc.Length, NbtCompression.None));
 
-            byte[] compoundDoc = MakeNestedCompoundDoc(MaxDepth + 1);
+            byte[] compoundDoc = TestFiles.MakeNestedCompoundDoc(MaxDepth + 1);
             Assert.Throws<NbtFormatException>(
                 () => file.LoadFromBuffer(compoundDoc, 0, compoundDoc.Length, NbtCompression.None));
         }

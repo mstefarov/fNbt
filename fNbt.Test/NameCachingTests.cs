@@ -52,7 +52,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void LongNamesBypassTheCache() {
+        public void LongNamesStillParse() {
             string longName = new string('x', 100);
             NbtFile file = Roundtrip(MakeSchemaDoc(20, (i, f) => longName + f));
             var items = (NbtList)file.RootTag["Items"];

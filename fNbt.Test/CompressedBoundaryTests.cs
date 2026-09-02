@@ -76,16 +76,16 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CompressedLoadDoesNotOverreadNonSeekableStreams() {
-            // A load must never read past the document on a non-seekable source. Those are not
-            // drained, so a load can stop with the container's trailer still unread.
+        public void CompressedLoadCountsBytesOnAwkwardNonSeekableStreams() {
+            // Decompression must cope with a source that dribbles three bytes per read, and
+            // the reported byte count must not exceed the document
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);
                 using (var ms = new MemoryStream(doc)) {
                     var awkward = new PartialReadStream(new NonSeekableStream(ms), 3);
                     var file = new NbtFile();
                     long bytesRead = file.LoadFromStream(awkward, compression);
-                    Assert.IsTrue(bytesRead <= doc.Length, compression + ": read past the document");
+                    Assert.IsTrue(bytesRead <= doc.Length, compression + ": counted past the document");
                     TestFiles.AssertNbtSmallFile(file);
                 }
             }
