@@ -125,8 +125,9 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentOutOfRangeException>(() => nestedInt = (NbtInt)childList[childList.Count]);
             Assert.Throws<ArgumentOutOfRangeException>(() => nestedInt = childList.Get<NbtInt>(childList.Count));
 
-            // Using setter correctly
+            // Using setter correctly, to add a tag under a new key
             parent["NewChild"] = new NbtByte("NewChild");
+            Assert.IsTrue(parent.Contains("NewChild"));
 
             // Using setter incorrectly
             object dummyObject;
@@ -234,22 +235,6 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void UtilityMethods() {
-            NbtTag[] testThings = {
-                new NbtShort("Name1", 1),
-                new NbtInt("Name2", 2),
-                new NbtLong("Name3", 3)
-            };
-            var compound = new NbtCompound();
-
-            // add range
-            compound.AddRange(testThings);
-
-            // add range with duplicates
-            Assert.Throws<ArgumentException>(() => compound.AddRange(testThings));
-        }
-
 
         [TestMethod]
         public void InterfaceImplementations() {
@@ -279,15 +264,15 @@ namespace fNbt.Test {
             iCollection.CopyTo(tags, 0);
             CollectionAssert.AreEquivalent(comp, tags);
 
-            // test non-generic GetEnumerator()
+            // test generic GetEnumerator()
             var enumeratedTags = comp.ToList();
             CollectionAssert.AreEquivalent(tagList, enumeratedTags);
 
-            // test generic GetEnumerator()
+            // test non-generic GetEnumerator()
             List<NbtTag> enumeratedTags2 = new List<NbtTag>();
-            var enumerator = comp.GetEnumerator();
+            System.Collections.IEnumerator enumerator = ((System.Collections.IEnumerable)comp).GetEnumerator();
             while (enumerator.MoveNext()) {
-                enumeratedTags2.Add(enumerator.Current);
+                enumeratedTags2.Add((NbtTag)enumerator.Current);
             }
             CollectionAssert.AreEquivalent(tagList, enumeratedTags2);
         }

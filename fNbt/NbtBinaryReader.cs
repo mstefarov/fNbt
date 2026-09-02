@@ -597,7 +597,8 @@ namespace fNbt {
         // to prevent massive allocations. Only seekable streams can be efficiently checked.
         public void EnsureCanRead(long byteCount) {
             if (BaseStream.CanSeek && byteCount > BaseStream.Length - BaseStream.Position) {
-                throw new EndOfStreamException();
+                throw new EndOfStreamException(
+                    "Declared data size (" + byteCount + " bytes) runs past the end of the stream.");
             }
         }
 

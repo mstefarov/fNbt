@@ -51,7 +51,7 @@ namespace fNbt.Test {
             var file = new NbtFile();
             long length = file.LoadFromFile(TestFiles.Big);
             TestFiles.AssertNbtBigFile(file);
-            Assert.AreEqual(length, new FileInfo(TestFiles.Big).Length);
+            Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
         }
 
 
@@ -83,7 +83,7 @@ namespace fNbt.Test {
 
             long length = file.LoadFromBuffer(fileBytes, 0, fileBytes.Length, NbtCompression.AutoDetect, null);
             TestFiles.AssertNbtBigFile(file);
-            Assert.AreEqual(length, new FileInfo(TestFiles.Big).Length);
+            Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
         }
 
 
@@ -95,7 +95,7 @@ namespace fNbt.Test {
                     var file = new NbtFile();
                     long length = file.LoadFromStream(nss, NbtCompression.None, null);
                     TestFiles.AssertNbtBigFile(file);
-                    Assert.AreEqual(length, new FileInfo(TestFiles.Big).Length);
+                    Assert.AreEqual(new FileInfo(TestFiles.Big).Length, length);
                 }
             }
         }
@@ -204,22 +204,6 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void LoadFromStream() {
-            LoadFromStreamInternal(TestFiles.Big, NbtCompression.None);
-            LoadFromStreamInternal(TestFiles.BigGZip, NbtCompression.GZip);
-            LoadFromStreamInternal(TestFiles.BigZLib, NbtCompression.ZLib);
-        }
-
-
-        void LoadFromStreamInternal(string fileName, NbtCompression compression) {
-            var file = new NbtFile();
-            byte[] fileBytes = File.ReadAllBytes(fileName);
-            using (var ms = new MemoryStream(fileBytes)) {
-                file.LoadFromStream(ms, compression);
-            }
-        }
-
 
         [TestMethod]
         public void SaveToBuffer() {
@@ -257,7 +241,7 @@ namespace fNbt.Test {
         [TestMethod]
         public void SaveToBufferCompressed() {
             // The compressed branch of SaveToBuffer is separate code from the exact-size
-            // uncompressed path, and nothing else covers it
+            // uncompressed path
             var root = new NbtCompound("root") { new NbtInt("v", 12345), new NbtString("s", "hello") };
             byte[] doc = new NbtFile(root).SaveToBuffer(NbtCompression.ZLib);
             var file = new NbtFile();
@@ -291,10 +275,11 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtFile.ReadRootTagName(fileName, (NbtCompression)255, NbtFlavor.Java));
 
             Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName));
-            // bufferSize is ignored now, so every value must give the same name, even a negative one.
-            foreach (int bufferSize in new[] { -1, 0, 1, 8, 8192 }) {
-                Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, NbtFlavor.Java));
-            }
+            Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, NbtFlavor.Java));
+            // The obsolete overload ignores bufferSize, even a negative one
+#pragma warning disable 618
+            Assert.AreEqual("Level", NbtFile.ReadRootTagName(fileName, compression, true, -1));
+#pragma warning restore 618
 
             byte[] fileBytes = File.ReadAllBytes(fileName);
             using (var ms = new MemoryStream(fileBytes)) {

@@ -78,14 +78,9 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CodecWritesGoldenBytes() {
-            // A single-child compound sidesteps NbtCompound's unspecified iteration order
-            var root = new NbtCompound("") { new NbtIntArray("ia", new[] { 0, -1, 300 }) };
-            byte[] expected = {
-                0x0A, 0x00,
-                0x0B, 0x02, (byte)'i', (byte)'a', 0x06, 0x00, 0x01, 0xD8, 0x04,
-                0x00
-            };
-            CollectionAssert.AreEqual(expected, NbtCodec.For(NbtFlavor.BedrockNetwork).WriteTag(root));
+            // Insertion order is guaranteed, so the whole golden doc can be pinned byte for byte
+            CollectionAssert.AreEqual(GoldenDoc,
+                                      NbtCodec.For(NbtFlavor.BedrockNetwork).WriteTag(MakeGoldenTree()));
         }
 
 
@@ -135,17 +130,13 @@ namespace fNbt.Test {
         public void NbtFileRoundTripsUncompressed() {
             var file = new NbtFile(MakeGoldenTree(), NbtFlavor.BedrockNetwork);
             byte[] saved = file.SaveToBuffer(NbtCompression.None);
+            // Insertion order is guaranteed, so the save matches the hand-written doc exactly
+            CollectionAssert.AreEqual(GoldenDoc, saved);
 
             var reloaded = new NbtFile(NbtFlavor.BedrockNetwork);
             long bytesRead = reloaded.LoadFromBuffer(saved, 0, saved.Length, NbtCompression.None);
             Assert.AreEqual(saved.Length, bytesRead);
             Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, reloaded.RootTag));
-
-            // The hand-written golden doc holds the same tags, so it must load to an equal
-            // tree even though its children come in another order
-            var golden = new NbtFile(NbtFlavor.BedrockNetwork);
-            golden.LoadFromBuffer(GoldenDoc, 0, GoldenDoc.Length, NbtCompression.None);
-            Assert.IsTrue(NbtComparer.Instance.Equals(file.RootTag, golden.RootTag));
         }
 
 

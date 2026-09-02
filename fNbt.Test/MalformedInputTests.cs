@@ -113,8 +113,10 @@ namespace fNbt.Test {
         public void ByteArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x07, 0x08000000); // 128 MiB claimed, 13-byte doc
             var file = new NbtFile();
-            Assert.Throws<EndOfStreamException>(
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            // The up-front bound must reject it, not the read after a huge allocation
+            StringAssert.Contains(ex.Message, "Declared");
         }
 
 
@@ -122,8 +124,10 @@ namespace fNbt.Test {
         public void IntArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x0B, 0x08000000);
             var file = new NbtFile();
-            Assert.Throws<EndOfStreamException>(
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            // The up-front bound must reject it, not the read after a huge allocation
+            StringAssert.Contains(ex.Message, "Declared");
         }
 
 
@@ -131,8 +135,10 @@ namespace fNbt.Test {
         public void LongArrayOversizedLengthSeekableThrows() {
             byte[] doc = MakeArrayHeaderDoc(0x0C, 0x08000000);
             var file = new NbtFile();
-            Assert.Throws<EndOfStreamException>(
+            EndOfStreamException ex = Assert.Throws<EndOfStreamException>(
                 () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None));
+            // The up-front bound must reject it, not the read after a huge allocation
+            StringAssert.Contains(ex.Message, "Declared");
         }
 
 

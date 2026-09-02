@@ -308,6 +308,8 @@ namespace fNbt.Test {
                 writer.BeginList("l", NbtTagType.Compound, 1);
                 Assert.Throws<NbtFormatException>(() => writer.BeginCompound());
                 Assert.Throws<NbtFormatException>(() => writer.WriteTag(new NbtCompound()));
+                // The refusals must not poison the writer; the open slot is what blocks EndList
+                Assert.IsFalse(writer.IsInErrorState);
                 Assert.Throws<NbtFormatException>(() => writer.EndList());
             }
         }

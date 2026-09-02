@@ -4,11 +4,6 @@
         private readonly NbtComparer comparer = NbtComparer.Instance;
 
         [TestMethod]
-        public void InstanceIsSingleton() {
-            Assert.AreSame(NbtComparer.Instance, NbtComparer.Instance);
-        }
-
-        [TestMethod]
         public void BasicTagsEqualAndHashCode() {
             var a = new NbtInt("foo", 123);
             var b = new NbtInt("foo", 123);

@@ -69,6 +69,7 @@ namespace fNbt.Test {
                     long bytesRead = file.LoadFromStream(ms, compression);
                     Assert.AreEqual(ms.Length, ms.Position, compression.ToString());
                     Assert.AreEqual(ms.Length, bytesRead, compression.ToString());
+                    TestFiles.AssertNbtSmallFile(file);
                 }
             }
         }
@@ -199,18 +200,6 @@ namespace fNbt.Test {
             }
         }
 #endif
-
-
-        [TestMethod]
-        public void CompressedRoundTripsStillLoadClean() {
-            foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
-                byte[] doc = MakeDoc(compression);
-                var file = new NbtFile();
-                long bytesRead = file.LoadFromBuffer(doc, 0, doc.Length, compression);
-                Assert.AreEqual(doc.Length, bytesRead, compression.ToString());
-                TestFiles.AssertNbtSmallFile(file);
-            }
-        }
 
 
         [TestMethod]

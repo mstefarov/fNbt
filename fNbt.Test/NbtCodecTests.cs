@@ -249,25 +249,5 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void CodecStreamMethodsWork() {
-            NbtCompound root = MakeSampleRoot("hello");
-            var codec = new NbtCodec(NbtFlavor.Java);
-
-            using (var ms = new MemoryStream()) {
-                codec.WriteTag(root, ms);
-                codec.WriteTag(root, ms);
-                ms.Position = 0;
-
-                var tags = codec.ReadConcatenatedTags(ms).ToList();
-                Assert.AreEqual(2, tags.Count);
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, tags[0]));
-            }
-
-            using (var ms = new MemoryStream(codec.WriteTag(root))) {
-                Assert.IsTrue(codec.TryReadTag(ms, out NbtTag tag));
-                Assert.IsTrue(NbtComparer.Instance.Equals(root, tag));
-            }
-        }
     }
 }

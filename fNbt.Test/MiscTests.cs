@@ -174,6 +174,18 @@ namespace fNbt.Test {
         [TestMethod]
         public void NbtTagNameTest() {
             Assert.AreEqual("TAG_End", NbtTag.GetCanonicalTagName(NbtTagType.End));
+            Assert.AreEqual("TAG_Byte", NbtTag.GetCanonicalTagName(NbtTagType.Byte));
+            Assert.AreEqual("TAG_Short", NbtTag.GetCanonicalTagName(NbtTagType.Short));
+            Assert.AreEqual("TAG_Int", NbtTag.GetCanonicalTagName(NbtTagType.Int));
+            Assert.AreEqual("TAG_Long", NbtTag.GetCanonicalTagName(NbtTagType.Long));
+            Assert.AreEqual("TAG_Float", NbtTag.GetCanonicalTagName(NbtTagType.Float));
+            Assert.AreEqual("TAG_Double", NbtTag.GetCanonicalTagName(NbtTagType.Double));
+            Assert.AreEqual("TAG_Byte_Array", NbtTag.GetCanonicalTagName(NbtTagType.ByteArray));
+            Assert.AreEqual("TAG_String", NbtTag.GetCanonicalTagName(NbtTagType.String));
+            Assert.AreEqual("TAG_List", NbtTag.GetCanonicalTagName(NbtTagType.List));
+            Assert.AreEqual("TAG_Compound", NbtTag.GetCanonicalTagName(NbtTagType.Compound));
+            Assert.AreEqual("TAG_Int_Array", NbtTag.GetCanonicalTagName(NbtTagType.IntArray));
+            Assert.AreEqual("TAG_Long_Array", NbtTag.GetCanonicalTagName(NbtTagType.LongArray));
             Assert.IsNull(NbtTag.GetCanonicalTagName((NbtTagType)255));
         }
 

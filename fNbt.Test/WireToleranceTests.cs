@@ -72,18 +72,18 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void EmptyListAcceptsAnyElementTypeByte() {
-            // Type byte 0x63 is garbage, but the declared length is zero, so nothing needs it
+            // Type byte 0x63 is garbage, but the declared length is zero, so nothing needs it.
+            // The garbage byte normalizes to End on load, so a resave is an ordinary document.
             NbtCompound root = Load(MakeListDoc(0x63, 0));
             var list = root.Get<NbtList>("l");
             Assert.AreEqual(0, list.Count);
+            Assert.AreEqual(NbtTagType.End, list.ListType);
 
             // A negative length with a garbage type byte is doubly tolerated
             root = Load(MakeListDoc(0xFF, -3));
-            Assert.AreEqual(0, root.Get<NbtList>("l").Count);
-
-            // The tolerated list saves cleanly as an ordinary empty End-typed list
-            byte[] resaved = new NbtFile(root).SaveToBuffer(NbtCompression.None);
-            Assert.AreEqual(0, Load(resaved).Get<NbtList>("l").Count);
+            list = root.Get<NbtList>("l");
+            Assert.AreEqual(0, list.Count);
+            Assert.AreEqual(NbtTagType.End, list.ListType);
         }
 
 

@@ -43,8 +43,7 @@ namespace fNbt.Test {
             for (int i = 0; i < 40; i++) {
                 Assert.IsTrue(compound.Remove("t" + i));
                 // Every survivor stays reachable after each position shift
-                Assert.AreEqual(i + 1 < 60 ? i + 1 : -1,
-                                compound["t" + (i + 1)]?.IntValue ?? -1);
+                Assert.AreEqual(i + 1, compound["t" + (i + 1)]?.IntValue ?? -1);
                 Assert.AreEqual(59, compound["t59"].IntValue);
             }
             Assert.AreEqual(20, compound.Count);

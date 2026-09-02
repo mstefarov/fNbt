@@ -1,35 +1,35 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace fNbt.Test {
     [TestClass]
     public sealed class NbtReaderTests {
         [TestMethod]
-        public void PrintBigFileUncompressed() {
+        public void WalkBigFile() {
+            // ReadToFollowing must visit every tag; a walk that stops early fails the count
             using (FileStream fs = File.OpenRead(TestFiles.Big)) {
                 var reader = new NbtReader(fs);
-                Assert.AreEqual(fs, reader.BaseStream);
+                Assert.AreSame(fs, reader.BaseStream);
                 while (reader.ReadToFollowing()) {
-                    Console.Write("@" + reader.TagStartOffset + " ");
-                    Console.WriteLine(reader.ToString());
+                    _ = reader.ToString(); // must not throw mid-walk
                 }
                 Assert.AreEqual("Level", reader.RootName);
+                Assert.AreEqual(31, reader.TagsRead);
             }
         }
 
 
         [TestMethod]
-        public void PrintBigFileUncompressedNoSkip() {
+        public void WalkBigFileNoSkip() {
+            // With SkipEndTags off, End markers count as tags, so the walk gets longer
             using (FileStream fs = File.OpenRead(TestFiles.Big)) {
                 var reader = new NbtReader(fs) {
                     SkipEndTags = false
                 };
-                Assert.AreEqual(fs, reader.BaseStream);
                 while (reader.ReadToFollowing()) {
-                    Console.Write("@" + reader.TagStartOffset + " ");
-                    Console.WriteLine(reader.ToString());
                 }
-                Assert.AreEqual("Level", reader.RootName);
+                Assert.AreEqual(37, reader.TagsRead);
             }
         }
 
@@ -94,8 +94,10 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream(testData)) {
                 var reader = new NbtReader(ms);
                 while (reader.ReadToFollowing()) {
-                    Console.WriteLine(reader.ToString(true));
+                    _ = reader.ToString(true); // must not throw mid-walk
                 }
+                // root, OuterList, three sublists, three elements
+                Assert.AreEqual(8, reader.TagsRead);
             }
         }
 
@@ -365,24 +367,28 @@ namespace fNbt.Test {
         [TestMethod]
         public void ReadAsTagTest4() {
             // read a bunch of lists as tags
-            byte[] testData = new NbtFile(TestFiles.MakeListTest()).SaveToBuffer(NbtCompression.None);
+            NbtCompound expected = TestFiles.MakeListTest();
+            byte[] testData = new NbtFile(expected).SaveToBuffer(NbtCompression.None);
 
-            // first, read everything all-at-once
+            // first, read the whole document at once
             {
                 var reader = new NbtReader(new MemoryStream(testData));
-                while (!reader.IsAtStreamEnd) {
-                    Console.WriteLine(reader.ReadAsTag());
-                }
+                Assert.IsTrue(NbtComparer.Instance.Equals(expected, reader.ReadAsTag()));
+                Assert.IsTrue(reader.IsAtStreamEnd);
             }
 
             // next, read each list individually
             {
+                var expectedLists = new List<NbtTag>(expected);
                 var reader = new NbtReader(new MemoryStream(testData));
                 reader.ReadToFollowing(); // read to root
                 reader.ReadToFollowing(); // read to first list tag
+                int index = 0;
                 while (!reader.IsAtStreamEnd) {
-                    Console.WriteLine(reader.ReadAsTag());
+                    Assert.IsTrue(NbtComparer.Instance.Equals(expectedLists[index], reader.ReadAsTag()));
+                    index++;
                 }
+                Assert.AreEqual(expectedLists.Count, index);
             }
         }
 
@@ -587,10 +593,7 @@ namespace fNbt.Test {
             // test bytes as shorts
             reader.ReadToFollowing("ByteList");
             short[] bytes = reader.ReadListAsArray<short>();
-            CollectionAssert.AreEqual(bytes,
-                                      new short[] {
-                                          100, 20, 3
-                                      });
+            CollectionAssert.AreEqual(new short[] { 100, 20, 3 }, bytes);
         }
 
 
@@ -797,26 +800,18 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NonSeekableStreamSkip1() {
+        public void NonSeekableStreamSkip() {
+            // The buffered skip fallback must count the same tags the seekable path does
             byte[] fileBytes = File.ReadAllBytes(TestFiles.Big);
-            using (var ms = new MemoryStream(fileBytes)) {
-                using (var nss = new NonSeekableStream(ms)) {
-                    var reader = new NbtReader(nss);
-                    reader.ReadToFollowing();
-                    reader.Skip();
-                }
+            using (var nss = new NonSeekableStream(new MemoryStream(fileBytes))) {
+                var reader = new NbtReader(nss);
+                reader.ReadToFollowing();
+                Assert.AreEqual(30, reader.Skip());
             }
-        }
-
-
-        [TestMethod]
-        public void NonSeekableStreamSkip2() {
-            using (var ms = TestFiles.MakeReaderTest()) {
-                using (var nss = new NonSeekableStream(ms)) {
-                    var reader = new NbtReader(nss);
-                    reader.ReadToFollowing();
-                    reader.Skip();
-                }
+            using (var nss = new NonSeekableStream(TestFiles.MakeReaderTest())) {
+                var reader = new NbtReader(nss);
+                reader.ReadToFollowing();
+                Assert.AreEqual(18, reader.Skip());
             }
         }
 
@@ -991,7 +986,7 @@ namespace fNbt.Test {
                 0x0A, // Child compound tag
                 0x00, 0x01, 0x67, // Child name: 'g'
                 0x0c, // LongArray tag
-                0x00, 0x01, 0x68, // LongArray tag name: 'g'
+                0x00, 0x01, 0x68, // LongArray tag name: 'h'
                 0x7F, 0x00, 0x00, 0x00, // array length: ~2 billion, cannot fit
                 0x00, // child end tag
                 0x00 // end tag

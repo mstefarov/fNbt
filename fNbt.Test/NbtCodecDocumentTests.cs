@@ -158,10 +158,19 @@ namespace fNbt.Test {
             Assert.AreEqual(0, bytesConsumed);
 
             // With actual data present, TryReadTag reads it
-            byte[] doc = codec.WriteTag(MakeSampleRoot("r"));
+            NbtCompound root = MakeSampleRoot("r");
+            byte[] doc = codec.WriteTag(root);
             Assert.IsTrue(codec.TryReadTag(doc, 0, doc.Length, out tag, out bytesConsumed));
             Assert.AreEqual("r", tag.Name);
             Assert.AreEqual(doc.Length, bytesConsumed);
+
+            // The stream overload behaves the same
+            using (var ms = new MemoryStream(doc)) {
+                Assert.IsTrue(codec.TryReadTag(ms, out NbtTag streamTag));
+                Assert.IsTrue(NbtComparer.Instance.Equals(root, streamTag));
+                Assert.IsFalse(codec.TryReadTag(ms, out NbtTag missing));
+                Assert.IsNull(missing);
+            }
         }
 
 

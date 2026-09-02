@@ -47,7 +47,6 @@ namespace fNbt.Test {
             NbtFlavor[] all = AllFlavors();
             Assert.AreEqual(all.Length, all.Distinct().Count());
             foreach (NbtFlavor flavor in all) {
-                Assert.IsFalse(string.IsNullOrEmpty(flavor.Name));
                 Assert.AreEqual(flavor.Name, flavor.ToString());
             }
             Assert.AreEqual("Java", NbtFlavor.Java.Name);

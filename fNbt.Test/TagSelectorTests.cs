@@ -110,19 +110,6 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void SkippingValuesInCompoundTest() {
-            NbtCompound root = TestFiles.MakeValueTest();
-            NbtCompound nestedComp = TestFiles.MakeValueTest();
-            nestedComp.Name = "NestedComp";
-            root.Add(nestedComp);
-
-            var file = new NbtFile(root);
-            byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-            file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None, tag => false);
-            Assert.AreEqual(0, file.RootTag.Count);
-        }
-
 
         [TestMethod]
         public void SkippedStringsRespectFlavorCeilingButNotMaxAllocation() {

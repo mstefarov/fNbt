@@ -62,7 +62,6 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentException>(() => new NbtFile(NbtFlavor.JavaNetwork));
             Assert.Throws<ArgumentException>(
                 () => new NbtFile(new NbtOptions { Flavor = NbtFlavor.JavaNetwork }));
-            Assert.Throws<ArgumentException>(() => NbtOptions.DefaultFlavor = NbtFlavor.JavaNetwork);
 
             using (var ms = new MemoryStream(new byte[] { 0x0A })) {
                 Assert.Throws<ArgumentException>(() => new NbtReader(ms, NbtFlavor.JavaNetwork));

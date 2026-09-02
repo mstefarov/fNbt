@@ -68,8 +68,8 @@ namespace fNbt.Test {
 
             // check IList.this[int]
             for (int i = 0; i < iList.Count; i++) {
-                Assert.AreEqual(originalList[i], iList[i]);
                 iList[i] = new NbtInt(i);
+                Assert.AreEqual(i, ((NbtInt)iList[i]).Value);
             }
 
             // check IList.Clear
@@ -132,11 +132,13 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentNullException>(() => new NbtList((NbtTag[])null, NbtTagType.Unknown));
 
             // correct explicitly-given list type
-            _ = new NbtList("Test2", new NbtTag[] {
+            var typed = new NbtList("Test2", new NbtTag[] {
                 new NbtInt(1),
                 new NbtInt(2),
                 new NbtInt(3)
             }, NbtTagType.Int);
+            Assert.AreEqual(NbtTagType.Int, typed.ListType);
+            Assert.AreEqual(3, typed.Count);
 
             // wrong explicitly-given list type
             Assert.Throws<ArgumentException>(() => new NbtList("Test3", new NbtTag[] {
@@ -153,11 +155,14 @@ namespace fNbt.Test {
             }));
 
             // using AddRange
-            new NbtList().AddRange(new NbtTag[] {
+            var ranged = new NbtList();
+            ranged.AddRange(new NbtTag[] {
                 new NbtInt(1),
                 new NbtInt(2),
                 new NbtInt(3)
             });
+            Assert.AreEqual(NbtTagType.Int, ranged.ListType);
+            Assert.AreEqual(3, ranged.Count);
             Assert.Throws<ArgumentNullException>(() => new NbtList().AddRange(null));
         }
 
@@ -190,11 +195,13 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentException>(() => list.Insert(3, new NbtString()));
             Assert.Throws<ArgumentNullException>(() => list.Insert(3, null));
 
-            // testing array contents
+            // testing array contents: the insert landed at its index, ahead of the appended tag
             for (int i = 0; i < sameTags.Length; i++) {
                 Assert.AreSame(sameTags[i], list[i]);
                 Assert.AreEqual(i, ((NbtInt)list[i]).Value);
             }
+            Assert.AreEqual(4, ((NbtInt)list[3]).Value);
+            Assert.AreEqual(3, ((NbtInt)list[4]).Value);
 
             // test removal
             Assert.IsFalse(list.Remove(new NbtInt(5)));
@@ -298,15 +305,14 @@ namespace fNbt.Test {
             Assert.AreEqual(bytesRead, data.Length);
 
             // check contents of loaded file
-            Assert.IsNotNull(readFile.RootTag);
             Assert.IsInstanceOfType<NbtList>(readFile.RootTag["Entities"]);
             var readList = (NbtList)readFile.RootTag["Entities"];
             Assert.AreEqual(writtenList.ListType, readList.ListType);
-            Assert.AreEqual(readList.Count, writtenList.Count);
+            Assert.AreEqual(writtenList.Count, readList.Count);
 
-            // check .ToArray
-            CollectionAssert.AreEquivalent(readList, readList.ToArray());
-            CollectionAssert.AreEquivalent(readList, readList.ToArray<NbtInt>());
+            // check .ToArray, in order
+            CollectionAssert.AreEqual(readList, readList.ToArray());
+            CollectionAssert.AreEqual(readList, readList.ToArray<NbtInt>());
 
             // check contents of loaded list
             for (int i = 0; i < elements; i++) {
@@ -321,7 +327,8 @@ namespace fNbt.Test {
             var testFile = new NbtFile(TestFiles.MakeListTest());
             byte[] buffer = testFile.SaveToBuffer(NbtCompression.None);
             long bytesRead = testFile.LoadFromBuffer(buffer, 0, buffer.Length, NbtCompression.None);
-            Assert.AreEqual(bytesRead, buffer.Length);
+            Assert.AreEqual(buffer.Length, bytesRead);
+            Assert.IsTrue(NbtComparer.Instance.Equals(TestFiles.MakeListTest(), testFile.RootTag));
         }
 
 
