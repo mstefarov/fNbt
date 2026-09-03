@@ -150,10 +150,12 @@ namespace fNbt {
         public bool ValidateOnWrite { get; set; }
 
         /// <summary> Maximum size, in bytes, of any single allocation made on behalf of a length
-        /// declared in the input: array payloads, list-as-array reads, and strings. Guards against
-        /// tiny corrupt or hostile documents declaring huge lengths, which matters most on
-        /// compressed and non-seekable streams where declared lengths cannot be checked against the
-        /// bytes actually available. Per-allocation, not a total document quota. Initialized from
+        /// declared in the input: array payloads, list-as-array reads, strings, and the array of
+        /// references a loaded list holds its elements in (one pointer per element; the element
+        /// objects themselves are not counted). Guards against tiny corrupt or hostile documents
+        /// declaring huge lengths, which matters most on compressed and non-seekable streams where
+        /// declared lengths cannot be checked against the bytes actually available.
+        /// Per-allocation, not a total document quota. Initialized from
         /// <see cref="DefaultMaxAllocation"/>; <see cref="long.MaxValue"/> means no limit, and the
         /// value must be positive when the options are used. </summary>
         public long MaxAllocation { get; set; }

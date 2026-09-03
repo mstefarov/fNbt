@@ -25,6 +25,31 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void MaxAllocationCapsListElementArrays() {
+            // A list's element references are one allocation driven by the declared length, so
+            // the cap covers them the way it covers an array payload. The element objects are
+            // not counted, so the cap only has to fit the pointers.
+            var list = new NbtList("l", NbtTagType.Byte);
+            for (int i = 0; i < 20_000; i++) list.Add(new NbtByte(1));
+            var root = new NbtCompound("r") { list };
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
+            long pointers = 20_000L * IntPtr.Size;
+
+            var fitting = new NbtCodec(new NbtOptions { MaxAllocation = pointers });
+            NbtAssert.AreEqual(root, fitting.ReadTag(doc, 0, doc.Length, out _));
+            var tooSmall = new NbtCodec(new NbtOptions { MaxAllocation = pointers - 1 });
+            Assert.Throws<NbtFormatException>(() => tooSmall.ReadTag(doc, 0, doc.Length, out _));
+
+            // Lists of containers hold references the same way
+            var compounds = new NbtList("c", NbtTagType.Compound);
+            for (int i = 0; i < 100; i++) compounds.Add(new NbtCompound());
+            byte[] compoundDoc = NbtCodec.For(NbtFlavor.Java).WriteTag(new NbtCompound("r") { compounds });
+            var tooSmallForCompounds = new NbtCodec(new NbtOptions { MaxAllocation = 100L * IntPtr.Size - 1 });
+            Assert.Throws<NbtFormatException>(() => tooSmallForCompounds.ReadTag(compoundDoc, 0, compoundDoc.Length, out _));
+        }
+
+
+        [TestMethod]
         public void MaxAllocationCapsStringAllocations() {
             var root = new NbtCompound("r") { new NbtString("s", new string('x', 100)) };
             byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);

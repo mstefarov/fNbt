@@ -298,6 +298,9 @@ namespace fNbt {
             }
             ListType = newListType;
 
+            // The reference array grows to hold every element, so it counts against the cap the
+            // way an array payload does. The element objects themselves are not counted.
+            readStream.EnsureAllocation((long)length * IntPtr.Size);
             tags.Capacity = Math.Min(length, MaxPresizedCapacity);
 
             for (int i = 0; i < length; i++) {
