@@ -651,7 +651,6 @@ namespace fNbt {
                     throw new EndOfStreamException();
 
                 case ParseState.AtStreamBeginning:
-                case ParseState.AtCompoundEnd:
                     ReadToFollowing();
                     break;
             }
@@ -662,13 +661,15 @@ namespace fNbt {
                 parent = new NbtCompound(TagName);
             } else if (TagType == NbtTagType.List) {
                 parent = new NbtList(TagName, ListType);
-            } else if (atValue) {
-                NbtTag result = ReadValueAsTag();
+            } else if (atValue || valueCache != null) {
+                // A value tag has no children. Its value comes from the stream, or from the
+                // cache when the caller already read it with CacheTagValues on.
+                NbtTag result = atValue ? ReadValueAsTag() : TagFromCachedValue();
                 ReadToFollowing();
-                // if we're at a value tag, there are no child tags to read
                 return result;
             } else {
-                // end tags cannot be read-as-tags (there is no corresponding NbtTag object)
+                // An End tag has no NbtTag counterpart, and a consumed value cannot be reread.
+                // Either way the reader stays where it is.
                 throw new InvalidOperationException(NoValueToReadError);
             }
 
@@ -777,9 +778,40 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads the value as the type specified: the tag's own value type directly, or any
+        // Builds the tag for a value that ReadValue already consumed and CacheTagValues kept
+        NbtTag TagFromCachedValue() {
+            NullableSupport.Assert(valueCache != null);
+            switch (TagType) {
+                case NbtTagType.Byte:
+                    return new NbtByte(TagName, (byte)valueCache);
+                case NbtTagType.Short:
+                    return new NbtShort(TagName, (short)valueCache);
+                case NbtTagType.Int:
+                    return new NbtInt(TagName, (int)valueCache);
+                case NbtTagType.Long:
+                    return new NbtLong(TagName, (long)valueCache);
+                case NbtTagType.Float:
+                    return new NbtFloat(TagName, (float)valueCache);
+                case NbtTagType.Double:
+                    return new NbtDouble(TagName, (double)valueCache);
+                case NbtTagType.String:
+                    return new NbtString(TagName, (string)valueCache);
+                case NbtTagType.ByteArray:
+                    return new NbtByteArray(TagName, (byte[])valueCache);
+                case NbtTagType.IntArray:
+                    return new NbtIntArray(TagName, (int[])valueCache);
+                case NbtTagType.LongArray:
+                    return new NbtLongArray(TagName, (long[])valueCache);
+                default:
+                    throw new InvalidOperationException(NonValueTagError);
+            }
+        }
+
+
+        /// <summary> Reads the value as the type specified: the tag's own value type directly, any
         /// type <see cref="Convert.ChangeType(object, Type)"/> can reach from it, such as a wider
-        /// numeric type or a string. Array values are returned as their own array type only. </summary>
+        /// numeric type or a string, or an enum type from an integral value or a member name.
+        /// Array values are returned as their own array type only. </summary>
         /// <remarks> A failed conversion happens after the value was read from the stream, so the value
         /// is then gone unless <see cref="CacheTagValues"/> is on; the reader stays usable. </remarks>
         /// <typeparam name="T"> The type of the value to be returned. </typeparam>
@@ -789,12 +821,31 @@ namespace fNbt {
         /// <exception cref="InvalidOperationException"> Value has already been read, or there is no value to read. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="InvalidCastException"> Tag value cannot be converted to the requested type. </exception>
-        /// <exception cref="FormatException"> A string value is not in a format the requested type accepts. </exception>
+        /// <exception cref="FormatException"> A string value is not in a format the requested type accepts,
+        /// or names no member of the requested enum type. </exception>
         /// <exception cref="OverflowException"> The value does not fit in the requested type. </exception>
         public T ReadValueAs<T>() {
             object value = ReadValue();
             if (value is T exact) return exact;
+            if (typeof(T).IsEnum) return (T)ConvertToEnum(value, typeof(T));
             return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
+        }
+
+
+        // Enum.ToObject widens any integral value; names go through Enum.Parse, whose bad-name
+        // failure is reported like any other unparseable string
+        static object ConvertToEnum(object value, Type enumType) {
+            if (value is string name) {
+                try {
+                    return Enum.Parse(enumType, name);
+                } catch (ArgumentException ex) {
+                    throw new FormatException("\"" + name + "\" is not a member of " + enumType + ".", ex);
+                }
+            }
+            if (value is byte || value is short || value is int || value is long) {
+                return Enum.ToObject(enumType, value);
+            }
+            throw new InvalidCastException("Cannot convert a " + value.GetType() + " value to " + enumType + ".");
         }
 
 
@@ -883,7 +934,8 @@ namespace fNbt {
         /// reader in its error state, since the stream position is then unknown. After a successful
         /// call no value is available to <see cref="ReadValue"/>, even with <see cref="CacheTagValues"/>. </remarks>
         /// <typeparam name="T"> Element type of the array to be returned: the list's own element type,
-        /// or any primitive or string type <see cref="Convert.ChangeType(object, Type)"/> can reach from it. </typeparam>
+        /// any primitive or string type <see cref="Convert.ChangeType(object, Type)"/> can reach from it,
+        /// or an enum type over a list of integral values or member names. </typeparam>
         /// <returns> List contents converted to an array of the requested type. </returns>
         /// <exception cref="EndOfStreamException"> End of stream has been reached, or the list's
         /// declared length does not fit in the remaining stream. </exception>
@@ -910,7 +962,7 @@ namespace fNbt {
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
                     }
-                    if (!IsConvertibleTarget(typeof(T))) {
+                    if (!IsConvertibleTarget(typeof(T), elementType)) {
                         throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
                     }
                     if (TagLength == 0) {
@@ -933,7 +985,7 @@ namespace fNbt {
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
                     }
-                    if (!IsConvertibleTarget(typeof(T))) {
+                    if (!IsConvertibleTarget(typeof(T), elementType)) {
                         throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
                     }
                     if (ListIndex >= ParentTagLength) {
@@ -975,6 +1027,12 @@ namespace fNbt {
                     return val;
                 }
 
+                if (typeof(T).IsEnum) {
+                    T[] enums = ReadListAsEnums<T>(elementType, elementsToRead);
+                    FinishListRead(unpublished);
+                    return enums;
+                }
+
                 T[] result = new T[elementsToRead];
                 if (typeof(T) == typeof(short) && elementType == NbtTagType.Short) {
                     short[] typed = (short[])(object)result;
@@ -1014,9 +1072,23 @@ namespace fNbt {
         }
 
 
-        // The types Convert.ChangeType can produce from a list value: primitives, string and decimal.
-        // Anything else would fail only after elements were consumed.
-        static bool IsConvertibleTarget(Type type) {
+        // The types list values can be converted to: primitives, string and decimal through
+        // Convert.ChangeType, and enums from integral values or names. Anything else would fail
+        // only after elements were consumed. GetTypeCode reports an enum as its underlying type,
+        // so enums are checked first.
+        static bool IsConvertibleTarget(Type type, NbtTagType elementType) {
+            if (type.IsEnum) {
+                switch (elementType) {
+                    case NbtTagType.Byte:
+                    case NbtTagType.Short:
+                    case NbtTagType.Int:
+                    case NbtTagType.Long:
+                    case NbtTagType.String:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
             switch (Type.GetTypeCode(type)) {
                 case TypeCode.Object:
                 case TypeCode.DateTime:
@@ -1026,6 +1098,39 @@ namespace fNbt {
                 default:
                     return true;
             }
+        }
+
+
+        // On .NET Core, a list whose element type is the enum's own underlying type is read as
+        // that primitive array and block-copied into the enum array by Array.Copy. Casting the
+        // primitive array instead would keep its runtime type, so enumerating it non-generically
+        // would yield boxed integers. .NET Framework refuses both the copy and pinning an enum
+        // array, so the netstandard2.0 build converts element by element, as every other pairing does.
+        T[] ReadListAsEnums<T>(NbtTagType elementType, int count) {
+            T[] result = new T[count];
+#if NETCOREAPP
+            Type underlying = Enum.GetUnderlyingType(typeof(T));
+            Array? primitives = null;
+            if (underlying == typeof(int) && elementType == NbtTagType.Int) {
+                primitives = reader.ReadInt32Array(count);
+            } else if (underlying == typeof(long) && elementType == NbtTagType.Long) {
+                primitives = reader.ReadInt64Array(count);
+            } else if (underlying == typeof(byte) && elementType == NbtTagType.Byte) {
+                primitives = reader.ReadByteArray(count);
+            } else if (underlying == typeof(short) && elementType == NbtTagType.Short) {
+                short[] shorts = new short[count];
+                for (int i = 0; i < count; i++) shorts[i] = reader.ReadInt16();
+                primitives = shorts;
+            }
+            if (primitives != null) {
+                Array.Copy(primitives, result, count);
+                return result;
+            }
+#endif
+            for (int i = 0; i < count; i++) {
+                result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T));
+            }
+            return result;
         }
 
 

@@ -20,6 +20,10 @@
     validation. It reports errors when a document cannot be represented by
     the current NBT flavor (e.g. Bedrock saves containing TAG_Long_Array or
     strings longer than 32,767 bytes).
+- Add type conversion to NbtReader.ReadValueAs<T> and ReadListAsArray<T>:
+    a TAG_Int can be read as long, double, or string, a TAG_String as a
+    number, and integral values or member names as an enum type. Exact
+    types are still read directly.
 - Java flavors write modified UTF-8 like Minecraft Java, so emoji and other
     astral characters round-trip. Reads accept both encodings under every
     flavor.
@@ -46,11 +50,11 @@
     with CacheTagValues on.
 - Fixed corrupt compressed documents sometimes loading silently. Loads now
     verify the checksum on every kind of stream, seekable or not.
-- NbtReader.ReadValueAs<T> now converts between compatible types, e.g.
-    reading a TAG_Int as long or string, instead of only casting. Add
-    NbtReader.LongTagStartOffset; TagStartOffset now throws OverflowException
-    past 2 GiB instead of wrapping. ReadListAsArray<T> rejects an unusable T
-    before reading anything.
+- Add NbtReader.LongTagStartOffset; TagStartOffset now throws
+    OverflowException past 2 GiB instead of wrapping. ReadListAsArray<T>
+    rejects an unusable T before reading anything, and ReadAsTag accepts a
+    value already read with CacheTagValues on and refuses every End tag
+    without moving.
 - NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
     constructors. To re-save a document under a different flavor, create a
     new NbtFile over the same RootTag.

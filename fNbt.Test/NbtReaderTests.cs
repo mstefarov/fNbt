@@ -870,6 +870,114 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ReadValueAsConvertsToEnums() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 3),
+                new NbtByte("b", 5),
+                new NbtString("s", "Friday"),
+                new NbtString("bad", "Someday"),
+                new NbtDouble("d", 1.0)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(DayOfWeek.Wednesday, reader.ReadValueAs<DayOfWeek>());
+            Assert.AreEqual((NbtTagType)3, reader.ReadValueAs<NbtTagType>());
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("s"));
+            Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("bad"));
+            Assert.Throws<FormatException>(() => reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("d"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<DayOfWeek>());
+            Assert.IsFalse(reader.IsInErrorState);
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayConvertsToEnums() {
+            var root = new NbtCompound("r") {
+                new NbtList("ints") { new NbtInt(1), new NbtInt(6) },
+                new NbtList("bytes") { new NbtByte(2), new NbtByte(0) },
+                new NbtList("names") { new NbtString("Monday"), new NbtString("Sunday") },
+                new NbtList("doubles") { new NbtDouble(1), new NbtDouble(2) },
+                new NbtInt("after", 9)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+
+            // Matching underlying type goes through the bulk int reader
+            Assert.IsTrue(reader.ReadToFollowing("ints"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Saturday }, reader.ReadListAsArray<DayOfWeek>());
+            // Other integral element types convert one at a time
+            Assert.IsTrue(reader.ReadToFollowing("bytes"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("names"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
+
+            // A non-integral element type is refused before anything is read
+            Assert.IsTrue(reader.ReadToFollowing("doubles"));
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<DayOfWeek>());
+            Assert.IsFalse(reader.IsInErrorState);
+            CollectionAssert.AreEqual(new[] { 1.0, 2.0 }, reader.ReadListAsArray<double>());
+            Assert.IsTrue(reader.ReadToFollowing("after"));
+        }
+
+
+        [TestMethod]
+        public void ReadAsTagUsesTheCachedValue() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 5),
+                new NbtByteArray("a", new byte[] { 1, 2 }),
+                new NbtInt("after", 9)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(5, reader.ReadValue());
+            NbtAssert.AreEqual(new NbtInt("i", 5), reader.ReadAsTag());
+            Assert.AreEqual("a", reader.TagName);
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, (byte[])reader.ReadValue());
+            NbtAssert.AreEqual(new NbtByteArray("a", new byte[] { 1, 2 }), reader.ReadAsTag());
+            Assert.AreEqual("after", reader.TagName);
+
+            // Without the cache, the consumed value is gone and the reader stays put
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            reader.ReadValue();
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual("i", reader.TagName);
+            Assert.IsFalse(reader.IsInErrorState);
+        }
+
+
+        [TestMethod]
+        public void ReadAsTagRefusesEveryEndTagWithoutMoving() {
+            var root = new NbtCompound("root") {
+                new NbtCompound("comp") { new NbtInt("inner", 1) },
+                new NbtInt("after", 7)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.SkipEndTags = false;
+            Assert.IsTrue(reader.ReadToFollowing("inner"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.AreEqual(3, reader.Depth);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.AreEqual(3, reader.Depth);
+            Assert.IsFalse(reader.IsInErrorState);
+
+            // The walk resumes normally from the refused End tag
+            Assert.IsTrue(reader.ReadToFollowing());
+            NbtAssert.AreEqual(new NbtInt("after", 7), reader.ReadAsTag());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.IsFalse(reader.ReadToFollowing());
+        }
+
+
+        [TestMethod]
         public void MaxAllocationCapsListAsArrayReads() {
             byte[] doc;
             using (var ms = new MemoryStream()) {
