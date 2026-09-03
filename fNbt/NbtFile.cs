@@ -433,26 +433,37 @@ namespace fNbt {
         }
 
 
-        // RFC 1952: ten fixed bytes, then the optional fields FLG announces
+        // RFC 1952: ten fixed bytes, then the optional fields FLG announces. The optional header
+        // CRC is the low 16 bits of the CRC-32 over everything before it, so the header is read
+        // through the checksum stream and compared when the field is present.
         static void SkipGZipHeader(Stream stream) {
-            int id1 = stream.ReadByte();
-            int id2 = stream.ReadByte();
-            int method = stream.ReadByte();
-            int flags = stream.ReadByte();
+            Crc32Stream header = new Crc32Stream(stream);
+            int id1 = header.ReadByte();
+            int id2 = header.ReadByte();
+            int method = header.ReadByte();
+            int flags = header.ReadByte();
             if (flags < 0) throw new EndOfStreamException();
             if (id1 != 0x1F || id2 != 0x8B || method != 8 || (flags & 0xE0) != 0) {
                 throw new InvalidDataException("Invalid GZip header.");
             }
-            SkipHeaderBytes(stream, 6);
+            SkipHeaderBytes(header, 6);
             if ((flags & 0x04) != 0) {
+                int low = header.ReadByte();
+                int high = header.ReadByte();
+                if (high < 0) throw new EndOfStreamException();
+                SkipHeaderBytes(header, low | (high << 8));
+            }
+            if ((flags & 0x08) != 0) SkipHeaderString(header);
+            if ((flags & 0x10) != 0) SkipHeaderString(header);
+            if ((flags & 0x02) != 0) {
+                uint expected = header.Crc & 0xFFFF;
                 int low = stream.ReadByte();
                 int high = stream.ReadByte();
                 if (high < 0) throw new EndOfStreamException();
-                SkipHeaderBytes(stream, low | (high << 8));
+                if ((uint)(low | (high << 8)) != expected) {
+                    throw new InvalidDataException("Failed to decompress GZip data: header checksum mismatch.");
+                }
             }
-            if ((flags & 0x08) != 0) SkipHeaderString(stream);
-            if ((flags & 0x10) != 0) SkipHeaderString(stream);
-            if ((flags & 0x02) != 0) SkipHeaderBytes(stream, 2);
         }
 
 

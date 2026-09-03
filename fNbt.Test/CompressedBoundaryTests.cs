@@ -323,11 +323,20 @@ namespace fNbt.Test {
                 .Concat(doc.Skip(10))
                 .ToArray();
 
+            // A wrong header CRC is rejected on both paths
+            byte[] badCrc = (byte[])fancy.Clone();
+            badCrc[headerBytes.Length] ^= 0xFF;
+
             foreach (bool seekable in new[] { false, true }) {
                 var file = new NbtFile();
                 Stream source = seekable ? new MemoryStream(fancy) : new NonSeekableStream(new MemoryStream(fancy));
                 file.LoadFromStream(source, NbtCompression.GZip);
                 TestFiles.AssertSmallFile(file);
+
+                Stream badSource = seekable ? new MemoryStream(badCrc) : new NonSeekableStream(new MemoryStream(badCrc));
+                Assert.Throws<InvalidDataException>(
+                    () => new NbtFile().LoadFromStream(badSource, NbtCompression.GZip),
+                    seekable ? "seekable" : "non-seekable");
             }
         }
 
