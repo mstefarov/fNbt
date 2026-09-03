@@ -37,7 +37,7 @@ namespace fNbt.Test {
 
             // proper initialization
             NbtCompound allNamedTest = new NbtCompound("allNamedTest", allNamed);
-            CollectionAssert.AreEquivalent(allNamed, allNamedTest);
+            CollectionAssert.AreEqual(allNamed, allNamedTest);
 
             // some tags are unnamed, should throw
             Assert.Throws<ArgumentException>(() => new NbtCompound("someUnnamedTest", someUnnamed));
@@ -247,10 +247,10 @@ namespace fNbt.Test {
             var comp = new NbtCompound(tagList);
 
             // test .Names and .Tags collections
-            CollectionAssert.AreEquivalent(new[] {
+            CollectionAssert.AreEqual(new[] {
                 "First", "Second", "Third", "Fourth"
             }, comp.Names.ToList());
-            CollectionAssert.AreEquivalent(tagList, comp.Tags.ToList());
+            CollectionAssert.AreEqual(tagList, comp.Tags.ToList());
 
             // test ICollection and ICollection<NbtTag> boilerplate properties
             ICollection<NbtTag> iGenCollection = comp;
@@ -262,11 +262,11 @@ namespace fNbt.Test {
             // test CopyTo()
             var tags = new NbtTag[iCollection.Count];
             iCollection.CopyTo(tags, 0);
-            CollectionAssert.AreEquivalent(comp, tags);
+            CollectionAssert.AreEqual(comp, tags);
 
             // test generic GetEnumerator()
             var enumeratedTags = comp.ToList();
-            CollectionAssert.AreEquivalent(tagList, enumeratedTags);
+            CollectionAssert.AreEqual(tagList, enumeratedTags);
 
             // test non-generic GetEnumerator()
             List<NbtTag> enumeratedTags2 = new List<NbtTag>();
@@ -274,7 +274,7 @@ namespace fNbt.Test {
             while (enumerator.MoveNext()) {
                 enumeratedTags2.Add((NbtTag)enumerator.Current);
             }
-            CollectionAssert.AreEquivalent(tagList, enumeratedTags2);
+            CollectionAssert.AreEqual(tagList, enumeratedTags2);
         }
     }
 }
