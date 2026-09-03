@@ -288,15 +288,14 @@ namespace fNbt {
 
 
         /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
-        /// <remarks> Compressed loads read the whole compressed document, which guarantees the
-        /// container checksum gets validated. Seekable streams are then left at their end, making
-        /// the returned byte count deterministic; the document's exact extent is unknowable behind
-        /// decompressor read-ahead. Non-seekable streams stay wherever decompression stopped, so a
-        /// load cannot block on a stream that never ends. On .NET Core and later, GZip data made of
-        /// several concatenated members decompresses as one continuous document, so a load reads
-        /// through every member; the .NET Framework decompressor stops after the first.
-        /// Uncompressed loads stop exactly at the end of the document, leaving any trailing
-        /// bytes in place. </remarks>
+        /// <remarks> Compressed loads verify the container checksum on every kind of stream. On
+        /// .NET 6 and later, a document cut off inside its trailer may still load without error.
+        /// Seekable streams are left at their end, so the returned byte count is
+        /// deterministic; non-seekable streams stay wherever decompression stopped, which can be
+        /// past the document, since decompressors read ahead. Concatenated GZip members decompress
+        /// as one document only on .NET Core and later and only from a seekable stream; otherwise
+        /// the load reads the first member. Uncompressed loads stop exactly at the end of the
+        /// document, leaving any trailing bytes in place. </remarks>
         /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.
@@ -330,8 +329,14 @@ namespace fNbt {
 
             switch (FileCompression) {
                 case NbtCompression.GZip:
-                    using (GZipStream decStream = new GZipStream(stream, CompressionMode.Decompress, true)) {
-                        LoadBufferedAndDrain(stream, decStream, selector);
+                    if (stream.CanSeek) {
+                        using (GZipStream decStream = new GZipStream(stream, CompressionMode.Decompress, true)) {
+                            LoadAndDrain(decStream, selector, true);
+                        }
+                    } else {
+                        // GZipStream reads on past a finished member looking for the next one, which
+                        // blocks on a source that stays open, so it cannot be drained here
+                        LoadNonSeekableGZip(stream, selector);
                     }
                     FinishCompressedLoad(stream);
                     break;
@@ -342,20 +347,23 @@ namespace fNbt {
 
                 case NbtCompression.ZLib:
 #if NET6_0_OR_GREATER
-                    // Built-in ZLibStream is faster and validates the checksum too
+                    // The framework stream validates the checksum itself and stops at the end of
+                    // the member, so draining it is safe on any source
                     try {
                         using (ZLibStream decStream = new ZLibStream(stream, CompressionMode.Decompress, true)) {
-                            LoadBufferedAndDrain(stream, decStream, selector);
+                            LoadAndDrain(decStream, selector, true);
                         }
                     } catch (IOException ex) when (ex.GetType().FullName == ZLibExceptionTypeName) {
                         throw new InvalidDataException("Failed to decompress ZLib data.", ex);
                     }
 #else
                     ValidateZLibHeader(stream);
-                    // A non-seekable source's trailer is out of reach, so skip the running checksum there
-                    using (ZLibStream decStream = new ZLibStream(stream, CompressionMode.Decompress, true, stream.CanSeek)) {
-                        LoadBufferedAndDrain(stream, decStream, selector);
-                        ValidateZLibChecksum(stream, startOffset, decStream.Checksum);
+                    TrailerLocatingStream feed = new TrailerLocatingStream(stream);
+                    using (ZLibStream decStream = new ZLibStream(feed, CompressionMode.Decompress, true)) {
+                        LoadAndDrain(decStream, selector, true);
+                        uint adler = (uint)decStream.Checksum;
+                        byte[] trailer = { (byte)(adler >> 24), (byte)(adler >> 16), (byte)(adler >> 8), (byte)adler };
+                        feed.ValidateTrailer(trailer, "Failed to decompress ZLib data: checksum trailer mismatch or missing.");
                     }
 #endif
                     FinishCompressedLoad(stream);
@@ -389,30 +397,78 @@ namespace fNbt {
         }
 
 
-        void LoadBufferedAndDrain(Stream source, Stream decompressed, TagSelector? selector) {
-            if (bufferSize > 0) {
-                BufferedStream bufferedStream = new BufferedStream(decompressed, bufferSize);
-                LoadFromStreamInternal(bufferedStream, selector);
-                DrainToEnd(source, bufferedStream);
-            } else {
-                LoadFromStreamInternal(decompressed, selector);
-                DrainToEnd(source, decompressed);
+        // Reading the decompressor to its end makes it process the trailer, so a corrupt checksum
+        // cannot slip past on an unlucky buffer alignment. Callers decide whether that is safe.
+        void LoadAndDrain(Stream decompressed, TagSelector? selector, bool drain) {
+            Stream input = bufferSize > 0 ? new BufferedStream(decompressed, bufferSize) : decompressed;
+            LoadFromStreamInternal(input, selector);
+            if (!drain) return;
+#if NETCOREAPP
+            Span<byte> buffer = stackalloc byte[4096];
+            while (input.Read(buffer) > 0) { }
+#else
+            byte[] buffer = new byte[4096];
+            while (input.Read(buffer, 0, buffer.Length) > 0) { }
+#endif
+        }
+
+
+        // A raw DeflateStream stops at the end of the deflate data on every runtime, so this path
+        // finishes the member and checks its trailer without ever reading past it. The trailer
+        // values are computed here, since the raw inflater knows nothing of the GZip framing.
+        void LoadNonSeekableGZip(Stream stream, TagSelector? selector) {
+            SkipGZipHeader(stream);
+            TrailerLocatingStream feed = new TrailerLocatingStream(stream);
+            using (DeflateStream deflate = new DeflateStream(feed, CompressionMode.Decompress, true)) {
+                Crc32Stream crcStream = new Crc32Stream(deflate);
+                LoadAndDrain(crcStream, selector, true);
+                uint crc = crcStream.Crc;
+                uint size = (uint)crcStream.BytesRead;
+                byte[] trailer = {
+                    (byte)crc, (byte)(crc >> 8), (byte)(crc >> 16), (byte)(crc >> 24),
+                    (byte)size, (byte)(size >> 8), (byte)(size >> 16), (byte)(size >> 24)
+                };
+                feed.ValidateTrailer(trailer, "Failed to decompress GZip data: checksum trailer mismatch or missing.");
             }
         }
 
 
-        // Reading the decompressor to its end makes it process the trailer, so a corrupt checksum
-        // cannot slip past on an unlucky buffer alignment. Skipped for non-seekable sources, where
-        // finishing a GZip member makes GZipStream read on for the next one and possibly block.
-        static void DrainToEnd(Stream source, Stream decompressed) {
-            if (!source.CanSeek) return;
-#if NETCOREAPP
-            Span<byte> buffer = stackalloc byte[4096];
-            while (decompressed.Read(buffer) > 0) { }
-#else
-            byte[] buffer = new byte[4096];
-            while (decompressed.Read(buffer, 0, buffer.Length) > 0) { }
-#endif
+        // RFC 1952: ten fixed bytes, then the optional fields FLG announces
+        static void SkipGZipHeader(Stream stream) {
+            int id1 = stream.ReadByte();
+            int id2 = stream.ReadByte();
+            int method = stream.ReadByte();
+            int flags = stream.ReadByte();
+            if (flags < 0) throw new EndOfStreamException();
+            if (id1 != 0x1F || id2 != 0x8B || method != 8 || (flags & 0xE0) != 0) {
+                throw new InvalidDataException("Invalid GZip header.");
+            }
+            SkipHeaderBytes(stream, 6);
+            if ((flags & 0x04) != 0) {
+                int low = stream.ReadByte();
+                int high = stream.ReadByte();
+                if (high < 0) throw new EndOfStreamException();
+                SkipHeaderBytes(stream, low | (high << 8));
+            }
+            if ((flags & 0x08) != 0) SkipHeaderString(stream);
+            if ((flags & 0x10) != 0) SkipHeaderString(stream);
+            if ((flags & 0x02) != 0) SkipHeaderBytes(stream, 2);
+        }
+
+
+        static void SkipHeaderBytes(Stream stream, int count) {
+            for (int i = 0; i < count; i++) {
+                if (stream.ReadByte() < 0) throw new EndOfStreamException();
+            }
+        }
+
+
+        static void SkipHeaderString(Stream stream) {
+            int value;
+            do {
+                value = stream.ReadByte();
+                if (value < 0) throw new EndOfStreamException();
+            } while (value != 0);
         }
 
 
@@ -423,28 +479,6 @@ namespace fNbt {
                 stream.Position = stream.Length;
             }
         }
-
-
-#if !NET6_0_OR_GREATER
-        // After draining, the document runs to the end of the stream, so the last four bytes are
-        // the big-endian Adler-32 trailer. Non-seekable streams cannot be validated: the
-        // decompressor buffers past the deflate data, leaving the trailer out of reach.
-        static void ValidateZLibChecksum(Stream stream, long startOffset, int computedChecksum) {
-            if (!stream.CanSeek) return;
-            long length = stream.Length;
-            // 2-byte header + deflate data + 4-byte trailer; anything shorter failed already
-            if (length - startOffset < 7) return;
-            stream.Position = length - 4;
-            int b0 = stream.ReadByte();
-            int b1 = stream.ReadByte();
-            int b2 = stream.ReadByte();
-            int b3 = stream.ReadByte();
-            uint expected = (uint)((b0 << 24) | (b1 << 16) | (b2 << 8) | b3);
-            if (expected != (uint)computedChecksum) {
-                throw new InvalidDataException("Failed to decompress ZLib data: checksum mismatch.");
-            }
-        }
-#endif
 
 
         static NbtCompression DetectCompression(Stream stream) {

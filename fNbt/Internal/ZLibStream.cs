@@ -12,10 +12,6 @@ namespace fNbt {
         uint adler32A = 1,
              adler32B;
 
-        // Decompression skips the running checksum when the source is not seekable, since the
-        // trailer to compare against is out of reach there
-        readonly bool trackChecksum;
-
         byte[]? singleByteBuffer;
 
         const uint ChecksumModulus = 65521;
@@ -46,23 +42,19 @@ namespace fNbt {
         }
 
 
-        public ZLibStream(Stream stream, CompressionMode mode, bool leaveOpen, bool trackChecksum = true)
-            : base(stream, mode, leaveOpen) {
-            this.trackChecksum = trackChecksum;
-        }
+        public ZLibStream(Stream stream, CompressionMode mode, bool leaveOpen)
+            : base(stream, mode, leaveOpen) { }
 
 
         public override void Write(byte[] array, int offset, int count) {
-            if (trackChecksum) {
-                UpdateChecksum(array, offset, count);
-            }
+            UpdateChecksum(array, offset, count);
             base.Write(array, offset, count);
         }
 
 
         public override int Read(byte[] array, int offset, int count) {
             int bytesRead = base.Read(array, offset, count);
-            if (bytesRead > 0 && trackChecksum) {
+            if (bytesRead > 0) {
                 UpdateChecksum(array, offset, bytesRead);
             }
             return bytesRead;

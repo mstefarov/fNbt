@@ -77,15 +77,16 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CompressedLoadCountsBytesOnAwkwardNonSeekableStreams() {
-            // Decompression must cope with a source that dribbles three bytes per read, and
-            // the reported byte count must not exceed the document
+            // Decompression must cope with a source that dribbles three bytes per read, and the
+            // reported count must be exactly what the source handed out. Non-seekable sources
+            // are not drained, so the decompressor may leave the trailer unread.
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);
                 using (var ms = new MemoryStream(doc)) {
                     var awkward = new PartialReadStream(new NonSeekableStream(ms), 3);
                     var file = new NbtFile();
                     long bytesRead = file.LoadFromStream(awkward, compression);
-                    Assert.IsTrue(bytesRead <= doc.Length, compression + ": counted past the document");
+                    Assert.AreEqual(ms.Position, bytesRead, compression.ToString());
                     TestFiles.AssertSmallFile(file);
                 }
             }
@@ -135,17 +136,10 @@ namespace fNbt.Test {
             TestFiles.AssertSmallFile(gzFile);
 
             byte[] z = MakeDoc(NbtCompression.ZLib).Concat(garbage).ToArray();
-#if NETFRAMEWORK
-            // netstandard2.0 finds the Adler trailer as the stream's last four bytes, so trailing
-            // garbage is indistinguishable from a corrupt checksum
-            Assert.Throws<InvalidDataException>(
-                () => new NbtFile().LoadFromBuffer(z, 0, z.Length, NbtCompression.ZLib));
-#else
             var zFile = new NbtFile();
             long zRead = zFile.LoadFromBuffer(z, 0, z.Length, NbtCompression.ZLib);
             Assert.AreEqual(z.Length, zRead);
             TestFiles.AssertSmallFile(zFile);
-#endif
         }
 
 
@@ -190,24 +184,15 @@ namespace fNbt.Test {
                 Assert.AreEqual(payload.Length, index);
                 Assert.AreEqual(bulkChecksum, z.Checksum, "byte-wise read checksum");
             }
-
-            // With tracking off, the checksum stays at its initial value
-            using (var ms = new MemoryStream(compressed)) {
-                var z = new ZLibStream(ms, System.IO.Compression.CompressionMode.Decompress, true, trackChecksum: false);
-                var sink = new byte[payload.Length];
-                while (z.Read(sink, 0, sink.Length) > 0) { }
-                Assert.AreEqual(1, z.Checksum);
-            }
         }
 #endif
 
 
         [TestMethod]
         public void CompressedLoadDoesNotReadPastANonSeekableSource() {
-            // GZipStream supports concatenated members, so draining it reads on looking for
-            // another header. On a source that stays open, a socket for example, that read
-            // blocks forever instead of returning end-of-stream. Non-seekable sources are
-            // therefore not drained, and nothing may be read past the compressed data.
+            // GZipStream reads on past a finished member looking for another one. On a source
+            // that stays open, a socket for example, that read blocks forever instead of
+            // returning end-of-stream, so no load path may read past the compressed data.
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] doc = MakeDoc(compression);
                 var file = new NbtFile();
@@ -218,25 +203,177 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void DrainingCatchesTrailerCorruptionAtAwkwardSizes() {
-            // Whether the parse alone pulls the trailer depends on how the document aligns with
-            // the decompressor's buffers. These payload sizes are ones where it does not, so an
-            // undrained load accepts a corrupt checksum. Draining is what closes it, which is
-            // why seekable sources are read to the end; non-seekable ones keep the gap.
+        public void TrailerCorruptionIsCaughtAtAwkwardSizes() {
+            // At these payload sizes the trailer lands in a different decompressor read than the
+            // last of the data, so a load that stopped at the root tag never saw it. Seekable
+            // sources are drained; non-seekable ones either drain a ZLibStream, which stops at the
+            // member end, or locate the GZip trailer themselves.
             foreach ((NbtCompression compression, int payloadSize, int trailer) in
-                     new[] { (NbtCompression.GZip, 8148, 8), (NbtCompression.ZLib, 24541, 4) }) {
+                     new[] { (NbtCompression.GZip, 8148, 8), (NbtCompression.ZLib, 24530, 4) }) {
                 var payload = new byte[payloadSize];
                 new Random(payloadSize).NextBytes(payload);
                 var root = new NbtCompound("root") { new NbtByteArray("data", payload) };
                 byte[] doc = new NbtFile(root).SaveToBuffer(compression);
-                byte[] bad = (byte[])doc.Clone();
-                bad[bad.Length - trailer] ^= 0xFF;
+                byte[] bad = Flip(doc, doc.Length - trailer);
 
                 Assert.Throws<InvalidDataException>(
                     () => new NbtFile().LoadFromBuffer(bad, 0, bad.Length, compression),
                     compression + ": seekable load accepted a corrupt trailer");
-
+                Assert.Throws<InvalidDataException>(
+                    () => new NbtFile().LoadFromStream(new NonSeekableStream(new MemoryStream(bad)), compression),
+                    compression + ": non-seekable load accepted a corrupt trailer");
             }
+        }
+
+
+        [TestMethod]
+        public void NonSeekableZLibLoadVerifiesChecksum() {
+            // ZLib decompressors stop at the end of the member, so the load can finish it and
+            // check the trailer on any source, however the source chunks its reads
+            byte[] doc = MakeDoc(NbtCompression.ZLib);
+            byte[] bad = Flip(doc, doc.Length - 1);
+            foreach (int increment in new[] { 1, 3, 4096 }) {
+                foreach (int bufferSize in new[] { 0, 8192 }) {
+                    var good = new NbtFile { BufferSize = bufferSize };
+                    good.LoadFromStream(Dribble(doc, increment), NbtCompression.ZLib);
+                    TestFiles.AssertSmallFile(good);
+
+                    var file = new NbtFile { BufferSize = bufferSize };
+                    Assert.Throws<InvalidDataException>(
+                        () => file.LoadFromStream(Dribble(bad, increment), NbtCompression.ZLib),
+                        "increment " + increment + ", buffer " + bufferSize);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void NonSeekableGZipLoadVerifiesTrailer() {
+            // GZipStream cannot be drained on a non-seekable source, so the load inflates the
+            // raw deflate data itself, computes the trailer values, and finds the trailer
+            // wherever a read boundary left it, including a missing or partial one
+            byte[] doc = MakeDoc(NbtCompression.GZip);
+            var corruptions = new[] {
+                ("crc", Flip(doc, doc.Length - 8)),
+                ("size", Flip(doc, doc.Length - 1)),
+                ("missing trailer", doc.Take(doc.Length - 8).ToArray()),
+                ("partial trailer", doc.Take(doc.Length - 3).ToArray())
+            };
+            foreach (int increment in new[] { 1, 3, 4096 }) {
+                var good = new NbtFile();
+                good.LoadFromStream(Dribble(doc, increment), NbtCompression.GZip);
+                TestFiles.AssertSmallFile(good);
+
+                foreach ((string name, byte[] bad) in corruptions) {
+                    var file = new NbtFile();
+                    Assert.Throws<InvalidDataException>(
+                        () => file.LoadFromStream(Dribble(bad, increment), NbtCompression.GZip),
+                        name + " at increment " + increment);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void TrailerIsFoundAtEveryChunkSplit() {
+            // The located trailer can start anywhere in the last chunk the inflater took, or
+            // straddle its end by any number of bytes. One-byte reads over a range of document
+            // sizes walk through every split, for the 8-byte GZip and 4-byte ZLib trailers.
+            for (int payloadSize = 0; payloadSize < 40; payloadSize++) {
+                var payload = new byte[payloadSize];
+                new Random(payloadSize).NextBytes(payload);
+                var root = new NbtCompound("root") { new NbtByteArray("data", payload) };
+                foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
+                    byte[] doc = new NbtFile(root).SaveToBuffer(compression);
+                    var file = new NbtFile();
+                    file.LoadFromStream(Dribble(doc, 1), compression);
+                    CollectionAssert.AreEqual(payload, file.RootTag["data"].ByteArrayValue);
+
+                    byte[] bad = Flip(doc, doc.Length - (compression == NbtCompression.GZip ? 8 : 4));
+                    var corrupt = new NbtFile();
+                    Assert.Throws<InvalidDataException>(
+                        () => corrupt.LoadFromStream(Dribble(bad, 1), compression),
+                        compression + " with payload " + payloadSize);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void NonSeekableGZipLoadSkipsOptionalHeaderFields() {
+            // RFC 1952 allows an extra field, a file name, a comment and a header CRC, none of
+            // which Minecraft writes. The non-seekable path parses the header itself, so it has
+            // to step over all of them; the seekable path leaves that to GZipStream. The header
+            // CRC is the low 16 bits of the CRC-32 of the header bytes, which GZipStream checks.
+            byte[] doc = MakeDoc(NbtCompression.GZip);
+            byte[] extra = { 0x41, 0x42, 3, 0, 1, 2, 3 }; // one subfield: id "AB", three bytes
+            byte[] name = System.Text.Encoding.ASCII.GetBytes("level.dat\0");
+            byte[] comment = System.Text.Encoding.ASCII.GetBytes("made by a test\0");
+            var header = new MemoryStream();
+            header.Write(new byte[] { 0x1F, 0x8B, 8, 0x02 | 0x04 | 0x08 | 0x10, 0, 0, 0, 0, 0, 0xFF }, 0, 10);
+            header.Write(new byte[] { (byte)extra.Length, 0 }, 0, 2);
+            header.Write(extra, 0, extra.Length);
+            header.Write(name, 0, name.Length);
+            header.Write(comment, 0, comment.Length);
+            byte[] headerBytes = header.ToArray();
+            var crc = new Crc32Stream(new MemoryStream(headerBytes));
+            while (crc.ReadByte() >= 0) { }
+            byte[] fancy = headerBytes
+                .Concat(new[] { (byte)crc.Crc, (byte)(crc.Crc >> 8) })
+                .Concat(doc.Skip(10))
+                .ToArray();
+
+            foreach (bool seekable in new[] { false, true }) {
+                var file = new NbtFile();
+                Stream source = seekable ? new MemoryStream(fancy) : new NonSeekableStream(new MemoryStream(fancy));
+                file.LoadFromStream(source, NbtCompression.GZip);
+                TestFiles.AssertSmallFile(file);
+            }
+        }
+
+
+        [TestMethod]
+        public void Crc32StreamMatchesTheFrameworkTrailer() {
+            // The framework's GZipStream writes the real CRC-32 into its trailer, an oracle for
+            // the internal checksum across the fold and tail boundaries and across read sizes,
+            // since the register carries over between Read calls.
+            var empty = new Crc32Stream(new MemoryStream());
+            Assert.AreEqual(-1, empty.ReadByte());
+            Assert.AreEqual(0u, empty.Crc);
+
+            // .NET Framework's GZipStream writes nothing at all for an empty payload
+            var rnd = new Random(32);
+            foreach (int length in Enumerable.Range(1, 199).Concat(new[] { 255, 256, 1000, 4095, 4096, 65537 })) {
+                var payload = new byte[length];
+                rnd.NextBytes(payload);
+                byte[] gz;
+                using (var ms = new MemoryStream()) {
+                    using (var g = new System.IO.Compression.GZipStream(ms, System.IO.Compression.CompressionMode.Compress, true)) {
+                        g.Write(payload, 0, payload.Length);
+                    }
+                    gz = ms.ToArray();
+                }
+                uint expected = BitConverter.ToUInt32(gz, gz.Length - 8);
+                foreach (int increment in new[] { 1, 7, 63, 64, 65, 8192 }) {
+                    var crc = new Crc32Stream(new PartialReadStream(new MemoryStream(payload), increment));
+                    var sink = new byte[8192];
+                    while (crc.Read(sink, 0, sink.Length) > 0) { }
+                    Assert.AreEqual(expected, crc.Crc, "length " + length + ", increment " + increment);
+                    Assert.AreEqual(length, crc.BytesRead);
+                }
+            }
+        }
+
+
+        static byte[] Flip(byte[] doc, int index) {
+            byte[] copy = (byte[])doc.Clone();
+            copy[index] ^= 0xFF;
+            return copy;
+        }
+
+
+        static Stream Dribble(byte[] doc, int increment) {
+            return new PartialReadStream(new NonSeekableStream(new MemoryStream(doc)), increment);
         }
 
 

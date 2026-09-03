@@ -23,10 +23,10 @@
 - Java flavors write modified UTF-8 like Minecraft Java, so emoji and other
     astral characters round-trip. Reads accept both encodings under every
     flavor.
-- NbtCompound now guarantees insertion order. Enumeration, Names, Values,
+- NbtCompound now guarantees insertion order. Enumeration, Names, Tags,
     ToString, and saved documents all list tags in the order they were added,
-    and the order survives removals, so saves are deterministic and documents
-    round-trip byte for byte.
+    and the order survives removals, so saves are deterministic and a
+    re-saved document keeps the tag order it was loaded with.
 - Much faster and leaner performance: parsing allocates about half what it did,
     skips and lookups run several times faster, and .NET 8 reads and writes
     int and long arrays in bulk.
@@ -44,8 +44,8 @@
 - Fixed NbtReader.ReadValue returning the previous tag's cached value after
     ReadListAsArray finished the list or the cursor moved onto an End tag
     with CacheTagValues on.
-- Fixed corrupt compressed documents sometimes loading silently. Loads from
-    seekable sources now always verify the checksum.
+- Fixed corrupt compressed documents sometimes loading silently. Loads now
+    verify the checksum on every kind of stream, seekable or not.
 - NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
     constructors. To re-save a document under a different flavor, create a
     new NbtFile over the same RootTag.
