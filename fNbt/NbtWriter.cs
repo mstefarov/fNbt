@@ -6,8 +6,10 @@ using System.Runtime.CompilerServices;
 namespace fNbt {
     /// <summary> An efficient writer for writing NBT data directly to streams.
     /// Each instance of NbtWriter writes one complete file.
-    /// NbtWriter enforces all constraints of the NBT file format
-    /// EXCEPT checking for duplicate tag names within a compound. </summary>
+    /// NbtWriter enforces the structural rules of the NBT format, except that it does not check for
+    /// duplicate tag names within a compound. The flavor's own restrictions, such as its permitted
+    /// tag types and string ceilings, are enforced only while <see cref="NbtOptions.ValidateOnWrite"/>
+    /// is on. </summary>
     /// <remarks> Every check the writer can make up front runs before any byte is written or a
     /// list slot consumed, so a refused call leaves the writer as it was. A write that fails after
     /// committing bytes, an I/O error for example, leaves the writer in an error state where every

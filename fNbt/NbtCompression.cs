@@ -7,7 +7,7 @@ namespace fNbt {
         /// <summary> No compression. </summary>
         None,
 
-        /// <summary> Compressed, with GZip header (default). </summary>
+        /// <summary> Compressed, with GZip header (RFC-1952). </summary>
         GZip,
 
         /// <summary> Compressed, with ZLib header (RFC-1950). </summary>

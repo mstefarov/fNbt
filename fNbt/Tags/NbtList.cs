@@ -190,10 +190,10 @@ namespace fNbt {
         }
 
 
-        /// <summary> Gets or sets the tag with the specified name. </summary>
-        /// <param name="tagIndex"> The zero-based index of the tag to get or set. </param>
+        /// <summary> Gets the tag at the specified index, cast to the requested type. </summary>
+        /// <param name="tagIndex"> The zero-based index of the tag to get. </param>
         /// <typeparam name="T"> Type to cast the result to. Must derive from NbtTag. </typeparam>
-        /// <returns> The tag with the specified key. </returns>
+        /// <returns> The tag at the specified index. </returns>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the NbtList. </exception>
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public T Get<T>(int tagIndex) where T : NbtTag {
@@ -444,7 +444,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Removes the first occurrence of a specific NbtTag from the NbtCompound.
+        /// <summary> Removes the first occurrence of a specific NbtTag from this NbtList.
         /// Looks for exact object matches, not name matches. </summary>
         /// <returns> true if tag was successfully removed from this NbtList; otherwise, false.
         /// This method also returns false if tag is not found. </returns>

@@ -118,7 +118,7 @@
 
 ## 0.6.1 (fNbt)
 - NbtReader now supports non-seekable streams.
-- Fixed issues loading from/saving to non-seekable steams in NbtFile.
+- Fixed issues loading from/saving to non-seekable streams in NbtFile.
 - NbtFile.LoadFromStream/SaveToStream now accurately report bytes read/written
     for NBT data over 2 GiB in size.
 - API change:
@@ -153,7 +153,7 @@
     New NbtCompound method:     bool TryGet(string,out NbtTag)
     New NbtCompound overload:   NbtTag Get(string)
     New NbtTag property:        bool HasValue
-- License changed from LGPL to to 3-Clause BSD, since none of the original
+- License changed from LGPL to 3-Clause BSD, since none of the original
     libnbt source code remains.
 
 ## 0.4.1 (LibNbt2012)
@@ -201,7 +201,7 @@
 
 ## 0.3.0 (LibNbt2012)
 - Auto-detection of NBT file compression.
-- Loading and saving of ZLib (RFC-1950) compresessed NBT files.
+- Loading and saving of ZLib (RFC-1950) compressed NBT files.
 - Reduced loading/saving CPU use by 15%, and memory use by 40%
 - Full support for TAG_Int_Array
 - NbtCompound now implements ICollection and ICollection<NbtTag>
@@ -225,5 +225,5 @@
 
 ## 0.1.1 (libnbt)
 - Initial release.
-- Modified the tag constructors to be consistant with each other.
+- Modified the tag constructors to be consistent with each other.
 - Changed NbtFile to allow some functions to be overridden.
