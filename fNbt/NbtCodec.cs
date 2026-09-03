@@ -215,6 +215,7 @@ namespace fNbt {
         /// deep, exceeds a configured limit, fails enabled validation, or consists of a lone
         /// <c>TAG_End</c> byte (use <see cref="TryReadTag(ReadOnlySpan{byte},out NbtTag,out int)"/> to accept
         /// absent documents). </exception>
+        /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public NbtTag ReadTag(ReadOnlySpan<byte> buffer, out int bytesConsumed) {
             return ReadSpan(buffer, null, out bytesConsumed);
         }
@@ -230,6 +231,7 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
         /// deep, exceeds a configured limit, fails enabled validation, or its root tag type does not match
         /// <paramref name="expectedRootType"/>. </exception>
+        /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public NbtTag ReadTag(ReadOnlySpan<byte> buffer, NbtTagType expectedRootType, out int bytesConsumed) {
             CheckExpectedRootType(expectedRootType);
             return ReadSpan(buffer, expectedRootType, out bytesConsumed);
@@ -246,6 +248,7 @@ namespace fNbt {
         /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
         /// deep, exceeds a configured limit, or fails enabled validation. </exception>
+        /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public bool TryReadTag(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out NbtTag? tag,
                                out int bytesConsumed) {
             if (buffer.IsEmpty) {
@@ -371,6 +374,7 @@ namespace fNbt {
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
+        /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
             BufferWriterStream stream = new BufferWriterStream(output);
@@ -396,6 +400,7 @@ namespace fNbt {
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. Documents before the offending one
         /// are already written when this throws. </exception>
+        /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, IBufferWriter<byte> output) {
             if (output == null) throw new ArgumentNullException(nameof(output));
             BufferWriterStream stream = new BufferWriterStream(output);
