@@ -20,7 +20,7 @@ public class WriteBenchmarks {
         file.SaveToStream(Stream.Null, NbtCompression.None);
     }
 
-    [AverageBenchmark(tieringSensitive: true)]
+    [AverageBenchmark]
     [Benchmark(Description = "NbtWriter to Stream")]
     public void SaveWithNbtWriter() {
         var writer = new NbtWriter(Stream.Null, "root");

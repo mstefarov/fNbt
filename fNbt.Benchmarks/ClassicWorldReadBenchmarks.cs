@@ -72,7 +72,9 @@ public class ClassicWorldReadBenchmarks {
 
 
     // Skipping an array is a seek here, but an inflate-and-discard in the GZip case above.
-    [VeryStableBenchmark]
+    // Average stability becayse the 870 KB it allocates per op gives it a RatioSD of 0.02 to
+    // 0.06 in A/A runs, where the GZip variant above stays at 0.01.
+    [AverageBenchmark]
     [Benchmark(Description = "Load header only, selector (uncompressed)")]
     public NbtFile LoadHeaderOnlyUncompressed() {
         var file = new NbtFile();
