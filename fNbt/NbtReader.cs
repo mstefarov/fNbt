@@ -250,6 +250,7 @@ namespace fNbt {
 
                     if (TagType == NbtTagType.End) {
                         TagName = null;
+                        valueCache = null;
                         TagsRead++;
                         state = ParseState.AtCompoundEnd;
                         if (SkipEndTags) {
@@ -981,6 +982,7 @@ namespace fNbt {
             TagsRead += unpublished;
             ListIndex = ParentTagLength;
             atValue = false;
+            valueCache = null;
         }
 
 
@@ -1090,7 +1092,7 @@ namespace fNbt {
                 sb.Append('[').Append(TagLength).Append(']');
             }
             sb.Append(' ').Append(TagName);
-            if (includeValue && (atValue || HasValue && cacheTagValues) && TagType != NbtTagType.IntArray &&
+            if (includeValue && (atValue || valueCache != null) && TagType != NbtTagType.IntArray &&
                 TagType != NbtTagType.ByteArray && TagType != NbtTagType.LongArray) {
                 sb.Append(" = ").Append(ReadValue());
             }

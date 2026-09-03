@@ -712,6 +712,40 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void CachedValueDoesNotOutliveItsTag() {
+            byte[] doc = new NbtFile(new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2), new NbtInt(3) },
+                new NbtInt("a", 5)
+            }).SaveToBuffer(NbtCompression.None);
+
+            // A bulk read finishes the list, and the element cached before it goes with it
+            NbtReader reader = TestFiles.OpenReader(doc);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(1, reader.ReadValue());
+            Assert.AreEqual(1, reader.ReadValue());
+            CollectionAssert.AreEqual(new[] { 2, 3 }, reader.ReadListAsArray<int>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsFalse(reader.ToString(true).Contains("="));
+
+            // A visible End tag has no value, cached or otherwise
+            reader = TestFiles.OpenReader(doc);
+            reader.CacheTagValues = true;
+            reader.SkipEndTags = false;
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.AreEqual(5, reader.ReadValue());
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.IsFalse(reader.HasValue);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsFalse(reader.ReadToFollowing());
+        }
+
+
+        [TestMethod]
         public void MaxAllocationCapsListAsArrayReads() {
             byte[] doc;
             using (var ms = new MemoryStream()) {

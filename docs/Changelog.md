@@ -41,6 +41,9 @@
     when given a non-zero offset and producing a bad NBT document.
 - Fixed NbtReader.ReadListAsArray throwing when called on an element of the
     list instead of the list itself.
+- Fixed NbtReader.ReadValue returning the previous tag's cached value after
+    ReadListAsArray finished the list or the cursor moved onto an End tag
+    with CacheTagValues on.
 - Fixed corrupt compressed documents sometimes loading silently. Loads from
     seekable sources now always verify the checksum.
 - NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
