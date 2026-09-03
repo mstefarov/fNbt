@@ -746,6 +746,130 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ReadValueAsConvertsCompatibleTypes() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 5),
+                new NbtByte("b", 200),
+                new NbtString("s", "42"),
+                new NbtString("t", "abc"),
+                new NbtIntArray("a", new[] { 1, 2 }),
+                new NbtInt("x", 1)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(5, reader.ReadValueAs<int>());
+            Assert.AreEqual(5L, reader.ReadValueAs<long>());
+            Assert.AreEqual(5.0, reader.ReadValueAs<double>());
+            Assert.AreEqual("5", reader.ReadValueAs<string>());
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.AreEqual(200, reader.ReadValueAs<int>());
+            Assert.Throws<OverflowException>(() => reader.ReadValueAs<sbyte>());
+            Assert.IsTrue(reader.ReadToFollowing("s"));
+            Assert.AreEqual(42, reader.ReadValueAs<int>());
+            Assert.IsTrue(reader.ReadToFollowing("t"));
+            Assert.Throws<FormatException>(() => reader.ReadValueAs<int>());
+            Assert.AreEqual("abc", reader.ReadValueAs<string>());
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<long[]>());
+            CollectionAssert.AreEqual(new[] { 1, 2 }, reader.ReadValueAs<int[]>());
+            Assert.IsFalse(reader.IsInErrorState);
+
+            // Without the cache, a failed conversion has consumed the value
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<long[]>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsTrue(reader.ReadToFollowing("x"));
+            Assert.AreEqual(1, reader.ReadValueAs<int>());
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayRefusesUnusableTypeBeforeReading() {
+            var root = new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2) },
+                new NbtInt("after", 3)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<NbtCompound>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<byte[]>());
+            Assert.IsFalse(reader.IsInErrorState);
+            CollectionAssert.AreEqual(new long[] { 1, 2 }, reader.ReadListAsArray<long>());
+            Assert.IsTrue(reader.ReadToFollowing("after"));
+
+            // Same from inside the list, with the current element's value intact
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<NbtCompound>());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.AreEqual(1, reader.ReadValue());
+        }
+
+
+        [TestMethod]
+        public void ReadToDescendantStopsOutsideTheSubtree() {
+            var root = new NbtCompound("root") {
+                new NbtInt("i", 5),
+                new NbtCompound("comp") { new NbtInt("inner", 1) },
+                new NbtInt("last", 7)
+            };
+            foreach (bool skipEndTags in new[] { true, false }) {
+                NbtReader reader = TestFiles.OpenReader(root);
+                reader.SkipEndTags = skipEndTags;
+
+                // From a value tag: its next sibling
+                Assert.IsTrue(reader.ReadToFollowing("i"));
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                Assert.AreEqual("comp", reader.TagName);
+
+                // From a compound: through its children, then its next sibling
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                Assert.AreEqual("last", reader.TagName);
+
+                // From the last child: the parent's End tag, or the end of the stream
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                if (skipEndTags) {
+                    Assert.IsTrue(reader.IsAtStreamEnd);
+                } else {
+                    Assert.AreEqual(NbtTagType.End, reader.TagType);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void TagStartOffsetIsRelativeToTheDocumentStart() {
+            byte[] doc = new NbtFile(new NbtCompound("root") { new NbtInt("i", 5) }).SaveToBuffer(NbtCompression.None);
+            var ms = new MemoryStream();
+            ms.Write(new byte[10], 0, 10);
+            ms.Write(doc, 0, doc.Length);
+            ms.Position = 10;
+            var reader = new NbtReader(ms);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            // Past the root's header: type byte, two-byte name length, four-byte name
+            Assert.AreEqual(7, reader.TagStartOffset);
+            Assert.AreEqual(7L, reader.LongTagStartOffset);
+
+            // Non-seekable streams report 0
+            reader = new NbtReader(new NonSeekableStream(new MemoryStream(doc)));
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(0, reader.TagStartOffset);
+            Assert.AreEqual(0L, reader.LongTagStartOffset);
+
+            // Past 2 GiB the int property refuses instead of wrapping
+            var far = new FarPositionStream(new MemoryStream(doc));
+            reader = new NbtReader(far);
+            far.Shift = 3L << 30;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual((3L << 30) + 7, reader.LongTagStartOffset);
+            Assert.Throws<OverflowException>(() => reader.TagStartOffset.ToString());
+        }
+
+
+        [TestMethod]
         public void MaxAllocationCapsListAsArrayReads() {
             byte[] doc;
             using (var ms = new MemoryStream()) {

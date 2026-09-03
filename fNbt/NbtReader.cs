@@ -178,9 +178,19 @@ namespace fNbt {
             get { return reader.BaseStream; }
         }
 
-        /// <summary> Gets the number of bytes from the beginning of the stream to the beginning of this tag.
-        /// If the stream is not seekable, this value will always be 0. </summary>
-        public int TagStartOffset { get; private set; }
+        /// <summary> Gets the offset of the current tag's first byte from the stream position at which
+        /// this NbtReader was created, which is the start of the document. Always 0 if the stream is
+        /// not seekable. </summary>
+        /// <exception cref="OverflowException"> The offset does not fit in an <c>int</c>;
+        /// use <see cref="LongTagStartOffset"/> for documents past 2 GiB. </exception>
+        public int TagStartOffset {
+            get { return checked((int)LongTagStartOffset); }
+        }
+
+        /// <summary> Gets the offset of the current tag's first byte from the stream position at which
+        /// this NbtReader was created, which is the start of the document, as a <c>long</c>.
+        /// Always 0 if the stream is not seekable. </summary>
+        public long LongTagStartOffset { get; private set; }
 
         /// <summary> Gets the number of tags read from the stream so far
         /// (including the current tag and all skipped tags). 
@@ -242,7 +252,7 @@ namespace fNbt {
                     }
                     // Read next tag, check if we've hit the end
                     if (canSeekStream) {
-                        TagStartOffset = (int)(reader.BaseStream.Position - streamStartOffset);
+                        LongTagStartOffset = reader.BaseStream.Position - streamStartOffset;
                     }
 
                     TagType = reader.ReadTagType();
@@ -292,7 +302,7 @@ namespace fNbt {
                         }
                     } else {
                         if (canSeekStream) {
-                            TagStartOffset = (int)(reader.BaseStream.Position - streamStartOffset);
+                            LongTagStartOffset = reader.BaseStream.Position - streamStartOffset;
                         }
                         state = ParseState.InList;
                         ReadTagHeader(false);
@@ -494,7 +504,9 @@ namespace fNbt {
 
 
         /// <summary> Advances the NbtReader to the next descendant tag with the specified name.
-        /// If a matching child tag is not found, the NbtReader is positioned on the end tag. </summary>
+        /// If none matches, the reader is left on the first tag outside the current tag's subtree:
+        /// its next sibling, an enclosing container's End tag when <see cref="SkipEndTags"/> is
+        /// <c>false</c>, or the end of the stream. </summary>
         /// <param name="tagName"> Name of the tag you wish to move to. May be null (to look for next unnamed tag). </param>
         /// <returns> <c>true</c> if a matching descendant tag is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
@@ -622,13 +634,14 @@ namespace fNbt {
 
 
         /// <summary> Reads the entirety of the current tag, including any descendants,
-        /// and constructs an NbtTag object of the appropriate type. </summary>
-        /// <returns> Constructed NbtTag object;
-        /// <c>null</c> if <c>SkipEndTags</c> is <c>true</c> and trying to read an End tag. </returns>
+        /// and constructs an NbtTag object of the appropriate type. Cannot be called on an End tag,
+        /// which no NbtTag represents; the reader stays usable after that refusal. </summary>
+        /// <returns> Constructed NbtTag object. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
-        /// <exception cref="InvalidOperationException"> Tag value has already been read, and CacheTagValues is false. </exception>
+        /// <exception cref="InvalidOperationException"> The reader is on an End tag, or the tag's value has
+        /// already been read and CacheTagValues is false. </exception>
         public NbtTag ReadAsTag() {
             switch (state) {
                 case ParseState.Error:
@@ -764,17 +777,24 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads the value as an object of the type specified. </summary>
-        /// <typeparam name="T"> The type of the value to be returned.
-        /// Tag value should be convertible to this type. </typeparam>
+        /// <summary> Reads the value as the type specified: the tag's own value type directly, or any
+        /// type <see cref="Convert.ChangeType(object, Type)"/> can reach from it, such as a wider
+        /// numeric type or a string. Array values are returned as their own array type only. </summary>
+        /// <remarks> A failed conversion happens after the value was read from the stream, so the value
+        /// is then gone unless <see cref="CacheTagValues"/> is on; the reader stays usable. </remarks>
+        /// <typeparam name="T"> The type of the value to be returned. </typeparam>
         /// <returns> Tag value converted to the requested type. </returns>
         /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="InvalidOperationException"> Value has already been read, or there is no value to read. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
         /// <exception cref="InvalidCastException"> Tag value cannot be converted to the requested type. </exception>
+        /// <exception cref="FormatException"> A string value is not in a format the requested type accepts. </exception>
+        /// <exception cref="OverflowException"> The value does not fit in the requested type. </exception>
         public T ReadValueAs<T>() {
-            return (T)ReadValue();
+            object value = ReadValue();
+            if (value is T exact) return exact;
+            return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
         }
 
 
@@ -858,16 +878,18 @@ namespace fNbt {
         /// included; one whose value was already read is not. The element type must be byte, short,
         /// int, long, float, double, or string. Stops reading after the last list element; an
         /// empty list is not entered, so the reader stays on the list tag. </summary>
-        /// <remarks> A failure of any kind, a conversion included, leaves the reader in its error
-        /// state, since the stream position is then unknown. After the call no value is available
-        /// to <see cref="ReadValue"/>, even with <see cref="CacheTagValues"/>. </remarks>
-        /// <typeparam name="T"> Element type of the array to be returned.
-        /// Tag contents should be convertible to this type. </typeparam>
+        /// <remarks> The refusals below are checked before anything is read, so after one of them the
+        /// reader is where it was. A failure once reading has begun, a conversion included, leaves the
+        /// reader in its error state, since the stream position is then unknown. After a successful
+        /// call no value is available to <see cref="ReadValue"/>, even with <see cref="CacheTagValues"/>. </remarks>
+        /// <typeparam name="T"> Element type of the array to be returned: the list's own element type,
+        /// or any primitive or string type <see cref="Convert.ChangeType(object, Type)"/> can reach from it. </typeparam>
         /// <returns> List contents converted to an array of the requested type. </returns>
         /// <exception cref="EndOfStreamException"> End of stream has been reached, or the list's
         /// declared length does not fit in the remaining stream. </exception>
         /// <exception cref="InvalidOperationException"> The reader is not on a List or one of its
-        /// value elements, or the list's element type is not supported by this method. </exception>
+        /// value elements, the list's element type is not supported by this method, or
+        /// <typeparamref name="T"/> is not a type values can be converted to. </exception>
         /// <exception cref="FormatException"> A value could not be converted to <typeparamref name="T"/>. </exception>
         /// <exception cref="OverflowException"> A value does not fit in <typeparamref name="T"/>. </exception>
         /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
@@ -888,6 +910,9 @@ namespace fNbt {
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
                     }
+                    if (!IsConvertibleTarget(typeof(T))) {
+                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
+                    }
                     if (TagLength == 0) {
                         // Nothing to enter, so the cursor stays on the list and the next step
                         // treats it like any other list tag
@@ -907,6 +932,9 @@ namespace fNbt {
                     elementType = nodes[nodeCount - 1].ListType;
                     if (!IsListValueType(elementType)) {
                         throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+                    }
+                    if (!IsConvertibleTarget(typeof(T))) {
+                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
                     }
                     if (ListIndex >= ParentTagLength) {
                         // An earlier bulk read consumed everything
@@ -983,6 +1011,21 @@ namespace fNbt {
             ListIndex = ParentTagLength;
             atValue = false;
             valueCache = null;
+        }
+
+
+        // The types Convert.ChangeType can produce from a list value: primitives, string and decimal.
+        // Anything else would fail only after elements were consumed.
+        static bool IsConvertibleTarget(Type type) {
+            switch (Type.GetTypeCode(type)) {
+                case TypeCode.Object:
+                case TypeCode.DateTime:
+                case TypeCode.DBNull:
+                case TypeCode.Empty:
+                    return false;
+                default:
+                    return true;
+            }
         }
 
 

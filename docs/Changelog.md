@@ -46,6 +46,11 @@
     with CacheTagValues on.
 - Fixed corrupt compressed documents sometimes loading silently. Loads now
     verify the checksum on every kind of stream, seekable or not.
+- NbtReader.ReadValueAs<T> now converts between compatible types, e.g.
+    reading a TAG_Int as long or string, instead of only casting. Add
+    NbtReader.LongTagStartOffset; TagStartOffset now throws OverflowException
+    past 2 GiB instead of wrapping. ReadListAsArray<T> rejects an unusable T
+    before reading anything.
 - NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
     constructors. To re-save a document under a different flavor, create a
     new NbtFile over the same RootTag.
