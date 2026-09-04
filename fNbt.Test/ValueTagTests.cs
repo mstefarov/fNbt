@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 
 namespace fNbt.Test {
+    // Value-tag basics: clone, array indexers, defaults, null values, canonical names, Path.
     [TestClass]
-    public class MiscTests {
+    public class ValueTagTests {
         [TestMethod]
-        public void CopyConstructorTest() {
+        public void CopyConstructorsCloneEveryTagType() {
             NbtByte byteTag = new NbtByte("byteTag", 1);
             NbtByte byteTagClone = (NbtByte)byteTag.Clone();
             Assert.AreNotSame(byteTag, byteTagClone);
@@ -98,7 +99,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ByteArrayIndexerTest() {
+        public void ByteArrayIndexerGetsAndSets() {
             // test getting/settings values of byte array tag via indexer
             var byteArray = new NbtByteArray("Test");
             CollectionAssert.AreEqual(new byte[0], byteArray.Value);
@@ -114,7 +115,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void IntArrayIndexerTest() {
+        public void IntArrayIndexerGetsAndSets() {
             // test getting/settings values of int array tag via indexer
             var intArray = new NbtIntArray("Test");
             CollectionAssert.AreEqual(new int[0], intArray.Value);
@@ -130,7 +131,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void LongArrayIndexerTest() {
+        public void LongArrayIndexerGetsAndSets() {
             var longArray = new NbtLongArray("Test");
             CollectionAssert.AreEqual(new long[0], longArray.Value);
             longArray.Value = new[] {
@@ -147,7 +148,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void DefaultValueTest() {
+        public void DefaultValuesAreZeroOrEmpty() {
             // test default values of all value tags
             Assert.AreEqual(0, new NbtByte("test").Value);
             CollectionAssert.AreEqual(new byte[0], new NbtByteArray("test").Value);
@@ -163,23 +164,41 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NullValueTest() {
+        public void NullValuesAreRejected() {
+            // via the setter
             Assert.Throws<ArgumentNullException>(() => new NbtByteArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtIntArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtLongArray().Value = null);
             Assert.Throws<ArgumentNullException>(() => new NbtString().Value = null);
+            // via the constructor
+            Assert.Throws<ArgumentNullException>(() => new NbtByteArray((byte[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtIntArray((int[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtLongArray((long[])null));
+            Assert.Throws<ArgumentNullException>(() => new NbtString((string)null));
         }
 
 
         [TestMethod]
-        public void NbtTagNameTest() {
+        public void GetCanonicalTagNameCoversEveryType() {
             Assert.AreEqual("TAG_End", NbtTag.GetCanonicalTagName(NbtTagType.End));
+            Assert.AreEqual("TAG_Byte", NbtTag.GetCanonicalTagName(NbtTagType.Byte));
+            Assert.AreEqual("TAG_Short", NbtTag.GetCanonicalTagName(NbtTagType.Short));
+            Assert.AreEqual("TAG_Int", NbtTag.GetCanonicalTagName(NbtTagType.Int));
+            Assert.AreEqual("TAG_Long", NbtTag.GetCanonicalTagName(NbtTagType.Long));
+            Assert.AreEqual("TAG_Float", NbtTag.GetCanonicalTagName(NbtTagType.Float));
+            Assert.AreEqual("TAG_Double", NbtTag.GetCanonicalTagName(NbtTagType.Double));
+            Assert.AreEqual("TAG_Byte_Array", NbtTag.GetCanonicalTagName(NbtTagType.ByteArray));
+            Assert.AreEqual("TAG_String", NbtTag.GetCanonicalTagName(NbtTagType.String));
+            Assert.AreEqual("TAG_List", NbtTag.GetCanonicalTagName(NbtTagType.List));
+            Assert.AreEqual("TAG_Compound", NbtTag.GetCanonicalTagName(NbtTagType.Compound));
+            Assert.AreEqual("TAG_Int_Array", NbtTag.GetCanonicalTagName(NbtTagType.IntArray));
+            Assert.AreEqual("TAG_Long_Array", NbtTag.GetCanonicalTagName(NbtTagType.LongArray));
             Assert.IsNull(NbtTag.GetCanonicalTagName((NbtTagType)255));
         }
 
 
         [TestMethod]
-        public void PathTest() {
+        public void PathDescribesPositionInTree() {
             // test NbtTag.Path property
             var testComp = new NbtCompound {
                 new NbtCompound("Compound") {
@@ -205,11 +224,12 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void BadParamsTest() {
-            Assert.Throws<ArgumentNullException>(() => new NbtByteArray((byte[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtIntArray((int[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtLongArray((long[])null));
-            Assert.Throws<ArgumentNullException>(() => new NbtString((string)null));
+        public void PrettyPrint() {
+            var loadedFile = new NbtFile(TestFiles.Big);
+            Assert.AreEqual(loadedFile.RootTag.ToString(), loadedFile.ToString());
+            Assert.AreEqual(loadedFile.RootTag.ToString("   "), loadedFile.ToString("   "));
+            Assert.Throws<ArgumentNullException>(() => loadedFile.ToString(null));
+            Assert.Throws<ArgumentNullException>(() => NbtTag.DefaultIndentString = null);
         }
     }
 }

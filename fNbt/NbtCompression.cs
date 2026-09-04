@@ -1,4 +1,4 @@
-﻿namespace fNbt {
+namespace fNbt {
     /// <summary> Compression method used for loading/saving NBT files. </summary>
     public enum NbtCompression {
         /// <summary> Automatically detect file compression. Not a valid format for saving. </summary>
@@ -7,7 +7,7 @@
         /// <summary> No compression. </summary>
         None,
 
-        /// <summary> Compressed, with GZip header (default). </summary>
+        /// <summary> Compressed, with GZip header (RFC-1952). </summary>
         GZip,
 
         /// <summary> Compressed, with ZLib header (RFC-1950). </summary>

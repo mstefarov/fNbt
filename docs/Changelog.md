@@ -1,3 +1,55 @@
+## 2.0.0 (fNbt)
+- Add NbtFlavor support for Java (the default), JavaAnvil,
+    JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube. A flavor
+    determines tag types, encodings, and limits. NbtFile, NbtReader, and
+    NbtWriter accept named-root flavors; NbtCodec also accepts JavaNetwork.
+    BedrockNetwork uses network varints.
+- Java flavors and ClassiCube now write modified UTF-8, matching Minecraft
+    Java. Every flavor reads modified and standard UTF-8. Malformed string bytes
+    fail with NbtFormatException instead of decoding to U+FFFD.
+- Add NbtOptions for flavor, ValidateOnWrite (default on), ValidateOnRead
+    (default off), and MaxAllocation, an optional cap on any single load
+    allocation. Write validation rejects documents the flavor cannot represent,
+    including Bedrock documents with TAG_Long_Array or strings over 32,767
+    bytes. Set ValidateOnWrite to false for permissive output. Static
+    NbtOptions.Default* properties change process-wide defaults without
+    affecting existing objects.
+- Add NbtCodec for raw or embedded NBT. It reads one document without
+    consuming trailing data and handles unnamed, non-compound, absent, and
+    concatenated documents. It reads and writes streams and byte arrays, plus
+    ReadOnlySpan<byte> and IBufferWriter<byte> on .NET 8.
+- NbtReader.ReadValueAs<T> now performs the same numeric and string
+    conversions as ReadListAsArray<T>, and both read integral values or member
+    names as an enum type.
+- NbtCompound now guarantees insertion order. Enumeration, Names, Tags,
+    ToString, and saved documents all list tags in the order they were added.
+- Improve performance: repeated-name parsing allocates about half as much,
+    NbtReader.Skip runs 2.5x faster with almost no allocation, selector skips
+    allocate 99% less, and NbtComparer compares arrays 4x to 30x faster
+    without allocating.
+- Readers now accept any element type for empty lists and treat negative list
+    and array lengths as empty.
+- Most invalid NbtWriter writes are rejected before emitting data, leaving the
+    writer usable. If a write fails after output begins, IsInErrorState reports
+    that the output is incomplete and should be discarded. Every later call
+    throws. The underlying stream remains accessible through BaseStream.
+- Fix NbtWriter.WriteIntArray and WriteLongArray with a non-zero offset.
+- Compressed loads now verify checksums for every stream type and target,
+    including .NET Standard 2.0. Seekable compressed loads now leave the source
+    at its end. The returned byte count covers everything read.
+- Fix NbtReader.ReadListAsArray when called on a list element, stale ReadValue
+    results, and ReadAsTag after a cached read.
+- Add NbtReader.LongTagStartOffset for documents past 2 GiB. TagStartOffset now
+    throws OverflowException instead of wrapping.
+- Add NbtFile constructors that take NbtFlavor or NbtOptions. Flavor is fixed at
+    construction. To re-save under another flavor, create a new NbtFile over
+    the same RootTag. BigEndian and BigEndianByDefault are now obsolete,
+    read-only properties.
+- The bool NbtReader and NbtWriter constructors and bool ReadRootTagName
+    overloads are now obsolete but still work. Their parameters map true to
+    Java and false to Bedrock.
+- Set AssemblyVersion to 2.0.0.0 for all 2.x releases.
+
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
     Minecraft's own limit, instead of crashing the process with an uncatchable
@@ -62,7 +114,7 @@
 
 ## 0.6.1 (fNbt)
 - NbtReader now supports non-seekable streams.
-- Fixed issues loading from/saving to non-seekable steams in NbtFile.
+- Fixed issues loading from/saving to non-seekable streams in NbtFile.
 - NbtFile.LoadFromStream/SaveToStream now accurately report bytes read/written
     for NBT data over 2 GiB in size.
 - API change:
@@ -97,7 +149,7 @@
     New NbtCompound method:     bool TryGet(string,out NbtTag)
     New NbtCompound overload:   NbtTag Get(string)
     New NbtTag property:        bool HasValue
-- License changed from LGPL to to 3-Clause BSD, since none of the original
+- License changed from LGPL to 3-Clause BSD, since none of the original
     libnbt source code remains.
 
 ## 0.4.1 (LibNbt2012)
@@ -145,7 +197,7 @@
 
 ## 0.3.0 (LibNbt2012)
 - Auto-detection of NBT file compression.
-- Loading and saving of ZLib (RFC-1950) compresessed NBT files.
+- Loading and saving of ZLib (RFC-1950) compressed NBT files.
 - Reduced loading/saving CPU use by 15%, and memory use by 40%
 - Full support for TAG_Int_Array
 - NbtCompound now implements ICollection and ICollection<NbtTag>
@@ -169,5 +221,5 @@
 
 ## 0.1.1 (libnbt)
 - Initial release.
-- Modified the tag constructors to be consistant with each other.
+- Modified the tag constructors to be consistent with each other.
 - Changed NbtFile to allow some functions to be overridden.

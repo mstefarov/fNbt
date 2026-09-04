@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Globalization;
 
 namespace fNbt.Test {
     [TestClass]
     public class ShortcutTests {
         [TestMethod]
-        public void NbtByteTest() {
+        public void ByteShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtByte(250);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -23,7 +23,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtByteArrayTest() {
+        public void ByteArrayShortcutsConvertOrThrow() {
             object dummy;
             byte[] bytes = { 1, 2, 3, 4, 5 };
             NbtTag test = new NbtByteArray(bytes);
@@ -42,7 +42,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtCompoundTest() {
+        public void CompoundShortcutsAllThrow() {
             object dummy;
             NbtTag test = new NbtCompound("Derp");
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -60,7 +60,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtDoubleTest() {
+        public void DoubleShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtDouble(0.4931287132182315);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -78,7 +78,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtFloatTest() {
+        public void FloatShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtFloat(0.49823147f);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -96,7 +96,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtIntTest() {
+        public void IntShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtInt(2147483647);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -114,7 +114,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtIntArrayTest() {
+        public void IntArrayShortcutsConvertOrThrow() {
             object dummy;
             int[] ints = { 1111, 2222, 3333, 4444, 5555 };
             NbtTag test = new NbtIntArray(ints);
@@ -133,7 +133,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtListTest() {
+        public void ListShortcutsAllThrow() {
             object dummy;
             NbtTag test = new NbtList("Derp");
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -151,7 +151,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtLongTest() {
+        public void LongShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtLong(9223372036854775807);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -169,7 +169,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtShortTest() {
+        public void ShortShortcutsConvertOrThrow() {
             object dummy;
             NbtTag test = new NbtShort(32767);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
@@ -187,9 +187,9 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NbtStringTest() {
+        public void StringShortcutsConvertOrThrow() {
             object dummy;
-            NbtTag test = new NbtString("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!");
+            NbtTag test = new NbtString("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!");
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteArrayValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.ByteValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.DoubleValue);
@@ -198,14 +198,14 @@ namespace fNbt.Test {
             Assert.Throws<InvalidCastException>(() => dummy = test.IntValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.LongValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.ShortValue);
-            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!", test.StringValue);
+            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!", test.StringValue);
             Assert.Throws<InvalidCastException>(() => dummy = test.LongArrayValue);
             Assert.IsTrue(test.HasValue);
         }
 
 
         [TestMethod]
-        public void NbtLongArrayTest() {
+        public void LongArrayShortcutsConvertOrThrow() {
             object dummy;
             long[] longs = { 1111, 2222, 3333, 4444, 5555 };
             NbtTag test = new NbtLongArray(longs);

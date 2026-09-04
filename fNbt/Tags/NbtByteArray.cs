@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Text;
 
@@ -25,12 +25,12 @@ namespace fNbt {
         byte[] bytes;
 
 
-        /// <summary> Creates an unnamed NbtByte tag, containing an empty array of bytes. </summary>
+        /// <summary> Creates an unnamed NbtByteArray tag, containing an empty array of bytes. </summary>
         public NbtByteArray()
             : this((string?)null) { }
 
 
-        /// <summary> Creates an unnamed NbtByte tag, containing the given array of bytes. </summary>
+        /// <summary> Creates an unnamed NbtByteArray tag, containing the given array of bytes. </summary>
         /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given byte array will be cloned. To avoid unnecessary copying, call one of the other constructor
@@ -39,7 +39,7 @@ namespace fNbt {
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtByte tag with the given name, containing an empty array of bytes. </summary>
+        /// <summary> Creates an NbtByteArray tag with the given name, containing an empty array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtByteArray(string? tagName) {
             name = tagName;
@@ -47,7 +47,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtByte tag with the given name, containing the given array of bytes. </summary>
+        /// <summary> Creates an NbtByteArray tag with the given name, containing the given array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
@@ -81,39 +81,26 @@ namespace fNbt {
         }
 
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Byte_Array");
-            }
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
+            // Negative lengths are tolerated as empty, exceeding Minecraft's own readers on purpose
+            int length = Math.Max(0, readStream.ReadInt32());
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.Skip<byte>(length);
                 return false;
             }
-            Value = readStream.ReadArray(length);
+            Value = readStream.ReadByteArray(length);
             return true;
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Byte_Array");
-            }
-            readStream.Skip<byte>(length);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            writeStream.WriteTagHeader(NbtTagType.ByteArray, Name);
+            WriteData(writeStream, depthBudget);
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.ByteArray);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
-            WriteData(writeStream);
-        }
-
-
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value.Length);
             writeStream.Write(Value, 0, Value.Length);
         }
@@ -125,14 +112,8 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Byte_Array");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} bytes]", bytes.Length);
         }
     }

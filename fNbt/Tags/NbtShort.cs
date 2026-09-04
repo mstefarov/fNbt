@@ -1,5 +1,4 @@
-﻿using System;
-using System.Globalization;
+using System;
 using System.Text;
 
 namespace fNbt {
@@ -49,9 +48,7 @@ namespace fNbt {
         }
 
 
-        #region Reading / Writing
-
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.ReadInt16();
                 return false;
@@ -61,24 +58,15 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            readStream.ReadInt16();
-        }
-
-
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.Short);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            writeStream.WriteTagHeader(NbtTagType.Short, Name);
             writeStream.Write(Value);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value);
         }
-
-        #endregion
 
 
         /// <inheritdoc />
@@ -87,14 +75,8 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Short");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.Append(": ");
             sb.Append(Value);
         }

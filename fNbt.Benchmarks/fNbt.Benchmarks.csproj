@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -7,7 +7,7 @@
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net48;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>10</LangVersion>
+    <LangVersion>12</LangVersion>
     
     <DebugType>pdbonly</DebugType>
     <DebugSymbols>true</DebugSymbols>
@@ -25,7 +25,9 @@
   <ItemGroup Condition="'$(FNbtNuGetVersion)' != ''">
     <PackageReference Include="fNbt" Version="$(FNbtNuGetVersion)" />
   </ItemGroup>
-  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != ''">
+  <!-- FNBT_BASELINE marks a build against a 1.x package, which lacks the 2.0 APIs some benchmarks use.
+       Later snapshots run the whole suite. -->
+  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != '' and $([MSBuild]::VersionLessThan('$(FNbtNuGetVersion)', '2.0'))">
     <DefineConstants>$(DefineConstants);FNBT_BASELINE</DefineConstants>
   </PropertyGroup>
   
@@ -34,6 +36,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="TestFiles\cw-template.cw">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\fNbt.Test\TestFiles\canonical_block_states.nbt" Link="TestFiles\canonical_block_states.nbt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

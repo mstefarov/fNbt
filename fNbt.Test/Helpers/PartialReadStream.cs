@@ -1,14 +1,10 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace fNbt.Test {
     class PartialReadStream : Stream {
         readonly Stream baseStream;
         readonly int increment;
-
-        public PartialReadStream(Stream baseStream)
-            : this(baseStream, 1) { }
-
 
         public PartialReadStream(Stream baseStream, int increment) {
             if (baseStream == null) throw new ArgumentNullException(nameof(baseStream));

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ namespace fNbt.Test {
     [TestClass]
     public sealed class CompoundTests {
         [TestMethod]
-        public void InitializingCompoundFromCollectionTest() {
+        public void CollectionConstructorValidatesTags() {
             NbtTag[] allNamed = {
                 new NbtShort("allNamed1", 1),
                 new NbtLong("allNamed2", 2),
@@ -37,7 +37,7 @@ namespace fNbt.Test {
 
             // proper initialization
             NbtCompound allNamedTest = new NbtCompound("allNamedTest", allNamed);
-            CollectionAssert.AreEquivalent(allNamed, allNamedTest);
+            CollectionAssert.AreEqual(allNamed, allNamedTest);
 
             // some tags are unnamed, should throw
             Assert.Throws<ArgumentException>(() => new NbtCompound("someUnnamedTest", someUnnamed));
@@ -125,8 +125,9 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentOutOfRangeException>(() => nestedInt = (NbtInt)childList[childList.Count]);
             Assert.Throws<ArgumentOutOfRangeException>(() => nestedInt = childList.Get<NbtInt>(childList.Count));
 
-            // Using setter correctly
+            // Using setter correctly, to add a tag under a new key
             parent["NewChild"] = new NbtByte("NewChild");
+            Assert.IsTrue(parent.Contains("NewChild"));
 
             // Using setter incorrectly
             object dummyObject;
@@ -234,22 +235,6 @@ namespace fNbt.Test {
         }
 
 
-        [TestMethod]
-        public void UtilityMethods() {
-            NbtTag[] testThings = {
-                new NbtShort("Name1", 1),
-                new NbtInt("Name2", 2),
-                new NbtLong("Name3", 3)
-            };
-            var compound = new NbtCompound();
-
-            // add range
-            compound.AddRange(testThings);
-
-            // add range with duplicates
-            Assert.Throws<ArgumentException>(() => compound.AddRange(testThings));
-        }
-
 
         [TestMethod]
         public void InterfaceImplementations() {
@@ -262,10 +247,10 @@ namespace fNbt.Test {
             var comp = new NbtCompound(tagList);
 
             // test .Names and .Tags collections
-            CollectionAssert.AreEquivalent(new[] {
+            CollectionAssert.AreEqual(new[] {
                 "First", "Second", "Third", "Fourth"
             }, comp.Names.ToList());
-            CollectionAssert.AreEquivalent(tagList, comp.Tags.ToList());
+            CollectionAssert.AreEqual(tagList, comp.Tags.ToList());
 
             // test ICollection and ICollection<NbtTag> boilerplate properties
             ICollection<NbtTag> iGenCollection = comp;
@@ -277,19 +262,19 @@ namespace fNbt.Test {
             // test CopyTo()
             var tags = new NbtTag[iCollection.Count];
             iCollection.CopyTo(tags, 0);
-            CollectionAssert.AreEquivalent(comp, tags);
-
-            // test non-generic GetEnumerator()
-            var enumeratedTags = comp.ToList();
-            CollectionAssert.AreEquivalent(tagList, enumeratedTags);
+            CollectionAssert.AreEqual(comp, tags);
 
             // test generic GetEnumerator()
+            var enumeratedTags = comp.ToList();
+            CollectionAssert.AreEqual(tagList, enumeratedTags);
+
+            // test non-generic GetEnumerator()
             List<NbtTag> enumeratedTags2 = new List<NbtTag>();
-            var enumerator = comp.GetEnumerator();
+            System.Collections.IEnumerator enumerator = ((System.Collections.IEnumerable)comp).GetEnumerator();
             while (enumerator.MoveNext()) {
-                enumeratedTags2.Add(enumerator.Current);
+                enumeratedTags2.Add((NbtTag)enumerator.Current);
             }
-            CollectionAssert.AreEquivalent(tagList, enumeratedTags2);
+            CollectionAssert.AreEqual(tagList, enumeratedTags2);
         }
     }
 }

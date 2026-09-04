@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Text;
 
 namespace fNbt {
     /// <summary> A tag containing an array of signed 32-bit integers. </summary>
     public sealed class NbtIntArray : NbtTag {
-        /// <summary> Type of this tag (ByteArray). </summary>
+        /// <summary> Type of this tag (IntArray). </summary>
         public override NbtTagType TagType {
             get { return NbtTagType.IntArray; }
         }
@@ -81,11 +81,9 @@ namespace fNbt {
         }
 
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Int_Array");
-            }
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
+            // Negative lengths are tolerated as empty, exceeding Minecraft's own readers on purpose
+            int length = Math.Max(0, readStream.ReadInt32());
 
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.Skip<int>(length);
@@ -97,28 +95,16 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative length given in TAG_Int_Array");
-            }
-            readStream.Skip<int>(length);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            writeStream.WriteTagHeader(NbtTagType.IntArray, Name);
+            WriteData(writeStream, depthBudget);
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.IntArray);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
-            WriteData(writeStream);
-        }
-
-
-        internal override void WriteData(NbtBinaryWriter writeStream) {
-            writeStream.Write(Value.Length);
-            for (int i = 0; i < Value.Length; i++) {
-                writeStream.Write(Value[i]);
-            }
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
+            int[] data = Value;
+            writeStream.Write(data.Length);
+            writeStream.Write(data, 0, data.Length);
         }
 
 
@@ -128,14 +114,8 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Int_Array");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} ints]", ints.Length);
         }
     }

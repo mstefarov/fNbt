@@ -3,7 +3,6 @@ using System;
 namespace fNbt.Test {
     [TestClass]
     public class ParentTrackingTests {
-        // Bugfix regression tests:
         // Indexer setters used to leave the displaced tag with Parent still pointing at the container.
         [TestMethod]
         public void CompoundIndexerClearsDisplacedParent() {
@@ -48,7 +47,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void RenameRejectsStaleParent() {
+        public void RenamingDisplacedTagLeavesOldParentAlone() {
             // After a tag is displaced, its stale Parent link must not let a rename re-key the live tag
             var root = new NbtCompound("root");
             var first = new NbtInt("x", 1);
@@ -231,6 +230,25 @@ namespace fNbt.Test {
             var list = new NbtList("l", NbtTagType.Int);
             list.AddRange(new NbtTag[] { new NbtInt(1), new NbtInt(2), new NbtInt(3) });
             Assert.AreEqual(3, list.Count);
+        }
+
+
+        [TestMethod]
+        public void CopyConstructorSetsParents() {
+            // Cloned children must belong to the clone, not to the original or to nothing
+            var original = new NbtList("original", NbtTagType.Int) {
+                new NbtInt(1),
+                new NbtInt(2)
+            };
+            var root = new NbtCompound("root") { original };
+
+            var clone = (NbtList)original.Clone();
+            Assert.AreSame(clone, clone[0].Parent);
+            Assert.AreSame(clone, clone[1].Parent);
+            Assert.AreEqual("original[0]", clone[0].Path);
+
+            var thief = new NbtList("thief", NbtTagType.Int);
+            Assert.Throws<ArgumentException>(() => thief.Add(clone[0]));
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,7 +12,7 @@ namespace fNbt {
             get { return NbtTagType.List; }
         }
 
-        readonly List<NbtTag> tags = new List<NbtTag>();
+        internal readonly List<NbtTag> tags = new List<NbtTag>();
 
         // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
         // of a corrupt length. Longer lists just grow as before.
@@ -20,7 +20,7 @@ namespace fNbt {
 
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
         /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is a recognized tag type. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is not a recognized tag type. </exception>
         public NbtTagType ListType {
             get { return listType; }
             set {
@@ -76,7 +76,7 @@ namespace fNbt {
         /// <summary> Creates an unnamed NbtList with empty contents and an explicitly specified ListType.
         /// If ListType is Unknown, it will be inferred from the type of the first added tag.
         /// Otherwise, all tags added to this list are expected to be of the given type. </summary>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown. </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a recognized tag type. </exception>
         public NbtList(NbtTagType givenListType)
             : this(null, null, givenListType) { }
@@ -100,7 +100,7 @@ namespace fNbt {
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType).
         /// List may be empty, but may not be <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown (to infer type from the first element of tags). </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown (to infer type from the first element of tags). </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
@@ -114,7 +114,7 @@ namespace fNbt {
 
         /// <summary> Creates an NbtList with the given name, empty contents, and an explicitly specified ListType. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag.
+        /// <param name="givenListType"> Type of the list elements.
         /// If givenListType is Unknown, ListType will be inferred from the first tag added to this NbtList. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         public NbtList(string? tagName, NbtTagType givenListType)
@@ -125,7 +125,7 @@ namespace fNbt {
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType). May be empty or <c>null</c>. </param>
-        /// <param name="givenListType"> Name to assign to this tag. May be Unknown (to infer type from the first element of tags). </param>
+        /// <param name="givenListType"> Type of the list elements. May be Unknown (to infer type from the first element of tags). </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
         /// or a tag is named, already has a Parent, or appears more than once. </exception>
@@ -151,17 +151,17 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
         public NbtList(NbtList other)
-            : this(other, 0) { }
+            : this(other, MaxDepth) { }
 
 
-        NbtList(NbtList other, int depth) {
+        NbtList(NbtList other, int depthBudget) {
             if (other == null) throw new ArgumentNullException(nameof(other));
-            if (depth >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             name = other.name;
             listType = other.listType;
             tags.Capacity = other.tags.Count;
             foreach (NbtTag tag in other.tags) {
-                NbtTag childClone = tag.Clone(depth + 1);
+                NbtTag childClone = tag.Clone(childDepthBudget);
                 tags.Add(childClone);
                 childClone.Parent = this;
             }
@@ -178,21 +178,7 @@ namespace fNbt {
         public override NbtTag this[int tagIndex] {
             get { return tags[tagIndex]; }
             set {
-                if (value == null) {
-                    throw new ArgumentNullException(nameof(value));
-                } else if (value.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (value == this || value == Parent) {
-                    throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-                } else if (IsDescendantOf(value)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (value.Name != null) {
-                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-                }
-                if (listType != NbtTagType.Unknown && value.TagType != listType) {
-                    throw new ArgumentException("Items in this list must be of type " + listType +
-                                                ". Given type: " + value.TagType);
-                }
+                ValidateCanAttach(value, listType, nameof(value));
                 // Clear the displaced tag's Parent so it doesn't keep pointing at this list
                 NbtTag displaced = tags[tagIndex];
                 if (!ReferenceEquals(displaced, value)) {
@@ -204,10 +190,10 @@ namespace fNbt {
         }
 
 
-        /// <summary> Gets or sets the tag with the specified name. </summary>
-        /// <param name="tagIndex"> The zero-based index of the tag to get or set. </param>
+        /// <summary> Gets the tag at the specified index, cast to the requested type. </summary>
+        /// <param name="tagIndex"> The zero-based index of the tag to get. </param>
         /// <typeparam name="T"> Type to cast the result to. Must derive from NbtTag. </typeparam>
-        /// <returns> The tag with the specified key. </returns>
+        /// <returns> The tag at the specified index. </returns>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the NbtList. </exception>
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public T Get<T>(int tagIndex) where T : NbtTag {
@@ -235,28 +221,39 @@ namespace fNbt {
         }
 
 
+        // One checklist for every path that attaches a tag, so no mutation path can skip or
+        // reorder the guards. Takes the type the list would have, so batch validation threads
+        // its running type through the same checks.
+        void ValidateCanAttach(NbtTag tag, NbtTagType effectiveType, string paramName) {
+            if (tag == null) {
+                throw new ArgumentNullException(paramName);
+            } else if (tag.Parent != null) {
+                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+            } else if (IsDescendantOf(tag)) {
+                throw new ArgumentException(tag == this || tag == Parent
+                    ? "A list tag may not be added to itself or to its child tag."
+                    : "A tag may not be added to one of its own descendants.");
+            } else if (tag.Name != null) {
+                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
+            } else if (effectiveType != NbtTagType.Unknown && tag.TagType != effectiveType) {
+                throw new ArgumentException("Items in this list must be of type " + effectiveType +
+                                            ". Given type: " + tag.TagType);
+            }
+        }
+
+
         // Checks that every tag in the batch can be added, without changing any fields.
         // Returns the ListType the list would have after a successful add.
         NbtTagType ValidateForAdd(List<NbtTag> toAdd, string paramName) {
             NbtTagType effectiveType = listType;
-            var seen = new HashSet<NbtTag>();
+            HashSet<NbtTag> seen = new HashSet<NbtTag>();
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
                     throw new ArgumentNullException(paramName, "A tag in the collection is null.");
                 } else if (!seen.Add(tag)) {
                     throw new ArgumentException("The same tag instance was given more than once.", paramName);
-                } else if (tag.Parent != null) {
-                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-                } else if (tag == this || tag == Parent) {
-                    throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-                } else if (IsDescendantOf(tag)) {
-                    throw new ArgumentException("A tag may not be added to one of its own descendants.");
-                } else if (tag.Name != null) {
-                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-                } else if (effectiveType != NbtTagType.Unknown && tag.TagType != effectiveType) {
-                    throw new ArgumentException("Items in this list must be of type " + effectiveType +
-                                                ". Given type: " + tag.TagType);
                 }
+                ValidateCanAttach(tag, effectiveType, paramName);
                 effectiveType = tag.TagType;
             }
             return effectiveType;
@@ -275,7 +272,7 @@ namespace fNbt {
         /// <returns> Array of NbtTags cast to the desired type. </returns>
         /// <exception cref="InvalidCastException"> If contents of this list cannot be cast to the given type. </exception>
         public T[] ToArray<T>() where T : NbtTag {
-            var result = new T[tags.Count];
+            T[] result = new T[tags.Count];
             for (int i = 0; i < result.Length; i++) {
                 result[i] = (T)tags[i];
             }
@@ -285,128 +282,66 @@ namespace fNbt {
 
         #region Reading / Writing
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
-                SkipTag(readStream);
+                readStream.SkipPayload(NbtTagType.List, depthBudget);
                 return false;
             }
 
-            ListType = readStream.ReadTagType();
-
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative list size given.");
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            NbtTagType newListType = readStream.ReadListHeader(out int length);
+            if (length == 0) {
+                // Still counts as a nesting level, like a non-empty list would. The field
+                // assignment keeps a tolerated End type without the property's checks.
+                listType = newListType;
+                return true;
             }
+            ListType = newListType;
 
+            // The reference array grows to hold every element, so it counts against the cap the
+            // way an array payload does. The element objects themselves are not counted.
+            readStream.EnsureAllocation((long)length * IntPtr.Size);
             tags.Capacity = Math.Min(length, MaxPresizedCapacity);
 
-            readStream.IncreaseDepth();
             for (int i = 0; i < length; i++) {
-                NbtTag newTag = ListType switch {
-                    NbtTagType.Byte => new NbtByte(),
-                    NbtTagType.Short => new NbtShort(),
-                    NbtTagType.Int => new NbtInt(),
-                    NbtTagType.Long => new NbtLong(),
-                    NbtTagType.Float => new NbtFloat(),
-                    NbtTagType.Double => new NbtDouble(),
-                    NbtTagType.ByteArray => new NbtByteArray(),
-                    NbtTagType.String => new NbtString(),
-                    NbtTagType.List => new NbtList(),
-                    NbtTagType.Compound => new NbtCompound(),
-                    NbtTagType.IntArray => new NbtIntArray(),
-                    NbtTagType.LongArray => new NbtLongArray(),
-                    // should never happen, since ListType is checked beforehand
-                    _ => throw new NbtFormatException("Unsupported tag type found in a list: " + ListType),
-                };
+                NbtTag newTag = NbtTag.Create(newListType);
                 newTag.Parent = this;
-                if (newTag.ReadTag(readStream)) {
+                if (newTag.ReadTag(readStream, childDepthBudget)) {
                     tags.Add(newTag);
                 }
             }
-            readStream.DecreaseDepth();
             return true;
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            // read list type, and make sure it's defined
-            ListType = readStream.ReadTagType();
-
-            int length = readStream.ReadInt32();
-            if (length < 0) {
-                throw new NbtFormatException("Negative list size given.");
-            }
-
-            readStream.IncreaseDepth();
-            switch (ListType) {
-                case NbtTagType.Byte:
-                    readStream.Skip<byte>(length);
-                    break;
-                case NbtTagType.Short:
-                    readStream.Skip<short>(length);
-                    break;
-                case NbtTagType.Int:
-                    readStream.Skip<int>(length);
-                    break;
-                case NbtTagType.Long:
-                    readStream.Skip<long>(length);
-                    break;
-                case NbtTagType.Float:
-                    readStream.Skip<float>(length);
-                    break;
-                case NbtTagType.Double:
-                    readStream.Skip<double>(length);
-                    break;
-                default:
-                    for (int i = 0; i < length; i++) {
-                        switch (listType) {
-                            case NbtTagType.ByteArray:
-                                new NbtByteArray().SkipTag(readStream);
-                                break;
-                            case NbtTagType.String:
-                                readStream.SkipString();
-                                break;
-                            case NbtTagType.List:
-                                new NbtList().SkipTag(readStream);
-                                break;
-                            case NbtTagType.Compound:
-                                new NbtCompound().SkipTag(readStream);
-                                break;
-                            case NbtTagType.IntArray:
-                                new NbtIntArray().SkipTag(readStream);
-                                break;
-                            case NbtTagType.LongArray:
-                                new NbtLongArray().SkipTag(readStream);
-                                break;
-                            default:
-                                throw new NbtFormatException("Unsupported tag type found in a list: " + listType);
-                        }
-                    }
-                    break;
-            }
-            readStream.DecreaseDepth();
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            EnsureListType();
+            writeStream.WriteTagHeader(NbtTagType.List, Name);
+            WritePayload(writeStream, childDepthBudget);
         }
 
 
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.List);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
-            WriteData(writeStream);
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            EnsureListType();
+            WritePayload(writeStream, childDepthBudget);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        void EnsureListType() {
             if (ListType == NbtTagType.Unknown) {
-                throw new NbtFormatException("NbtList had no elements and an Unknown ListType");
+                throw NbtFormatException.UnknownListType();
             }
-            writeStream.IncreaseDepth();
+        }
+
+
+        void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
             writeStream.Write(ListType);
             writeStream.Write(tags.Count);
             foreach (NbtTag tag in tags) {
-                tag.WriteData(writeStream);
+                tag.WriteData(writeStream, childDepthBudget);
             }
-            writeStream.DecreaseDepth();
         }
 
         #endregion
@@ -415,7 +350,7 @@ namespace fNbt {
         #region Implementation of IEnumerable<NBtTag> and IEnumerable
 
         /// <summary> Returns an enumerator that iterates through all tags in this NbtList. </summary>
-        /// <returns> An IEnumerator&gt;NbtTag&lt; that can be used to iterate through the list. </returns>
+        /// <returns> An IEnumerator&lt;NbtTag&gt; that can be used to iterate through the list. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
             return tags.GetEnumerator();
         }
@@ -447,24 +382,12 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Insert(int tagIndex, NbtTag newTag) {
-            if (newTag == null) {
-                throw new ArgumentNullException(nameof(newTag));
-            }
-            if (listType != NbtTagType.Unknown && newTag.TagType != listType) {
-                throw new ArgumentException("Items in this list must be of type " + listType +
-                                            ". Given type: " + newTag.TagType);
-            } else if (newTag.Parent != null) {
-                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-            } else if (IsDescendantOf(newTag)) {
-                throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            } else if (newTag.Name != null) {
-                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-            }
+            ValidateCanAttach(newTag, listType, nameof(newTag));
             tags.Insert(tagIndex, newTag);
+            newTag.Parent = this;
             if (listType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
-            newTag.Parent = this;
         }
 
 
@@ -484,21 +407,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Add(NbtTag newTag) {
-            if (newTag == null) {
-                throw new ArgumentNullException(nameof(newTag));
-            } else if (newTag.Parent != null) {
-                throw new ArgumentException("A tag may only be added to one compound/list at a time.");
-            } else if (newTag == this || newTag == Parent) {
-                throw new ArgumentException("A list tag may not be added to itself or to its child tag.");
-            } else if (IsDescendantOf(newTag)) {
-                throw new ArgumentException("A tag may not be added to one of its own descendants.");
-            } else if (newTag.Name != null) {
-                throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
-            }
-            if (listType != NbtTagType.Unknown && newTag.TagType != listType) {
-                throw new ArgumentException("Items in this list must be of type " + listType + ". Given type: " +
-                                            newTag.TagType);
-            }
+            ValidateCanAttach(newTag, listType, nameof(newTag));
             tags.Add(newTag);
             newTag.Parent = this;
             if (listType == NbtTagType.Unknown) {
@@ -538,7 +447,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Removes the first occurrence of a specific NbtTag from the NbtCompound.
+        /// <summary> Removes the first occurrence of a specific NbtTag from this NbtList.
         /// Looks for exact object matches, not name matches. </summary>
         /// <returns> true if tag was successfully removed from this NbtList; otherwise, false.
         /// This method also returns false if tag is not found. </returns>
@@ -629,37 +538,16 @@ namespace fNbt {
         /// <inheritdoc />
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public override object Clone() {
-            return new NbtList(this, 0);
+            return new NbtList(this, MaxDepth);
         }
 
 
-        internal override NbtTag Clone(int depth) {
-            return new NbtList(this, depth);
+        internal override NbtTag Clone(int depthBudget) {
+            return new NbtList(this, depthBudget);
         }
 
-
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            if (indentLevel >= MaxDepth) throw new NbtFormatException(DepthLimitMessage);
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_List");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
-            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", tags.Count);
-
-            if (Count > 0) {
-                sb.Append('\n');
-                foreach (NbtTag tag in tags) {
-                    tag.PrettyPrint(sb, indentString, indentLevel + 1);
-                    sb.Append('\n');
-                }
-                for (int i = 0; i < indentLevel; i++) {
-                    sb.Append(indentString);
-                }
-            }
-            sb.Append('}');
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintContainer(sb, indentString, indentLevel, depthBudget, this);
         }
     }
 }

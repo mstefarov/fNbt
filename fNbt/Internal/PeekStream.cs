@@ -2,9 +2,8 @@ using System;
 using System.IO;
 
 namespace fNbt {
-    // .NET Core 3.0 through 8.0 inflate all the input they are handed, however little the caller asked
-    // for, and DeflateStream hands them 8 KiB at a time. That turns a 20-byte peek into 128 KiB of work.
-    // .NET Framework and .NET 9+ don't.
+    // Limits a decompressor's read-ahead during a root-name peek. Inflaters may process
+    // everything they are handed, so capping input is what keeps a peek cheap.
     internal sealed class PeekStream : Stream {
         // Enough to keep inflate fed, little enough that a peek stays cheap.
         const int ReadChunk = 64;
@@ -21,6 +20,13 @@ namespace fNbt {
         public override int Read(byte[] buffer, int offset, int count) {
             return baseStream.Read(buffer, offset, Math.Min(count, ReadChunk));
         }
+
+
+#if NETCOREAPP
+        public override int Read(Span<byte> buffer) {
+            return baseStream.Read(buffer.Slice(0, Math.Min(buffer.Length, ReadChunk)));
+        }
+#endif
 
 
         public override void Flush() { }

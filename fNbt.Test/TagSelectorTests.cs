@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 
 namespace fNbt.Test {
     [TestClass]
@@ -46,10 +46,8 @@ namespace fNbt.Test {
                 ms.WriteByte(0x00); // root's TAG_End
                 doc = ms.ToArray();
             }
-            var file = new NbtFile();
             Assert.Throws<NbtFormatException>(
-                () => file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None,
-                                          tag => tag.Name != "skipme"));
+                () => TestFiles.Load(doc, selector: tag => tag.Name != "skipme"));
         }
 
 
@@ -83,44 +81,48 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void SkippingLists() {
-            {
-                var file = new NbtFile(TestFiles.MakeListTest());
-                byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-                file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
-                                    tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(0, file.RootTag.Count);
-            }
-            {
-                // Check list-compound interaction
-                NbtCompound comp = new NbtCompound("root") {
-                    new NbtCompound("compOfLists") {
-                        new NbtList("listOfComps") {
-                            new NbtCompound {
-                                new NbtList("emptyList", NbtTagType.Compound)
-                            }
+            NbtCompound root = TestFiles.Reload(TestFiles.MakeAllListsRoot(),
+                                                selector: tag => tag.TagType != NbtTagType.List);
+            Assert.AreEqual(0, root.Count);
+
+            // Check list-compound interaction
+            NbtCompound comp = new NbtCompound("root") {
+                new NbtCompound("compOfLists") {
+                    new NbtList("listOfComps") {
+                        new NbtCompound {
+                            new NbtList("emptyList", NbtTagType.Compound)
                         }
                     }
-                };
-                var file = new NbtFile(comp);
-                byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-                file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None,
-                                    tag => tag.TagType != NbtTagType.List);
-                Assert.AreEqual(1, file.RootTag.Count);
-            }
+                }
+            };
+            root = TestFiles.Reload(comp, selector: tag => tag.TagType != NbtTagType.List);
+            Assert.AreEqual(1, root.Count);
         }
 
 
-        [TestMethod]
-        public void SkippingValuesInCompoundTest() {
-            NbtCompound root = TestFiles.MakeValueTest();
-            NbtCompound nestedComp = TestFiles.MakeValueTest();
-            nestedComp.Name = "NestedComp";
-            root.Add(nestedComp);
 
-            var file = new NbtFile(root);
-            byte[] savedFile = file.SaveToBuffer(NbtCompression.None);
-            file.LoadFromBuffer(savedFile, 0, savedFile.Length, NbtCompression.None, tag => false);
-            Assert.AreEqual(0, file.RootTag.Count);
+        [TestMethod]
+        public void SkippedStringsRespectFlavorCeilingButNotMaxAllocation() {
+            // A 300-byte string, valid under Java rules
+            var root = new NbtCompound("r") {
+                new NbtString("s", new string('x', 300)),
+                new NbtShort("k", 5)
+            };
+            byte[] doc = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
+
+            // Read validation enforces the flavor's own ceiling on skipped strings too:
+            // conformance is about the document, not about whether the value was kept
+            Assert.Throws<NbtFormatException>(
+                () => TestFiles.Load(doc, new NbtOptions { Flavor = NbtFlavor.ClassiCube, ValidateOnRead = true },
+                                     tag => tag.Name != "s"));
+
+            // MaxAllocation does not apply to skips, which allocate nothing
+            NbtFile capped = TestFiles.Load(doc, new NbtOptions { MaxAllocation = 100 }, tag => tag.Name != "s");
+            Assert.IsFalse(capped.RootTag.Contains("s"));
+            Assert.AreEqual((short)5, capped.RootTag["k"].ShortValue);
+
+            // Reading the same string with that cap still throws
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, new NbtOptions { MaxAllocation = 100 }));
         }
     }
 }

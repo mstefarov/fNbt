@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace fNbt.Test {
@@ -11,11 +11,34 @@ namespace fNbt.Test {
         public static readonly string BigGZip = Path.Combine(DirName, "bigtest.nbt.gz");
         public static readonly string BigZLib = Path.Combine(DirName, "bigtest.nbt.z");
 
+        // Real BedrockNetwork-encoded data generated from Minecraft: Bedrock Edition,
+        // from pmmp/BedrockData (CC0-1.0), commit bdb44a48fb6beffb6e9f6864f06d2232eb62b6a3
+        public static readonly string CanonicalBlockStates = Path.Combine(DirName, "canonical_block_states.nbt");
+        public static readonly string EntityIdentifiers = Path.Combine(DirName, "entity_identifiers.nbt");
+
 
         // Big-endian primitives for hand-building corrupt or exotic documents byte by byte
         public static void WriteBEShort(Stream s, short value) {
             s.WriteByte((byte)(value >> 8));
             s.WriteByte((byte)value);
+        }
+
+
+        // Builds an uncompressed doc of compounds nested totalLevels deep (including root).
+        public static byte[] MakeNestedCompoundDoc(int totalLevels) {
+            using (var ms = new MemoryStream()) {
+                ms.WriteByte(0x0A);
+                WriteBEShort(ms, 0); // root name: ""
+                for (int i = 1; i < totalLevels; i++) {
+                    ms.WriteByte(0x0A);
+                    WriteBEShort(ms, 1);
+                    ms.WriteByte((byte)'c');
+                }
+                for (int i = 0; i < totalLevels; i++) {
+                    ms.WriteByte(0x00);
+                }
+                return ms.ToArray();
+            }
         }
 
 
@@ -27,8 +50,53 @@ namespace fNbt.Test {
         }
 
 
+        // Loads an uncompressed document into a fresh NbtFile
+        public static NbtFile Load(byte[] doc, NbtOptions options = null, TagSelector selector = null) {
+            NbtFile file = options == null ? new NbtFile() : new NbtFile(options);
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, selector);
+            return file;
+        }
+
+
+        public static NbtFile Load(byte[] doc, NbtFlavor flavor, TagSelector selector = null) {
+            return Load(doc, new NbtOptions(flavor), selector);
+        }
+
+
+        // Saves a tree uncompressed and loads it back
+        public static NbtCompound Reload(NbtCompound root, NbtOptions options = null, TagSelector selector = null) {
+            NbtFile file = options == null ? new NbtFile(root) : new NbtFile(root, options);
+            return Load(file.SaveToBuffer(NbtCompression.None), options, selector).RootTag;
+        }
+
+
+        // Finishes a streaming writer and loads what it wrote
+        public static NbtFile FinishAndReload(NbtWriter writer, MemoryStream ms, NbtOptions options = null) {
+            writer.Finish();
+            return Load(ms.ToArray(), options);
+        }
+
+
+        // Opens a streaming reader over an uncompressed document
+        public static NbtReader OpenReader(byte[] doc, NbtOptions options = null) {
+            var ms = new MemoryStream(doc);
+            return options == null ? new NbtReader(ms) : new NbtReader(ms, options);
+        }
+
+
+        public static NbtReader OpenReader(byte[] doc, NbtFlavor flavor) {
+            return new NbtReader(new MemoryStream(doc), flavor);
+        }
+
+
+        public static NbtReader OpenReader(NbtCompound root, NbtOptions options = null) {
+            NbtFile file = options == null ? new NbtFile(root) : new NbtFile(root, options);
+            return OpenReader(file.SaveToBuffer(NbtCompression.None), options);
+        }
+
+
         // creates a compound containing lists of every kind of tag
-        public static NbtCompound MakeListTest() {
+        public static NbtCompound MakeAllListsRoot() {
             return new NbtCompound("Root") {
                 new NbtList("ByteList") {
                     new NbtByte(100),
@@ -112,8 +180,8 @@ namespace fNbt.Test {
         }
 
 
-        // creates a file with lots of compounds and lists, used to test NbtReader compliance
-        public static Stream MakeReaderTest() {
+        // creates a document with lots of compounds and lists, used to test NbtReader compliance
+        public static Stream MakeNestedContainersStream() {
             var root = new NbtCompound("root") {
                 new NbtInt("first"),
                 new NbtInt("second"),
@@ -155,7 +223,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertNbtSmallFile(NbtFile file) {
+        public static void AssertSmallFile(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;
@@ -170,7 +238,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertNbtBigFile(NbtFile file) {
+        public static void AssertBigFile(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;
@@ -190,7 +258,7 @@ namespace fNbt.Test {
             Assert.IsInstanceOfType<NbtString>(root["stringTest"]);
             node = root["stringTest"];
             Assert.AreEqual("stringTest", node.Name);
-            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING ÅÄÖ!", ((NbtString)node).Value);
+            Assert.AreEqual("HELLO WORLD THIS IS A TEST STRING \u00C5\u00C4\u00D6!", ((NbtString)node).Value);
 
             Assert.IsInstanceOfType<NbtFloat>(root["floatTest"]);
             node = root["floatTest"];
@@ -329,7 +397,7 @@ namespace fNbt.Test {
         #region Value test
 
         // creates an NbtCompound with one of tag of each value-type
-        public static NbtCompound MakeValueTest() {
+        public static NbtCompound MakeAllValuesRoot() {
             return new NbtCompound("root") {
                 new NbtByte("byte", 1),
                 new NbtShort("short", 2),
@@ -345,7 +413,7 @@ namespace fNbt.Test {
         }
 
 
-        public static void AssertValueTest(NbtFile file) {
+        public static void AssertAllValues(NbtFile file) {
             Assert.IsInstanceOfType<NbtCompound>(file.RootTag);
 
             NbtCompound root = file.RootTag;

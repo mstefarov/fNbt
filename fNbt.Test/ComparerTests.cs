@@ -1,12 +1,7 @@
-﻿namespace fNbt.Test {
+namespace fNbt.Test {
     [TestClass]
     public class ComparerTests {
         private readonly NbtComparer comparer = NbtComparer.Instance;
-
-        [TestMethod]
-        public void InstanceIsSingleton() {
-            Assert.AreSame(NbtComparer.Instance, NbtComparer.Instance);
-        }
 
         [TestMethod]
         public void BasicTagsEqualAndHashCode() {
@@ -105,11 +100,11 @@
         }
 
         [TestMethod]
-        public void ListTestEquals() {
+        public void ListsOfEveryTypeCompareEqual() {
             // Stress-test: compare lists with every single tag type
-            var x = TestFiles.MakeListTest();
-            var y = TestFiles.MakeListTest();
-            Assert.IsTrue(comparer.Equals(x, y), "Two runs of MakeListTest should be deeply equal");
+            var x = TestFiles.MakeAllListsRoot();
+            var y = TestFiles.MakeAllListsRoot();
+            Assert.IsTrue(comparer.Equals(x, y), "Two runs of MakeAllListsRoot should be deeply equal");
             Assert.AreEqual(comparer.GetHashCode(x), comparer.GetHashCode(y), "And their hash codes should match");
         }
 

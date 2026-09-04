@@ -1,43 +1,43 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 
 namespace fNbt.Test {
     [TestClass]
     public sealed class NbtReaderTests {
         [TestMethod]
-        public void PrintBigFileUncompressed() {
+        public void WalkBigFile() {
+            // ReadToFollowing must visit every tag; a walk that stops early fails the count
             using (FileStream fs = File.OpenRead(TestFiles.Big)) {
                 var reader = new NbtReader(fs);
-                Assert.AreEqual(fs, reader.BaseStream);
+                Assert.AreSame(fs, reader.BaseStream);
                 while (reader.ReadToFollowing()) {
-                    Console.Write("@" + reader.TagStartOffset + " ");
-                    Console.WriteLine(reader.ToString());
+                    _ = reader.ToString(); // must not throw mid-walk
                 }
                 Assert.AreEqual("Level", reader.RootName);
+                Assert.AreEqual(31, reader.TagsRead);
             }
         }
 
 
         [TestMethod]
-        public void PrintBigFileUncompressedNoSkip() {
+        public void WalkBigFileNoSkip() {
+            // With SkipEndTags off, End markers count as tags, so the walk gets longer
             using (FileStream fs = File.OpenRead(TestFiles.Big)) {
                 var reader = new NbtReader(fs) {
                     SkipEndTags = false
                 };
-                Assert.AreEqual(fs, reader.BaseStream);
                 while (reader.ReadToFollowing()) {
-                    Console.Write("@" + reader.TagStartOffset + " ");
-                    Console.WriteLine(reader.ToString());
                 }
-                Assert.AreEqual("Level", reader.RootName);
+                Assert.AreEqual(37, reader.TagsRead);
             }
         }
 
 
         [TestMethod]
-        public void CacheTagValuesTest() {
-            byte[] testData = new NbtFile(TestFiles.MakeValueTest()).SaveToBuffer(NbtCompression.None);
-            var reader = new NbtReader(new MemoryStream(testData));
+        public void CachedValuesCanBeReadTwice() {
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllValuesRoot());
             Assert.IsFalse(reader.CacheTagValues);
             reader.CacheTagValues = true;
             Assert.IsTrue(reader.ReadToFollowing()); // root
@@ -76,7 +76,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void NestedListTest() {
+        public void NestedListsAreWalked() {
             var root = new NbtCompound("root") {
                 new NbtList("OuterList") {
                     new NbtList {
@@ -90,19 +90,18 @@ namespace fNbt.Test {
                     }
                 }
             };
-            byte[] testData = new NbtFile(root).SaveToBuffer(NbtCompression.None);
-            using (var ms = new MemoryStream(testData)) {
-                var reader = new NbtReader(ms);
-                while (reader.ReadToFollowing()) {
-                    Console.WriteLine(reader.ToString(true));
-                }
+            NbtReader reader = TestFiles.OpenReader(root);
+            while (reader.ReadToFollowing()) {
+                _ = reader.ToString(true); // must not throw mid-walk
             }
+            // root, OuterList, three sublists, three elements
+            Assert.AreEqual(8, reader.TagsRead);
         }
 
 
         [TestMethod]
-        public void PropertiesTest() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+        public void PropertiesTrackTheWalk() {
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.AreEqual(0, reader.Depth);
             Assert.AreEqual(0, reader.TagsRead);
 
@@ -228,8 +227,8 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadToSiblingTest() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+        public void ReadToNextSiblingFindsNamedSibling() {
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.IsTrue(reader.ReadToFollowing());
             Assert.AreEqual("root", reader.TagName);
             Assert.IsTrue(reader.ReadToFollowing());
@@ -249,8 +248,8 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadToSiblingTest2() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+        public void ReadToNextSiblingStopsAtParentEnd() {
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.IsTrue(reader.ReadToFollowing("inComp1"));
             // Expect all siblings to be read while we search for a non-existent one
             Assert.IsFalse(reader.ReadToNextSibling("no such tag"));
@@ -261,7 +260,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ReadToFollowingNotFound() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.IsTrue(reader.ReadToFollowing()); // at "root"
             Assert.IsFalse(reader.ReadToFollowing("no such tag"));
             Assert.IsFalse(reader.ReadToFollowing("not this one either"));
@@ -270,8 +269,8 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadToDescendantTest() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+        public void ReadToDescendantSearchesSubtree() {
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.IsTrue(reader.ReadToDescendant("third-comp"));
             Assert.AreEqual("third-comp", reader.TagName);
             Assert.IsTrue(reader.ReadToDescendant("inComp2"));
@@ -290,13 +289,13 @@ namespace fNbt.Test {
             Assert.IsFalse(reader.ReadToDescendant("*"));
 
             // Ensure that this works even on the root
-            Assert.IsFalse(new NbtReader(TestFiles.MakeReaderTest()).ReadToDescendant("*"));
+            Assert.IsFalse(new NbtReader(TestFiles.MakeNestedContainersStream()).ReadToDescendant("*"));
         }
 
 
         [TestMethod]
-        public void SkipTest() {
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+        public void SkipReturnsTagsSkipped() {
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             reader.ReadToFollowing(); // at root
             reader.ReadToFollowing(); // at first
             reader.ReadToFollowing(); // at second
@@ -312,9 +311,9 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadAsTagTest1() {
+        public void ReadAsTagWalksToStreamEnd() {
             // read various lists/compounds as tags
-            var reader = new NbtReader(TestFiles.MakeReaderTest());
+            var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             reader.ReadToFollowing(); // skip root
             while (!reader.IsAtStreamEnd) {
                 reader.ReadAsTag();
@@ -324,30 +323,28 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadAsTagTest2() {
+        public void ReadAsTagReadsWholeDocument() {
             // read the whole thing as one tag
-            byte[] testData = new NbtFile(TestFiles.MakeValueTest()).SaveToBuffer(NbtCompression.None);
+            byte[] testData = new NbtFile(TestFiles.MakeAllValuesRoot()).SaveToBuffer(NbtCompression.None);
             {
-                var reader = new NbtReader(new MemoryStream(testData));
+                NbtReader reader = TestFiles.OpenReader(testData);
                 var root = (NbtCompound)reader.ReadAsTag();
-                TestFiles.AssertValueTest(new NbtFile(root));
+                TestFiles.AssertAllValues(new NbtFile(root));
             }
             {
                 // Try the same thing but with end tag skipping disabled
-                var reader = new NbtReader(new MemoryStream(testData)) {
-                    SkipEndTags = false
-                };
+                NbtReader reader = TestFiles.OpenReader(testData);
+                reader.SkipEndTags = false;
                 var root = (NbtCompound)reader.ReadAsTag();
-                TestFiles.AssertValueTest(new NbtFile(root));
+                TestFiles.AssertAllValues(new NbtFile(root));
             }
         }
 
 
         [TestMethod]
-        public void ReadAsTagTest3() {
+        public void ReadAsTagReadsValuesOneByOne() {
             // read values as tags
-            byte[] testData = new NbtFile(TestFiles.MakeValueTest()).SaveToBuffer(NbtCompression.None);
-            var reader = new NbtReader(new MemoryStream(testData));
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllValuesRoot());
             var root = new NbtCompound("root");
 
             // skip root
@@ -358,43 +355,44 @@ namespace fNbt.Test {
                 root.Add(reader.ReadAsTag());
             }
 
-            TestFiles.AssertValueTest(new NbtFile(root));
+            TestFiles.AssertAllValues(new NbtFile(root));
         }
 
 
         [TestMethod]
-        public void ReadAsTagTest4() {
+        public void ReadAsTagReadsListsWholeOrOneByOne() {
             // read a bunch of lists as tags
-            byte[] testData = new NbtFile(TestFiles.MakeListTest()).SaveToBuffer(NbtCompression.None);
+            NbtCompound expected = TestFiles.MakeAllListsRoot();
+            byte[] testData = new NbtFile(expected).SaveToBuffer(NbtCompression.None);
 
-            // first, read everything all-at-once
+            // first, read the whole document at once
             {
-                var reader = new NbtReader(new MemoryStream(testData));
-                while (!reader.IsAtStreamEnd) {
-                    Console.WriteLine(reader.ReadAsTag());
-                }
+                NbtReader reader = TestFiles.OpenReader(testData);
+                NbtAssert.AreEqual(expected, reader.ReadAsTag());
+                Assert.IsTrue(reader.IsAtStreamEnd);
             }
 
             // next, read each list individually
             {
-                var reader = new NbtReader(new MemoryStream(testData));
+                var expectedLists = new List<NbtTag>(expected);
+                NbtReader reader = TestFiles.OpenReader(testData);
                 reader.ReadToFollowing(); // read to root
                 reader.ReadToFollowing(); // read to first list tag
+                int index = 0;
                 while (!reader.IsAtStreamEnd) {
-                    Console.WriteLine(reader.ReadAsTag());
+                    NbtAssert.AreEqual(expectedLists[index], reader.ReadAsTag());
+                    index++;
                 }
+                Assert.AreEqual(expectedLists.Count, index);
             }
         }
 
 
         [TestMethod]
         public void ReadListAsArray() {
-            NbtCompound intList = TestFiles.MakeListTest();
+            NbtCompound intList = TestFiles.MakeAllListsRoot();
 
-            var ms = new MemoryStream();
-            new NbtFile(intList).SaveToStream(ms, NbtCompression.None);
-            ms.Seek(0, SeekOrigin.Begin);
-            var reader = new NbtReader(ms);
+            NbtReader reader = TestFiles.OpenReader(intList);
 
             // attempt to read value before we're in a list
             Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<int>());
@@ -429,7 +427,7 @@ namespace fNbt.Test {
             short[] shorts = reader.ReadListAsArray<short>();
             CollectionAssert.AreEqual(new short[] { 1, 200, -30000 }, shorts);
 
-            // test short values
+            // test string values
             reader.ReadToFollowing("StringList");
             string[] strings = reader.ReadListAsArray<string>();
             CollectionAssert.AreEqual(new[] { "one", "two thousand", "negative three million" }, strings);
@@ -469,7 +467,7 @@ namespace fNbt.Test {
                 ms.WriteByte(0x00); // root End
                 doc = ms.ToArray();
             }
-            var reader = new NbtReader(new MemoryStream(doc));
+            NbtReader reader = TestFiles.OpenReader(doc);
             reader.ReadToFollowing("l");
             Assert.Throws<EndOfStreamException>(() => reader.ReadListAsArray<int>());
             // Partial reads due to bad count are not recoverable.
@@ -481,11 +479,8 @@ namespace fNbt.Test {
         public void ReadListAsArrayTwiceReturnsEmpty() {
             // Reading a value list to completion, then calling again, must return an empty array
             // rather than reading past the list end.
-            NbtCompound intList = TestFiles.MakeListTest();
-            var ms = new MemoryStream();
-            new NbtFile(intList).SaveToStream(ms, NbtCompression.None);
-            ms.Seek(0, SeekOrigin.Begin);
-            var reader = new NbtReader(ms);
+            NbtCompound intList = TestFiles.MakeAllListsRoot();
+            NbtReader reader = TestFiles.OpenReader(intList);
 
             reader.ReadToFollowing("IntList");
             int[] first = reader.ReadListAsArray<int>();
@@ -497,28 +492,90 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadListAsArrayRecast() {
-            NbtCompound intList = TestFiles.MakeListTest();
+        public void ReadListAsArrayIncludesPublishedUnreadElement() {
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllListsRoot());
 
-            var ms = new MemoryStream();
-            new NbtFile(intList).SaveToStream(ms, NbtCompression.None);
-            ms.Seek(0, SeekOrigin.Begin);
-            var reader = new NbtReader(ms);
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.Int, reader.TagType);
+            Assert.AreEqual(0, reader.ListIndex);
+            int tagsReadBefore = reader.TagsRead;
 
-            // test bytes as shorts
-            reader.ReadToFollowing("ByteList");
-            short[] bytes = reader.ReadListAsArray<short>();
-            CollectionAssert.AreEqual(bytes,
-                                      new short[] {
-                                          100, 20, 3
-                                      });
+            int[] remaining = reader.ReadListAsArray<int>();
+
+            CollectionAssert.AreEqual(new[] { 1, 2000, -3000000 }, remaining);
+            Assert.AreEqual(tagsReadBefore + 2, reader.TagsRead);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
         }
 
 
         [TestMethod]
-        public void ReadValueTest() {
-            byte[] testData = new NbtFile(TestFiles.MakeValueTest()).SaveToBuffer(NbtCompression.None);
-            var reader = new NbtReader(new MemoryStream(testData));
+        public void ReadListAsArrayExcludesPublishedConsumedElement() {
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllListsRoot());
+
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(1, reader.ReadValue());
+            int tagsReadBefore = reader.TagsRead;
+
+            int[] remaining = reader.ReadListAsArray<int>();
+
+            CollectionAssert.AreEqual(new[] { 2000, -3000000 }, remaining);
+            Assert.AreEqual(tagsReadBefore + 2, reader.TagsRead);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
+
+            // Nothing left after the last element's value was consumed
+            reader = TestFiles.OpenReader(TestFiles.MakeAllListsRoot());
+            Assert.IsTrue(reader.ReadToFollowing("IntList"));
+            for (int i = 0; i < 3; i++) {
+                Assert.IsTrue(reader.ReadToFollowing());
+            }
+            Assert.AreEqual(-3000000, reader.ReadValue());
+            Assert.AreEqual(0, reader.ReadListAsArray<int>().Length);
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual("LongList", reader.TagName);
+        }
+
+
+        [TestMethod]
+        public void ReadEmptyListAsArrayKeepsCursorOnTheList() {
+            var root = new NbtCompound("root") {
+                new NbtList("empty", NbtTagType.Int),
+                new NbtByte("after", 1)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+
+            Assert.IsTrue(reader.ReadToFollowing("empty"));
+            int depth = reader.Depth;
+            Assert.AreEqual(0, reader.ReadListAsArray<int>().Length);
+            Assert.AreEqual("empty", reader.TagName);
+            Assert.AreEqual(NbtTagType.List, reader.TagType);
+            Assert.AreEqual(depth, reader.Depth);
+
+            // Still a list tag as far as navigation is concerned
+            Assert.IsTrue(reader.ReadToNextSibling());
+            Assert.AreEqual("after", reader.TagName);
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayRecast() {
+            NbtCompound intList = TestFiles.MakeAllListsRoot();
+
+            NbtReader reader = TestFiles.OpenReader(intList);
+
+            // test bytes as shorts
+            reader.ReadToFollowing("ByteList");
+            short[] bytes = reader.ReadListAsArray<short>();
+            CollectionAssert.AreEqual(new short[] { 100, 20, 3 }, bytes);
+        }
+
+
+        [TestMethod]
+        public void ReadValueReturnsEveryValueType() {
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllValuesRoot());
 
             Assert.IsTrue(reader.ReadToFollowing()); // root
 
@@ -550,9 +607,8 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadValueAsTest() {
-            byte[] testData = new NbtFile(TestFiles.MakeValueTest()).SaveToBuffer(NbtCompression.None);
-            var reader = new NbtReader(new MemoryStream(testData));
+        public void ReadValueAsConvertsEveryValueType() {
+            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllValuesRoot());
 
             Assert.IsTrue(reader.ReadToFollowing()); // root
 
@@ -580,7 +636,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ErrorTest() {
+        public void BadStreamsThrowAndCorruptDataPoisons() {
             var root = new NbtCompound("root");
             byte[] testData = new NbtFile(root).SaveToBuffer(NbtCompression.None);
 
@@ -590,7 +646,7 @@ namespace fNbt.Test {
 
             // corrupt the data
             testData[0] = 123;
-            var reader = new NbtReader(new MemoryStream(testData));
+            NbtReader reader = TestFiles.OpenReader(testData);
 
             // attempt to use ReadValue when not at value
             Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
@@ -601,252 +657,462 @@ namespace fNbt.Test {
             Assert.Throws<NbtFormatException>(() => reader.ReadToFollowing());
 
             // make sure we've properly entered the error state
-            Assert.IsTrue(reader.IsInErrorState);
+            NbtAssert.ReaderIsPoisoned(reader);
             Assert.IsFalse(reader.HasName);
-            Assert.Throws<InvalidReaderStateException>(() => reader.ReadToFollowing());
-            Assert.Throws<InvalidReaderStateException>(() => reader.ReadListAsArray<int>());
-            Assert.Throws<InvalidReaderStateException>(() => reader.ReadToNextSibling());
-            Assert.Throws<InvalidReaderStateException>(() => reader.ReadToDescendant("derp"));
-            Assert.Throws<InvalidReaderStateException>(() => reader.ReadAsTag());
-            Assert.Throws<InvalidReaderStateException>(() => reader.Skip());
         }
 
 
         [TestMethod]
-        public void NonSeekableStreamSkip1() {
+        public void FailedValueReadEntersErrorState() {
+            // A read that fails partway through a payload leaves the stream desynchronised,
+            // so the reader must poison itself instead of parsing from mid-payload
+            byte[] doc = new NbtFile(new NbtCompound("") {
+                new NbtByteArray("a", new byte[65536])
+            }).SaveToBuffer(NbtCompression.None);
+            var options = new NbtOptions { MaxAllocation = 1024 };
+
+            NbtReader reader = TestFiles.OpenReader(doc, options);
+            reader.ReadToFollowing();
+            reader.ReadToFollowing();
+            Assert.Throws<NbtFormatException>(() => reader.ReadValue());
+            NbtAssert.ReaderIsPoisoned(reader);
+
+            // Same through the ReadAsTag path
+            reader = TestFiles.OpenReader(doc, options);
+            reader.ReadToFollowing();
+            reader.ReadToFollowing();
+            Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
+            NbtAssert.ReaderIsPoisoned(reader);
+        }
+
+
+        [TestMethod]
+        public void FailedListArrayReadPoisonsReadValue() {
+            byte[] doc = new NbtFile(new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2), new NbtInt(3) }
+            }).SaveToBuffer(NbtCompression.None);
+            var options = new NbtOptions { MaxAllocation = 5 };
+
+            // The current payload is still unread when the bulk allocation is refused
+            NbtReader reader = TestFiles.OpenReader(doc, options);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<int>());
+            NbtAssert.ReaderIsPoisoned(reader);
+
+            // A cached value must not leak back out after the reader is poisoned either
+            reader = TestFiles.OpenReader(doc, options);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(1, reader.ReadValue());
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<int>());
+            NbtAssert.ReaderIsPoisoned(reader);
+        }
+
+
+        [TestMethod]
+        public void CachedValueDoesNotOutliveItsTag() {
+            byte[] doc = new NbtFile(new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2), new NbtInt(3) },
+                new NbtInt("a", 5)
+            }).SaveToBuffer(NbtCompression.None);
+
+            // A bulk read finishes the list, and the element cached before it goes with it
+            NbtReader reader = TestFiles.OpenReader(doc);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(1, reader.ReadValue());
+            Assert.AreEqual(1, reader.ReadValue());
+            CollectionAssert.AreEqual(new[] { 2, 3 }, reader.ReadListAsArray<int>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsFalse(reader.ToString(true).Contains("="));
+
+            // A visible End tag has no value, cached or otherwise
+            reader = TestFiles.OpenReader(doc);
+            reader.CacheTagValues = true;
+            reader.SkipEndTags = false;
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.AreEqual(5, reader.ReadValue());
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.IsFalse(reader.HasValue);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsFalse(reader.ReadToFollowing());
+        }
+
+
+        [TestMethod]
+        public void ReadValueAsConvertsCompatibleTypes() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 5),
+                new NbtByte("b", 200),
+                new NbtString("s", "42"),
+                new NbtString("t", "abc"),
+                new NbtIntArray("a", new[] { 1, 2 }),
+                new NbtInt("x", 1)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(5, reader.ReadValueAs<int>());
+            Assert.AreEqual(5L, reader.ReadValueAs<long>());
+            Assert.AreEqual(5.0, reader.ReadValueAs<double>());
+            Assert.AreEqual("5", reader.ReadValueAs<string>());
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.AreEqual(200, reader.ReadValueAs<int>());
+            Assert.Throws<OverflowException>(() => reader.ReadValueAs<sbyte>());
+            Assert.IsTrue(reader.ReadToFollowing("s"));
+            Assert.AreEqual(42, reader.ReadValueAs<int>());
+            Assert.IsTrue(reader.ReadToFollowing("t"));
+            Assert.Throws<FormatException>(() => reader.ReadValueAs<int>());
+            Assert.AreEqual("abc", reader.ReadValueAs<string>());
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<long[]>());
+            CollectionAssert.AreEqual(new[] { 1, 2 }, reader.ReadValueAs<int[]>());
+            Assert.IsFalse(reader.IsInErrorState);
+
+            // Without the cache, a failed conversion has consumed the value
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("a"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<long[]>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.IsTrue(reader.ReadToFollowing("x"));
+            Assert.AreEqual(1, reader.ReadValueAs<int>());
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayRefusesUnusableTypeBeforeReading() {
+            var root = new NbtCompound("r") {
+                new NbtList("i") { new NbtInt(1), new NbtInt(2) },
+                new NbtInt("after", 3)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<NbtCompound>());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<byte[]>());
+            Assert.IsFalse(reader.IsInErrorState);
+            CollectionAssert.AreEqual(new long[] { 1, 2 }, reader.ReadListAsArray<long>());
+            Assert.IsTrue(reader.ReadToFollowing("after"));
+
+            // Same from inside the list, with the current element's value intact
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<NbtCompound>());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.AreEqual(1, reader.ReadValue());
+        }
+
+
+        [TestMethod]
+        public void ReadToDescendantStopsOutsideTheSubtree() {
+            var root = new NbtCompound("root") {
+                new NbtInt("i", 5),
+                new NbtCompound("comp") { new NbtInt("inner", 1) },
+                new NbtInt("last", 7)
+            };
+            foreach (bool skipEndTags in new[] { true, false }) {
+                NbtReader reader = TestFiles.OpenReader(root);
+                reader.SkipEndTags = skipEndTags;
+
+                // From a value tag: its next sibling
+                Assert.IsTrue(reader.ReadToFollowing("i"));
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                Assert.AreEqual("comp", reader.TagName);
+
+                // From a compound: through its children, then its next sibling
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                Assert.AreEqual("last", reader.TagName);
+
+                // From the last child: the parent's End tag, or the end of the stream
+                Assert.IsFalse(reader.ReadToDescendant("nothing"));
+                if (skipEndTags) {
+                    Assert.IsTrue(reader.IsAtStreamEnd);
+                } else {
+                    Assert.AreEqual(NbtTagType.End, reader.TagType);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void TagStartOffsetIsRelativeToTheDocumentStart() {
+            byte[] doc = new NbtFile(new NbtCompound("root") { new NbtInt("i", 5) }).SaveToBuffer(NbtCompression.None);
+            var ms = new MemoryStream();
+            ms.Write(new byte[10], 0, 10);
+            ms.Write(doc, 0, doc.Length);
+            ms.Position = 10;
+            var reader = new NbtReader(ms);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            // Past the root's header: type byte, two-byte name length, four-byte name
+            Assert.AreEqual(7, reader.TagStartOffset);
+            Assert.AreEqual(7L, reader.LongTagStartOffset);
+
+            // Non-seekable streams report 0
+            reader = new NbtReader(new NonSeekableStream(new MemoryStream(doc)));
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(0, reader.TagStartOffset);
+            Assert.AreEqual(0L, reader.LongTagStartOffset);
+
+            // Past 2 GiB the int property refuses instead of wrapping
+            var far = new FarPositionStream(new MemoryStream(doc));
+            reader = new NbtReader(far);
+            far.Shift = 3L << 30;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual((3L << 30) + 7, reader.LongTagStartOffset);
+            Assert.Throws<OverflowException>(() => reader.TagStartOffset.ToString());
+        }
+
+
+        [TestMethod]
+        public void ReadValueAsConvertsToEnums() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 3),
+                new NbtByte("b", 5),
+                new NbtString("s", "Friday"),
+                new NbtString("bad", "Someday"),
+                new NbtDouble("d", 1.0)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(DayOfWeek.Wednesday, reader.ReadValueAs<DayOfWeek>());
+            Assert.AreEqual((NbtTagType)3, reader.ReadValueAs<NbtTagType>());
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("s"));
+            Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("bad"));
+            Assert.Throws<FormatException>(() => reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("d"));
+            Assert.Throws<InvalidCastException>(() => reader.ReadValueAs<DayOfWeek>());
+            Assert.IsFalse(reader.IsInErrorState);
+        }
+
+
+        [TestMethod]
+        public void ReadListAsArrayConvertsToEnums() {
+            var root = new NbtCompound("r") {
+                new NbtList("ints") { new NbtInt(1), new NbtInt(6) },
+                new NbtList("bytes") { new NbtByte(2), new NbtByte(0) },
+                new NbtList("names") { new NbtString("Monday"), new NbtString("Sunday") },
+                new NbtList("doubles") { new NbtDouble(1), new NbtDouble(2) },
+                new NbtInt("after", 9)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+
+            // Matching underlying type goes through the bulk int reader
+            Assert.IsTrue(reader.ReadToFollowing("ints"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Saturday }, reader.ReadListAsArray<DayOfWeek>());
+            // Other integral element types convert one at a time
+            Assert.IsTrue(reader.ReadToFollowing("bytes"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("names"));
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
+
+            // A non-integral element type is refused before anything is read
+            Assert.IsTrue(reader.ReadToFollowing("doubles"));
+            Assert.Throws<InvalidOperationException>(() => reader.ReadListAsArray<DayOfWeek>());
+            Assert.IsFalse(reader.IsInErrorState);
+            CollectionAssert.AreEqual(new[] { 1.0, 2.0 }, reader.ReadListAsArray<double>());
+            Assert.IsTrue(reader.ReadToFollowing("after"));
+        }
+
+
+        [TestMethod]
+        public void ReadAsTagUsesTheCachedValue() {
+            var root = new NbtCompound("r") {
+                new NbtInt("i", 5),
+                new NbtByteArray("a", new byte[] { 1, 2 }),
+                new NbtInt("after", 9)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.AreEqual(5, reader.ReadValue());
+            NbtAssert.AreEqual(new NbtInt("i", 5), reader.ReadAsTag());
+            Assert.AreEqual("a", reader.TagName);
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, (byte[])reader.ReadValue());
+            NbtAssert.AreEqual(new NbtByteArray("a", new byte[] { 1, 2 }), reader.ReadAsTag());
+            Assert.AreEqual("after", reader.TagName);
+
+            // Without the cache, the consumed value is gone and the reader stays put
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            reader.ReadValue();
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual("i", reader.TagName);
+            Assert.IsFalse(reader.IsInErrorState);
+        }
+
+
+        [TestMethod]
+        public void ReadAsTagRefusesEveryEndTagWithoutMoving() {
+            var root = new NbtCompound("root") {
+                new NbtCompound("comp") { new NbtInt("inner", 1) },
+                new NbtInt("after", 7)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.SkipEndTags = false;
+            Assert.IsTrue(reader.ReadToFollowing("inner"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.AreEqual(3, reader.Depth);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.AreEqual(3, reader.Depth);
+            Assert.IsFalse(reader.IsInErrorState);
+
+            // The walk resumes normally from the refused End tag
+            Assert.IsTrue(reader.ReadToFollowing());
+            NbtAssert.AreEqual(new NbtInt("after", 7), reader.ReadAsTag());
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.IsFalse(reader.ReadToFollowing());
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationCapsListAsArrayReads() {
+            byte[] doc;
+            using (var ms = new MemoryStream()) {
+                var writer = new NbtWriter(ms, "r");
+                writer.BeginList("longs", NbtTagType.Long, 1000);
+                for (int i = 0; i < 1000; i++) {
+                    writer.WriteLong(i);
+                }
+                writer.EndList();
+                writer.BeginList("strings", NbtTagType.String, 2000);
+                for (int i = 0; i < 2000; i++) {
+                    writer.WriteString("");
+                }
+                writer.EndList();
+                writer.EndCompound();
+                writer.Finish();
+                doc = ms.ToArray();
+            }
+
+            // 1,000 longs need an 8,000-byte array
+            NbtReader reader = TestFiles.OpenReader(doc, new NbtOptions { MaxAllocation = 1024 });
+            Assert.IsTrue(reader.ReadToFollowing("longs"));
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<long>());
+
+            // 2,000 empty strings are only 4,000 payload bytes, but the result array alone
+            // holds 2,000 references, which the estimate must count at pointer size
+            reader = TestFiles.OpenReader(doc, new NbtOptions { MaxAllocation = 4096 });
+            Assert.IsTrue(reader.ReadToFollowing("strings"));
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<string>());
+
+            // With room to spare, both read fine
+            reader = TestFiles.OpenReader(doc, new NbtOptions { MaxAllocation = 64 * 1024 });
+            Assert.IsTrue(reader.ReadToFollowing("longs"));
+            Assert.AreEqual(1000, reader.ReadListAsArray<long>().Length);
+            Assert.IsTrue(reader.ReadToFollowing("strings"));
+            Assert.AreEqual(2000, reader.ReadListAsArray<string>().Length);
+        }
+
+
+        [TestMethod]
+        public void NonSeekableStreamSkip() {
+            // The buffered skip fallback must count the same tags the seekable path does
             byte[] fileBytes = File.ReadAllBytes(TestFiles.Big);
-            using (var ms = new MemoryStream(fileBytes)) {
-                using (var nss = new NonSeekableStream(ms)) {
-                    var reader = new NbtReader(nss);
-                    reader.ReadToFollowing();
-                    reader.Skip();
-                }
+            using (var nss = new NonSeekableStream(new MemoryStream(fileBytes))) {
+                var reader = new NbtReader(nss);
+                reader.ReadToFollowing();
+                Assert.AreEqual(30, reader.Skip());
+            }
+            using (var nss = new NonSeekableStream(TestFiles.MakeNestedContainersStream())) {
+                var reader = new NbtReader(nss);
+                reader.ReadToFollowing();
+                Assert.AreEqual(18, reader.Skip());
             }
         }
 
 
         [TestMethod]
-        public void NonSeekableStreamSkip2() {
-            using (var ms = TestFiles.MakeReaderTest()) {
-                using (var nss = new NonSeekableStream(ms)) {
-                    var reader = new NbtReader(nss);
-                    reader.ReadToFollowing();
-                    reader.Skip();
-                }
-            }
-        }
-
-
-        [TestMethod]
-        public void EndOfStreamFileRead() {
-            byte[] data = {
-                0x0A, // Compound tag
-                0x00, 0x02, 0x66, 0x4E, // Root name 'fN'
-                0x00 // end tag
-            };
-
-            for (int i = 0; i < data.Length; i++) {
-                var partialData = new byte[i];
-                Array.Copy(data,partialData,i);
-                TryReadIncompleteFile(partialData);
-                if (i < 5)
-                    TryReadIncompleteRootTagName(partialData);
-            }
-        }
-
-
-        static void TryReadIncompleteRootTagName(byte[] partialData) {
-
-            Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.None, true, 0), "Length=" + partialData.Length);
-            Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(partialData), NbtCompression.AutoDetect, true, 0), "Length=" + partialData.Length);
-        }
-
-
-        static void TryReadIncompleteFile(byte[] partialData) {
-
-            Assert.Throws<EndOfStreamException>(() => TryReadBadFile(partialData));
-            Assert.Throws<EndOfStreamException>(
-                () => new NbtFile().LoadFromBuffer(partialData, 0, partialData.Length, NbtCompression.None));
-            Assert.Throws<EndOfStreamException>(
-                () => new NbtFile().LoadFromBuffer(partialData, 0, partialData.Length, NbtCompression.AutoDetect));
-        }
-
-
-        [TestMethod]
-        public void CorruptFileRead() {
-            byte[] badHeader = {
-                0x02, // TAG_Short ID (instead of TAG_Compound ID)
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x00 // end tag
-            };
-            Assert.Throws<NbtFormatException>(() => TryReadBadFile(badHeader));
-            Assert.Throws<NbtFormatException>(
-                () => new NbtFile().LoadFromBuffer(badHeader, 0, badHeader.Length, NbtCompression.None));
-            Assert.Throws<NbtFormatException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(badHeader), NbtCompression.None, true, 0));
-
-            byte[] badStringLength = {
-                0x0A, // Compound tag
-                0xFF, 0xFF, 0x66, // Root name 'f' (string length prefix 0xFFFF = 65535 unsigned bytes)
-                0x00 // end tag
-            };
-            // The prefix is unsigned, so 0xFFFF is a valid 65535-byte length. The string is
-            // truncated, so it fails with EndOfStreamException rather than a negative-length error.
-            Assert.Throws<EndOfStreamException>(() => TryReadBadFile(badStringLength));
-            Assert.Throws<EndOfStreamException>(
-                () => new NbtFile().LoadFromBuffer(badStringLength, 0, badStringLength.Length, NbtCompression.None));
-            Assert.Throws<EndOfStreamException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(badStringLength), NbtCompression.None, true, 0));
-
-            byte[] badSecondTag = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0xFF, 0x01, 0x4E, 0x7F, 0xFF, // Short tag named 'N' with invalid tag ID (0xFF instead of 0x02)
-                0x00 // end tag
-            };
-            AssertBadFileFromBuffer(badSecondTag);
-
-            byte[] badListType = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x09, // List tag
-                0x00, 0x01, 0x67, // List tag name: 'g'
-                0xFF // invalid list tag type (-1)
-            };
-            AssertBadFileFromBuffer(badListType);
-
-            byte[] badListSize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x09, // List tag
-                0x00, 0x01, 0x67, // List tag name: 'g'
-                0x01, // List type: Byte
-                0xFF, 0xFF, 0xFF, 0xFF, // List size: -1
-            };
-            AssertBadFileFromBuffer(badListSize);
-        }
-
-
-        [TestMethod]
-        public void BadArraySize() {
-            byte[] badByteArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x07, // ByteArray tag
-                0x00, 0x01, 0x67, // ByteArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badByteArraySize);
-
-
-            byte[] badIntArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x0b, // IntArray tag
-                0x00, 0x01, 0x66, // IntArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badIntArraySize);
-
-            byte[] badLongArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x0c, // LongArray tag
-                0x00, 0x01, 0x66, // LongArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badLongArraySize);
-        }
-
-
-        [TestMethod]
-        public void BadNestedArraySize() {
-            byte[] badNestedByteArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x0A, // Child compound tag
-                0x00, 0x01, 0x67, // Child name: 'g'
-                0x07, // ByteArray tag
-                0x00, 0x01, 0x68, // ByteArray tag name: 'h'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badNestedByteArraySize);
-
-
-            byte[] badNestedIntArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x0A, // Child compound tag
-                0x00, 0x01, 0x67, // Child name: 'g'
-                0x0b, // IntArray tag
-                0x00, 0x01, 0x68, // IntArray tag name: 'h'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badNestedIntArraySize);
-
-            byte[] badNestedLongArraySize = {
-                0x0A, // Compound tag
-                0x00, 0x01, 0x66, // Root name: 'f'
-                0x0A, // Child compound tag
-                0x00, 0x01, 0x67, // Child name: 'g'
-                0x0c, // LongArray tag
-                0x00, 0x01, 0x68, // LongArray tag name: 'g'
-                0xFF, 0xFF, 0xFF, 0xFF, // array length: -1
-            };
-            AssertBadFileFromBuffer(badNestedLongArraySize);
-        }
-
-
-        [TestMethod]
-        public void PartialReadTest() {
+        public void ReadsOneByteAtATime() {
             // read the whole thing as one tag, one byte at a time
-            TestFiles.AssertValueTest(PartialReadTestInternal(new NbtFile(TestFiles.MakeValueTest())));
-            TestFiles.AssertNbtSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile()));
-            TestFiles.AssertNbtBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big)));
+            TestFiles.AssertAllValues(PartialReadTestInternal(new NbtFile(TestFiles.MakeAllValuesRoot())));
+            TestFiles.AssertSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile()));
+            TestFiles.AssertBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big)));
         }
 
 
         [TestMethod]
-        public void PartialBatchReadTest() {
+        public void ReadsInFourByteBatches() {
             // read the whole thing as one tag, in batches of 4 bytes
             // Verifies fix for https://github.com/fragmer/fNbt/issues/26
-            TestFiles.AssertValueTest(PartialReadTestInternal(new NbtFile(TestFiles.MakeValueTest()), 4));
-            TestFiles.AssertNbtSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile(), 4));
-            TestFiles.AssertNbtBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big), 4));
+            TestFiles.AssertAllValues(PartialReadTestInternal(new NbtFile(TestFiles.MakeAllValuesRoot()), 4));
+            TestFiles.AssertSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile(), 4));
+            TestFiles.AssertBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big), 4));
         }
 
 
         [TestMethod]
-        public void EndTagTest() {
-            using (MemoryStream ms = new MemoryStream()) {
-                var root = new NbtCompound("root") {
-                    new NbtInt("test", 0)
-                };
-                new NbtFile(root).SaveToStream(ms, NbtCompression.None);
-                ms.Position = 0;
+        public void EndTagsAreVisibleWhenNotSkipped() {
+            var root = new NbtCompound("root") {
+                new NbtInt("test", 0)
+            };
 
-                NbtReader reader = new NbtReader(ms) { SkipEndTags = false };
-                reader.ReadToDescendant("test");
-                Assert.AreEqual(NbtTagType.Int, reader.TagType);
-                Assert.IsTrue(reader.ReadToNextSibling());
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.SkipEndTags = false;
+            reader.ReadToDescendant("test");
+            Assert.AreEqual(NbtTagType.Int, reader.TagType);
+            Assert.IsTrue(reader.ReadToNextSibling());
 
-                // should be at root's End tag now
-                Assert.AreEqual(NbtTagType.End, reader.TagType);
-                Assert.IsFalse(reader.IsInErrorState);
-                Assert.IsFalse(reader.IsAtStreamEnd);
-                Assert.IsFalse(reader.IsCompound);
-                Assert.IsFalse(reader.IsList);
-                Assert.IsFalse(reader.IsListElement);
-                Assert.IsFalse(reader.HasValue);
-                Assert.IsFalse(reader.HasName);
-                Assert.IsFalse(reader.HasLength);
-                Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag()); // Cannot create NbtTag from TAG_END
+            // should be at root's End tag now
+            Assert.AreEqual(NbtTagType.End, reader.TagType);
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsFalse(reader.IsAtStreamEnd);
+            Assert.IsFalse(reader.IsCompound);
+            Assert.IsFalse(reader.IsList);
+            Assert.IsFalse(reader.IsListElement);
+            Assert.IsFalse(reader.HasValue);
+            Assert.IsFalse(reader.HasName);
+            Assert.IsFalse(reader.HasLength);
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag()); // Cannot create NbtTag from TAG_END
 
-                // We done now
-                Assert.IsFalse(reader.ReadToFollowing());
-                Assert.IsTrue(reader.IsAtStreamEnd);
+            Assert.IsFalse(reader.ReadToFollowing());
+            Assert.IsTrue(reader.IsAtStreamEnd);
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationGuardsHostileDeclaredLengths() {
+            // A tiny document declaring a 64 MB array. On compressed and non-seekable streams
+            // the declared length cannot be checked against the bytes actually available, which
+            // is the scenario MaxAllocation exists for.
+            byte[] hostile = {
+                0x0A, 0x00, 0x00, // TAG_Compound ""
+                0x07, 0x00, 0x01, (byte)'a', // TAG_Byte_Array "a"
+                0x04, 0x00, 0x00, 0x00 // declared length: 64 MB
+            };
+            var capped = new NbtFile(new NbtOptions { MaxAllocation = 1_048_576 });
+
+            byte[] compressed;
+            using (var ms = new MemoryStream()) {
+                using (var gzs = new GZipStream(ms, CompressionMode.Compress, true)) {
+                    gzs.Write(hostile, 0, hostile.Length);
+                }
+                compressed = ms.ToArray();
+            }
+            Assert.Throws<NbtFormatException>(
+                () => capped.LoadFromBuffer(compressed, 0, compressed.Length, NbtCompression.GZip));
+
+            using (var ms = new MemoryStream(hostile)) {
+                Assert.Throws<NbtFormatException>(
+                    () => capped.LoadFromStream(new NonSeekableStream(ms), NbtCompression.None));
+            }
+
+            using (var ms = new MemoryStream(hostile)) {
+                var reader = new NbtReader(new NonSeekableStream(ms),
+                                           new NbtOptions { MaxAllocation = 1_048_576 });
+                Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
             }
         }
 
@@ -856,45 +1122,6 @@ namespace fNbt.Test {
             var reader = new NbtReader(new PartialReadStream(new MemoryStream(testData), increment));
             var root = (NbtCompound)reader.ReadAsTag();
             return new NbtFile(root);
-        }
-
-
-        void AssertBadFileFromBuffer(byte[] input) {
-            Assert.Throws<NbtFormatException>(() => TryReadBadFile(input));
-            Assert.Throws<NbtFormatException>(
-                () => new NbtFile().LoadFromBuffer(input, 0, input.Length, NbtCompression.None));
-            Assert.Throws<NbtFormatException>(
-                () => new NbtFile().LoadFromBuffer(input, 0, input.Length, NbtCompression.None, tag => false));
-        }
-
-
-        static void TryReadBadFile(byte[] data) {
-            using (MemoryStream ms = new MemoryStream(data)) {
-                NbtReader reader = new NbtReader(ms);
-                try {
-                    while (reader.ReadToFollowing()) { }
-                } catch (Exception) {
-                    Assert.IsTrue(reader.IsInErrorState);
-                    throw;
-                }
-            }
-        }
-
-
-        class NonReadableStream : MemoryStream {
-            public override bool CanRead {
-                get { return false; }
-            }
-
-
-            public override int ReadByte() {
-                throw new NotSupportedException();
-            }
-
-
-            public override int Read(byte[] buffer, int offset, int count) {
-                throw new NotSupportedException();
-            }
         }
     }
 }

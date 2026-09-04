@@ -1,10 +1,9 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 
 namespace fNbt.Benchmarks;
 
-[MemoryDiagnoser]
 public class ReadBenchmarks {
-    private byte[] serializedLargeByteArrayNbt = null!;
+    byte[] serializedLargeByteArrayNbt = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {
@@ -18,8 +17,9 @@ public class ReadBenchmarks {
     }
 
     // Raw Byte Array Reading Performance
+    [AverageBenchmark]
     [Benchmark(Description = "Reader: ByteArray")]
-    public byte[] RawByteArray_Read() {
+    public byte[] ReadByteArrayValue() {
         using (var ms = new MemoryStream(serializedLargeByteArrayNbt)) {
             var reader = new NbtReader(ms);
             reader.ReadToDescendant("payload");

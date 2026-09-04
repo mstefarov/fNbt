@@ -1,83 +1,138 @@
+using System.Collections.Immutable;
+using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.ConsoleArguments;
+using BenchmarkDotNet.ConsoleArguments.ListBenchmarks;
 using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Exporters.Csv;
 using BenchmarkDotNet.Filters;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
+using BenchmarkDotNet.Order;
+using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 
 namespace fNbt.Benchmarks;
 
 class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
+    public const string VeryStable = "VeryStable";
+    public const string Average = "Average";
+    public const string Unstable = "Unstable";
 
-    static void Main(string[] args) {
+    static int Main(string[] args) {
         var customArgs = new CustomArguments(args);
         var benchmarkArgs = customArgs.GetRemainingArgs();
 
         var logger = ConsoleLogger.Default;
         var initialConfig = DefaultConfig.Instance
-            .AddDiagnoser(MemoryDiagnoser.Default);
+            .AddDiagnoser(MemoryDiagnoser.Default)
+            .AddExporter(CsvMeasurementsExporter.Default)
+            .AddColumn(CategoriesColumn.Default, StatisticColumn.MValue);
 
         if (customArgs.BaselineSource != null && customArgs.BaselineVersion == null) {
             logger.WriteLineError("// --baseline-source has no effect without --baseline");
+            return 1;
+        }
+        if (customArgs.ReverseOrder) {
+            initialConfig = initialConfig.WithOrderer(ReverseOrderer.Orderer);
         }
 
         // Parse the BenchmarkDotNet options up front, to get at the parsed jobs below
-        (bool isSuccess, IConfig parsedConfig, _) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
+        (bool isSuccess, IConfig parsedConfig, CommandLineOptions parsedOptions) = ConfigParser.Parse(benchmarkArgs, logger, initialConfig);
         if (!isSuccess)
-            return;
+            return IsHelpOrVersion(benchmarkArgs) ? 0 : 1;
 
-        // Benchmarks using newer APIs can't compile against the baseline package. Source #if
+        // Benchmarks using 2.0 APIs can't compile against a 1.x baseline package. Source #if
         // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
-        if (customArgs.BaselineVersion != null) {
+        if (customArgs.BaselineVersion != null && IsPre2(customArgs.BaselineVersion)) {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
         }
 
-        // When "--baseline" is specified, add a baseline for each job
-        if (customArgs.BaselineVersion is string version) {
-            // With no --job or --runtimes, the parsed config has no jobs yet. The switcher only
-            // adds the default job if the config still has none, so add the local job here too.
-            // Otherwise a plain --baseline run would silently skip the comparison.
-            Job[] jobs = parsedConfig.GetJobs().ToArray();
-            if (jobs.Length == 0) {
-                jobs = new[] { Job.Default };
-                initialConfig.AddJob(Job.Default);
-            }
-            bool isFirst = true;
-            foreach (Job job in jobs) {
-                // With several --runtimes, BenchmarkDotNet already makes the first one the baseline, and
-                // a group may only have one.
-                bool makeBaseline = isFirst && !job.Meta.Baseline;
-                var msBuildArgs = new List<string> { $"/p:FNbtNuGetVersion={version}" };
-                if (customArgs.BaselineSource is string source) {
-                    msBuildArgs.Add($"/p:RestoreAdditionalProjectSources={source}");
-                }
-                initialConfig.AddJob(job
-                    .WithId($"{job.Id}-NuGet")
-                    .WithMsBuildArguments(msBuildArgs.ToArray())
-                    .WithBaseline(makeBaseline));
-                logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
-                isFirst = false;
-            }
+        if (customArgs.ServerGc && customArgs.BaselineVersion == null) {
+            // BDN writes its own runtimeconfig for each generated app, which beats any GC
+            // environment variable, so the mode has to come from a job. Only the package
+            // comparison below builds one.
+            logger.WriteLineError("// --server-gc requires --baseline");
+            return 1;
         }
 
-        // Args go to the switcher itself, not into the config. Given an empty array, it ignores
-        // --filter and drops into interactive selection.
-        BenchmarkSwitcher
+        if (customArgs.BaselineVersion is string version) {
+            // A setting like --launchCount arrives as a mutator job rather than a runnable one.
+            // Both the local and the NuGet job have to be added for it to modify, since cloning
+            // the mutator itself would leave only the NuGet job runnable.
+            Job[] parsedJobs = parsedConfig.GetJobs().ToArray();
+            if (parsedJobs.Length > 1) {
+                logger.WriteLineError("// --baseline cannot be combined with multiple jobs or runtimes; run each comparison separately");
+                return 1;
+            }
+            Job job = parsedJobs.Length == 0 || parsedJobs[0].Meta.IsMutator
+                ? Job.Default
+                : parsedJobs[0];
+            if (customArgs.ServerGc) {
+                job = job.WithGcServer(true);
+                logger.WriteLineInfo("// Server GC scenario: jobs run with GcServer=true");
+            }
+            initialConfig.AddJob(job);
+            var msBuildArgs = new List<string> { $"/p:FNbtNuGetVersion={version}" };
+            if (customArgs.BaselineSource is string source) {
+                msBuildArgs.Add($"/p:RestoreAdditionalProjectSources={source}");
+            }
+            initialConfig.AddJob(job
+                .WithId($"{job.Id}-NuGet")
+                .WithMsBuildArguments(msBuildArgs.ToArray())
+                .WithBaseline(true));
+            logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
+        }
+
+        // The switcher needs the args itself, not just the config built from them. Hand it an
+        // empty array and it ignores --filter and drops into interactive selection.
+        Summary[] summaries = BenchmarkSwitcher
             .FromAssembly(typeof(Program).Assembly)
-            .Run(benchmarkArgs, initialConfig);
+            .Run(benchmarkArgs, initialConfig)
+            .ToArray();
+
+        if (parsedOptions.PrintInformation || parsedOptions.ListBenchmarkCaseMode != ListBenchmarkCaseMode.Disabled)
+            return 0;
+
+        if (summaries.Any(summary => summary.HasCriticalValidationErrors)) {
+            logger.WriteLineError("// Benchmark run failed validation");
+            return 1;
+        }
+        if (summaries.SelectMany(summary => summary.Reports).Any(report => !report.Success)) {
+            logger.WriteLineError("// One or more benchmark reports failed");
+            return 1;
+        }
+        if (summaries.Sum(summary => summary.GetNumberOfExecutedBenchmarks()) == 0) {
+            logger.WriteLineError("// No benchmarks were executed");
+            return 1;
+        }
+        return 0;
+    }
+
+    static bool IsHelpOrVersion(string[] args) {
+        return args.Any(arg => arg.Equals("--help", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals("--version", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Mirrors the FNBT_BASELINE condition in the csproj
+    static bool IsPre2(string version) {
+        return int.TryParse(version.Split('.')[0], out int major) && major < 2;
     }
 }
 
 public class CustomArguments {
     public string? BaselineVersion { get; private set; }
     public string? BaselineSource { get; private set; }
-    private readonly string[] remainingArgs;
+    public bool ReverseOrder { get; private set; }
+    public bool ServerGc { get; private set; }
+    readonly string[] remainingArgs;
 
     public CustomArguments(string[] args) {
         var argsList = args.ToList();
         BaselineVersion = TakeValue(argsList, "--baseline");
+        ReverseOrder = TakeSwitch(argsList, "--reverse-order");
+        ServerGc = TakeSwitch(argsList, "--server-gc");
 
         // A folder of .nupkg files, so the baseline can be a local build.
         string? source = TakeValue(argsList, "--baseline-source");
@@ -86,6 +141,15 @@ public class CustomArguments {
         }
 
         remainingArgs = argsList.ToArray();
+    }
+
+    static bool TakeSwitch(List<string> args, string name) {
+        int index = args.FindIndex(a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) {
+            return false;
+        }
+        args.RemoveAt(index);
+        return true;
     }
 
     static string? TakeValue(List<string> args, string name) {
@@ -118,5 +182,14 @@ sealed class ExcludeCategoryFilter : IFilter {
             if (string.Equals(c, category, StringComparison.OrdinalIgnoreCase)) return false;
         }
         return true;
+    }
+}
+
+sealed class ReverseOrderer : DefaultOrderer {
+    public static readonly IOrderer Orderer = new ReverseOrderer();
+
+    public override IEnumerable<BenchmarkCase> GetExecutionOrder(ImmutableArray<BenchmarkCase> benchmarkCases,
+                                                                   IEnumerable<BenchmarkLogicalGroupRule>? order = null) {
+        return base.GetExecutionOrder(benchmarkCases, order).Reverse();
     }
 }

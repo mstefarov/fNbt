@@ -1,5 +1,4 @@
-﻿using System;
-using System.Globalization;
+using System;
 using System.Text;
 
 namespace fNbt {
@@ -49,7 +48,7 @@ namespace fNbt {
         }
 
 
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.ReadByte();
                 return false;
@@ -59,20 +58,13 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            readStream.ReadByte();
-        }
-
-
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.Byte);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            writeStream.WriteTagHeader(NbtTagType.Byte, Name);
             writeStream.Write(Value);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value);
         }
 
@@ -83,14 +75,8 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_Byte");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.Append(": ");
             sb.Append(Value);
         }

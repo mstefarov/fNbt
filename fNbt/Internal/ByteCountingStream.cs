@@ -1,7 +1,8 @@
+using System;
 using System.IO;
 
 namespace fNbt {
-    // Class used to count bytes read-from/written-to non-seekable streams.
+    // Counts bytes read from and written to non-seekable streams.
     internal sealed class ByteCountingStream : Stream {
         readonly Stream baseStream;
 
@@ -40,6 +41,23 @@ namespace fNbt {
         }
 
 
+#if NETCOREAPP
+        // Without these, dotnet's span calls fall through Stream's compatibility shim,
+        // which rents and copies a temporary array per call
+        public override int Read(Span<byte> buffer) {
+            int bytesActuallyRead = baseStream.Read(buffer);
+            BytesRead += bytesActuallyRead;
+            return bytesActuallyRead;
+        }
+
+
+        public override void Write(ReadOnlySpan<byte> buffer) {
+            baseStream.Write(buffer);
+            BytesWritten += buffer.Length;
+        }
+#endif
+
+
         // Straight to baseStream instead of base to avoid re-entering Read/Write.
         public override int ReadByte() {
             int value = baseStream.ReadByte();
@@ -66,11 +84,5 @@ namespace fNbt {
 
         public long BytesRead { get; private set; }
         public long BytesWritten { get; private set; }
-
-
-        protected override void Dispose(bool disposing) {
-            base.Dispose(disposing);
-            baseStream.Dispose();
-        }
     }
 }

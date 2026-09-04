@@ -1,6 +1,9 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Resources;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
+[assembly: InternalsVisibleTo("fNbt.Test")]
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
@@ -36,9 +39,10 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 
-// AssemblyVersion stays at 1.0.0.0 across 1.x, so Framework apps built against 1.0.0 bind without redirects.
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.1.1.0")]
+// AssemblyVersion moves only on major versions, so Framework apps built against any 2.x
+// bind to later 2.x without redirects. AssemblyFileVersion tracks every release.
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 
 // Potentially speed up resource probes
 

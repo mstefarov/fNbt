@@ -1,47 +1,56 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using BenchmarkDotNet.Attributes;
 
 namespace fNbt.Benchmarks;
 
 // Reading ClassicWorld maps. Mostly block data, so these measure bulk throughput and GZip cost
 // rather than per-tag overhead.
-// See ClassicWorldWriteBenchmarks for why these are memory-randomized.
-[MemoryDiagnoser]
-[MemoryRandomization]
 public class ClassicWorldReadBenchmarks {
     [Params(CwSize.Small, CwSize.Medium)]
     public CwSize Size;
 
-    CwMap map = null!;
+    string filePath = null!;
+    byte[] gzipBytes = null!;
+    byte[] rawBytes = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {
-        map = ClassicWorldFiles.Load(Size);
+        // The parsed tree is not an input to any read benchmark. Do not retain its two large
+        // arrays and silently double the live payload while measuring another parse.
+        CwMap map = ClassicWorldFiles.Load(Size);
+        filePath = map.FilePath;
+        gzipBytes = map.GZipBytes;
+        rawBytes = map.RawBytes;
     }
 
 
     // Whole-Map Loading
 
-    [Benchmark(Description = "Load map from file (GZip)", Baseline = true)]
+    // No Baseline=true here: with --baseline runs, the NuGet job is the baseline, and a method
+    // baseline on top would make every ratio compare against this method instead of per-method.
+    [AverageBenchmark]
+    [Benchmark(Description = "Load map from file (GZip)")]
     public NbtFile LoadFromFile() {
         var file = new NbtFile();
-        file.LoadFromFile(map.FilePath, NbtCompression.AutoDetect, null);
+        file.LoadFromFile(filePath, NbtCompression.AutoDetect, null);
         return file;
     }
 
 
+    [AverageBenchmark]
     [Benchmark(Description = "Load map from buffer (GZip)")]
     public NbtFile LoadFromBufferGZip() {
         var file = new NbtFile();
-        file.LoadFromBuffer(map.GZipBytes, 0, map.GZipBytes.Length, NbtCompression.GZip, null);
+        file.LoadFromBuffer(gzipBytes, 0, gzipBytes.Length, NbtCompression.GZip, null);
         return file;
     }
 
 
+    [UnstableBenchmark]
     [Benchmark(Description = "Load map from buffer (uncompressed)")]
     public NbtFile LoadFromBufferUncompressed() {
         var file = new NbtFile();
-        file.LoadFromBuffer(map.RawBytes, 0, map.RawBytes.Length, NbtCompression.None, null);
+        file.LoadFromBuffer(rawBytes, 0, rawBytes.Length, NbtCompression.None, null);
         return file;
     }
 
@@ -53,27 +62,47 @@ public class ClassicWorldReadBenchmarks {
     }
 
 
+    [VeryStableBenchmark]
     [Benchmark(Description = "Load header only, selector (GZip)")]
     public NbtFile LoadHeaderOnlyGZip() {
         var file = new NbtFile();
-        file.LoadFromBuffer(map.GZipBytes, 0, map.GZipBytes.Length, NbtCompression.GZip, HeaderOnly);
+        file.LoadFromBuffer(gzipBytes, 0, gzipBytes.Length, NbtCompression.GZip, HeaderOnly);
         return file;
     }
 
 
     // Skipping an array is a seek here, but an inflate-and-discard in the GZip case above.
+    // Average stability becayse the 870 KB it allocates per op gives it a RatioSD of 0.02 to
+    // 0.06 in A/A runs, where the GZip variant above stays at 0.01.
+    [AverageBenchmark]
     [Benchmark(Description = "Load header only, selector (uncompressed)")]
     public NbtFile LoadHeaderOnlyUncompressed() {
         var file = new NbtFile();
-        file.LoadFromBuffer(map.RawBytes, 0, map.RawBytes.Length, NbtCompression.None, HeaderOnly);
+        file.LoadFromBuffer(rawBytes, 0, rawBytes.Length, NbtCompression.None, HeaderOnly);
+        return file;
+    }
+
+
+    static bool BlocksOnly(NbtTag tag) {
+        return tag.Name != "Metadata";
+    }
+
+
+    // The inverse of the header-only rows: block arrays load, the ~9.3k-tag subtree is skipped.
+    [UnstableBenchmark]
+    [Benchmark(Description = "Load blocks only, selector (uncompressed)")]
+    public NbtFile LoadBlocksOnlyUncompressed() {
+        var file = new NbtFile();
+        file.LoadFromBuffer(rawBytes, 0, rawBytes.Length, NbtCompression.None, BlocksOnly);
         return file;
     }
 
 
     // X/Y/Z sit near the front, so the reader stops before reaching the block arrays.
+    [VeryStableBenchmark]
     [Benchmark(Description = "Read dimensions only (NbtReader, GZip)")]
     public int ReadDimensions() {
-        using var ms = new MemoryStream(map.GZipBytes);
+        using var ms = new MemoryStream(gzipBytes);
         using var gzip = new GZipStream(ms, CompressionMode.Decompress);
 
         var reader = new NbtReader(gzip);
@@ -94,9 +123,10 @@ public class ClassicWorldReadBenchmarks {
 
     // Bulk Array Access
 
+    [UnstableBenchmark]
     [Benchmark(Description = "Read BlockArray (NbtReader)")]
     public byte[] ReadBlockArray() {
-        using var ms = new MemoryStream(map.RawBytes);
+        using var ms = new MemoryStream(rawBytes);
 
         var reader = new NbtReader(ms);
         reader.ReadToFollowing("BlockArray");
@@ -105,9 +135,10 @@ public class ClassicWorldReadBenchmarks {
 
 
     // The parser's floor cost.
+    [VeryStableBenchmark]
     [Benchmark(Description = "Skip whole map (NbtReader)")]
     public int SkipWholeMap() {
-        using var ms = new MemoryStream(map.RawBytes);
+        using var ms = new MemoryStream(rawBytes);
 
         var reader = new NbtReader(ms);
         reader.ReadToFollowing();

@@ -1,13 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
     /// <summary> Base class for different kinds of named binary tags. </summary>
     public abstract class NbtTag : ICloneable {
         // Reading, writing, cloning, and printing are all recursive.
-        // A stack overflow cannot be caught, so every recursive walk caps depth instead.
+        // A stack overflow cannot be caught, so every recursive walk caps open containers instead.
         // Matches Minecraft's own limit. Real NBT is nowhere near this deep.
         internal const int MaxDepth = 512;
 
@@ -75,11 +76,11 @@ namespace fNbt {
                     return Name ?? "";
                 }
                 // Built iteratively: more efficient than recursion and no risk of stack overflow.
-                var segments = new List<NbtTag>();
+                List<NbtTag> segments = new List<NbtTag>();
                 for (NbtTag? tag = this; tag != null; tag = tag.Parent) {
                     segments.Add(tag);
                 }
-                var sb = new StringBuilder();
+                StringBuilder sb = new StringBuilder();
                 for (int i = segments.Count - 1; i >= 0; i--) {
                     NbtTag tag = segments[i];
                     if (tag.Parent is NbtList parentAsList) {
@@ -105,15 +106,22 @@ namespace fNbt {
             return false;
         }
 
-        internal abstract bool ReadTag(NbtBinaryReader readStream);
+        // depthBudget is the number of container tags that this call and its descendants may
+        // still enter. Value tags leave it untouched; compounds and lists consume one.
+        internal abstract bool ReadTag(NbtBinaryReader readStream, int depthBudget);
 
-        internal abstract void SkipTag(NbtBinaryReader readStream);
-
-        internal abstract void WriteTag(NbtBinaryWriter writeReader);
+        internal abstract void WriteTag(NbtBinaryWriter writeStream, int depthBudget);
 
         // WriteData does not write the tag's ID byte or the name
-        internal abstract void WriteData(NbtBinaryWriter writeStream);
+        internal abstract void WriteData(NbtBinaryWriter writeStream, int depthBudget);
 
+
+        // Called exactly once when a recursive walk enters a compound or list. Returning the
+        // child budget makes the off-by-one rule common to reading, writing, cloning, and validation.
+        internal static int ConsumeDepthBudget(int depthBudget) {
+            if (depthBudget <= 0) throw new NbtFormatException(DepthLimitMessage);
+            return depthBudget - 1;
+        }
 
         #region Shortcuts
 #pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
@@ -135,8 +143,8 @@ namespace fNbt {
         /// <exception cref="ArgumentOutOfRangeException"> tagIndex is not a valid index in this tag. </exception>
         /// <exception cref="ArgumentNullException"> Given tag is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> Given tag's type does not match ListType. </exception>
-        /// <exception cref="InvalidOperationException"> If used on a tag that is not NbtList, NbtByteArray, or NbtIntArray. </exception>
-        /// <remarks> ONLY APPLICABLE TO NbtList, NbtByteArray, and NbtIntArray OBJECTS!
+        /// <exception cref="InvalidOperationException"> If used on a tag that is not NbtList. </exception>
+        /// <remarks> ONLY APPLICABLE TO NbtList OBJECTS! The array tags hide this indexer with their own, so those work only through their own type.
         /// Included in NbtTag base class for programmers' convenience, to avoid extra type casts. </remarks>
         public virtual NbtTag this[int tagIndex] {
             get { throw new InvalidOperationException("Integer indexers only work on NbtList tags."); }
@@ -210,7 +218,7 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Returns the value of this tag, cast as a long (64-bit signed integer).
+        /// <summary> Returns the value of this tag, cast as a float (single-precision floating point number).
         /// Only supported by NbtFloat and, with loss of precision, by NbtDouble, NbtByte, NbtShort, NbtInt, and NbtLong. </summary>
         /// <exception cref="InvalidCastException"> When used on an unsupported tag. </exception>
         public float FloatValue {
@@ -234,7 +242,7 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Returns the value of this tag, cast as a long (64-bit signed integer).
+        /// <summary> Returns the value of this tag, cast as a double (double-precision floating point number).
         /// Only supported by NbtFloat, NbtDouble, and, with loss of precision, by NbtByte, NbtShort, NbtInt, and NbtLong. </summary>
         /// <exception cref="InvalidCastException"> When used on an unsupported tag. </exception>
         public double DoubleValue {
@@ -352,6 +360,29 @@ namespace fNbt {
         }
 
 
+        // The one tag-type-to-constructor map. Parse paths validate the type before calling.
+        // Inlined so each parse site keeps its own jump table.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static NbtTag Create(NbtTagType type) {
+            switch (type) {
+                case NbtTagType.Byte: return new NbtByte();
+                case NbtTagType.Short: return new NbtShort();
+                case NbtTagType.Int: return new NbtInt();
+                case NbtTagType.Long: return new NbtLong();
+                case NbtTagType.Float: return new NbtFloat();
+                case NbtTagType.Double: return new NbtDouble();
+                case NbtTagType.ByteArray: return new NbtByteArray();
+                case NbtTagType.String: return new NbtString();
+                case NbtTagType.List: return new NbtList();
+                case NbtTagType.Compound: return new NbtCompound();
+                case NbtTagType.IntArray: return new NbtIntArray();
+                case NbtTagType.LongArray: return new NbtLongArray();
+                default:
+                    throw new NbtFormatException("NBT tag type out of range: " + (int)type);
+            }
+        }
+
+
         /// <summary> Prints contents of this tag, and any child tags, to a string.
         /// Indents the string using multiples of the given indentation string. </summary>
         /// <returns> A string representing contents of this tag, and all child tags (if any). </returns>
@@ -366,9 +397,9 @@ namespace fNbt {
         public abstract object Clone();
 
 
-        // Depth-tracking clone, used by deep copies of compounds and lists.
+        // Depth-budgeted clone, used by deep copies of compounds and lists.
         // Throws for ridiculously deep nesting instead of overflowing the stack.
-        internal virtual NbtTag Clone(int depth) {
+        internal virtual NbtTag Clone(int depthBudget) {
             return (NbtTag)Clone(); // Default implementation for Value tags that do not recurse.
         }
 
@@ -381,13 +412,45 @@ namespace fNbt {
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToString(string indentString) {
             if (indentString == null) throw new ArgumentNullException(nameof(indentString));
-            var sb = new StringBuilder();
-            PrettyPrint(sb, indentString, 0);
+            StringBuilder sb = new StringBuilder();
+            PrettyPrint(sb, indentString, 0, MaxDepth);
             return sb.ToString();
         }
 
 
-        internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel);
+        internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget);
+
+
+        // The indented 'TAG_X("name")' prefix shared by every PrettyPrint override
+        internal void PrettyPrintHeader(StringBuilder sb, string indentString, int indentLevel) {
+            for (int i = 0; i < indentLevel; i++) {
+                sb.Append(indentString);
+            }
+            sb.Append(GetCanonicalTagName(TagType));
+            if (!String.IsNullOrEmpty(Name)) {
+                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
+            }
+        }
+
+
+        // The header plus a brace-wrapped, indented child list, shared by compound and list tags
+        internal void PrettyPrintContainer(StringBuilder sb, string indentString, int indentLevel, int depthBudget,
+                                           ICollection<NbtTag> children) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            PrettyPrintHeader(sb, indentString, indentLevel);
+            sb.AppendFormat(CultureInfo.InvariantCulture, ": {0} entries {{", children.Count);
+            if (children.Count > 0) {
+                sb.Append('\n');
+                foreach (NbtTag child in children) {
+                    child.PrettyPrint(sb, indentString, indentLevel + 1, childDepthBudget);
+                    sb.Append('\n');
+                }
+                for (int i = 0; i < indentLevel; i++) {
+                    sb.Append(indentString);
+                }
+            }
+            sb.Append('}');
+        }
 
         /// <summary> String to use for indentation in NbtTag's and NbtFile's ToString() methods by default. </summary>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>

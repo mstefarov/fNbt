@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace fNbt.Test {
@@ -45,7 +45,7 @@ namespace fNbt.Test {
 
 
         public override long Seek(long offset, SeekOrigin origin) {
-            throw new NotImplementedException();
+            throw new NotSupportedException();
         }
 
 

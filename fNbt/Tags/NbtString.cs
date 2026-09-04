@@ -1,9 +1,9 @@
-﻿using System;
-using System.Globalization;
+using System;
 using System.Text;
 
 namespace fNbt {
-    /// <summary> A tag containing a single string. String is stored in UTF-8 encoding. </summary>
+    /// <summary> A tag containing a single string, stored in the flavor's encoding:
+    /// modified UTF-8 for the Java flavors, standard UTF-8 for the Bedrock flavors. </summary>
     public sealed class NbtString : NbtTag {
         /// <summary> Type of this tag (String). </summary>
         public override NbtTagType TagType {
@@ -56,9 +56,7 @@ namespace fNbt {
         }
 
 
-        #region Reading / Writing
-
-        internal override bool ReadTag(NbtBinaryReader readStream) {
+        internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.SkipString();
                 return false;
@@ -68,24 +66,15 @@ namespace fNbt {
         }
 
 
-        internal override void SkipTag(NbtBinaryReader readStream) {
-            readStream.SkipString();
-        }
-
-
-        internal override void WriteTag(NbtBinaryWriter writeStream) {
-            writeStream.Write(NbtTagType.String);
-            if (Name == null) throw new NbtFormatException("Name is null");
-            writeStream.Write(Name);
+        internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
+            writeStream.WriteTagHeader(NbtTagType.String, Name);
             writeStream.Write(Value);
         }
 
 
-        internal override void WriteData(NbtBinaryWriter writeStream) {
+        internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             writeStream.Write(Value);
         }
-
-        #endregion
 
 
         /// <inheritdoc />
@@ -94,14 +83,8 @@ namespace fNbt {
         }
 
 
-        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel) {
-            for (int i = 0; i < indentLevel; i++) {
-                sb.Append(indentString);
-            }
-            sb.Append("TAG_String");
-            if (!String.IsNullOrEmpty(Name)) {
-                sb.AppendFormat(CultureInfo.InvariantCulture, "(\"{0}\")", Name);
-            }
+        internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
+            PrettyPrintHeader(sb, indentString, indentLevel);
             sb.Append(": \"");
             sb.Append(Value);
             sb.Append('"');

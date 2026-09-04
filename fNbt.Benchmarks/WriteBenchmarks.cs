@@ -1,10 +1,9 @@
-﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Attributes;
 
 namespace fNbt.Benchmarks;
 
-[MemoryDiagnoser]
 public class WriteBenchmarks {
-    private NbtCompound complexCompound = null!;
+    NbtCompound complexCompound = null!;
 
     [GlobalSetup]
     public void GlobalSetup() {
@@ -14,14 +13,16 @@ public class WriteBenchmarks {
 
     // Full Save vs. NbtWriter for Building a File.
     // Stream.Null is safe for small tags but not large arrays: it discards writes without reading them.
+    [AverageBenchmark]
     [Benchmark(Description = "NbtFile to Stream")]
-    public void BuildAndSave_FullSave() {
+    public void SaveWithNbtFile() {
         var file = new NbtFile(complexCompound);
         file.SaveToStream(Stream.Null, NbtCompression.None);
     }
 
+    [AverageBenchmark]
     [Benchmark(Description = "NbtWriter to Stream")]
-    public void BuildAndSave_NbtWriter() {
+    public void SaveWithNbtWriter() {
         var writer = new NbtWriter(Stream.Null, "root");
         foreach (var tag in complexCompound) {
             writer.WriteTag(tag);
