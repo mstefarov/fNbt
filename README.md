@@ -4,11 +4,12 @@
 
 [Named Binary Tag (NBT)](https://minecraft.gamepedia.com/NBT_format) is a structured binary file format used by Minecraft.
 fNbt is a small library, written in C#. It provides functionality
-to create, load, traverse, modify, and save NBT files and streams.
+to create, load, traverse, modify, and save NBT files and streams, in every encoding that
+Minecraft Java, Minecraft Bedrock, and ClassiCube use.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 1.1.1 (26 August 2026).
+Current released version is 2.0.0 (3 September 2026).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -23,7 +24,10 @@ now completely rewritten by Matvei Stefarov (fragmer).
 - Good performance and low memory overhead.
 - Built-in pretty-printing of individual tags or whole files.
 - Every class and method is fully documented, annotated, and unit-tested.
-- Can work with both big-endian and little-endian NBT data and systems.
+- Supports every NBT flavor: Java Edition files and network packets, Bedrock Edition files and
+  network packets (varint encoding), and ClassiCube maps.
+- Works with raw NBT that is not a file (packet payloads, LevelDB values, embedded blobs) via NbtCodec.
+- Validates on write, so a document the target flavor cannot represent is refused instead of written.
 - Optional high-performance reader/writer for working with streams directly.
 
 
@@ -34,7 +38,7 @@ Projects on .NET 8 or newer automatically get a build with extra performance opt
 
 - **Package @ NuGet:**  https://www.nuget.org/packages/fNbt/
 
-- **Compiled binaries and single-source-file amalgamations:**  https://github.com/mstefarov/fNbt/releases
+- **Release notes:**  https://github.com/mstefarov/fNbt/releases
 
 
 ## EXAMPLES
@@ -43,6 +47,18 @@ Projects on .NET 8 or newer automatically get a build with extra performance opt
     var myFile = new NbtFile();
     myFile.LoadFromFile("somefile.nbt.gz");
     var myCompoundTag = myFile.RootTag;
+```
+
+#### Loading a Bedrock Edition file
+```cs
+    var structure = new NbtFile(NbtFlavor.Bedrock);
+    structure.LoadFromFile("house.mcstructure");
+```
+
+#### Reading raw NBT (packet payloads, LevelDB values, embedded blobs)
+```cs
+    NbtCodec codec = NbtCodec.For(NbtFlavor.JavaNetwork);
+    NbtTag root = codec.ReadTag(payload, 0, payload.Length, out int bytesConsumed);
 ```
 
 #### Accessing tags (long/strongly-typed style)

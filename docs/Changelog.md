@@ -1,67 +1,54 @@
 ## 2.0.0 (fNbt, unreleased)
-- Add support for all variants of NBT via new NbtFlavor type. It includes
-    Java (the default), JavaAnvil, JavaLegacy, JavaNetwork, Bedrock,
-    BedrockNetwork, and ClassiCube. A flavor defines which tag types,
-    encodings, and limits should be used. Choose a default via
-    NbtOptions.DefaultFlavor, or configure individual NbtFile, NbtReader,
-    and NbtWriter.
-- Add support for varint encoding when BedrockNetwork flavor is active.
-- Add NbtOptions: combines the flavor, ValidateOnWrite flag (default on),
-    ValidateOnRead (default off), and MaxAllocation (defensive opt-in cap
-    on any single allocation during load). Process-wide defaults for all
-    four can be changed via the static NbtOptions.Default* properties;
-    changing a default never affects existing objects.
-- Add NbtCodec, for working with NBT documents that are not "files":
-    packet payloads, LevelDB values, NBT embedded in other formats, etc.
-    It handles unnamed roots, non-compound roots, absent documents, and
+- Add NbtFlavor support for Java (the default), JavaAnvil,
+    JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube. A flavor
+    determines tag types, encodings, and limits. NbtFile, NbtReader, and
+    NbtWriter accept named-root flavors; NbtCodec also accepts JavaNetwork.
+    BedrockNetwork uses network varints.
+- Java flavors and ClassiCube now write modified UTF-8, matching Minecraft
+    Java. Every flavor reads modified and standard UTF-8. Malformed string bytes
+    fail with NbtFormatException instead of decoding to U+FFFD.
+- Add NbtOptions for flavor, ValidateOnWrite (default on), ValidateOnRead
+    (default off), and MaxAllocation, an optional cap on any single load
+    allocation. Write validation rejects documents the flavor cannot represent,
+    including Bedrock documents with TAG_Long_Array or strings over 32,767
+    bytes. Set ValidateOnWrite to false for permissive output. Static
+    NbtOptions.Default* properties change process-wide defaults without
+    affecting existing objects.
+- Add NbtCodec for raw or embedded NBT. It reads one document without
+    consuming trailing data and handles unnamed, non-compound, absent, and
     concatenated documents. It reads and writes streams and byte arrays, plus
     ReadOnlySpan<byte> and IBufferWriter<byte> on .NET 8.
-- Add write-time (on by default) and read-time (optional) compatibility
-    validation. It reports errors when a document cannot be represented by
-    the current NBT flavor (e.g. Bedrock saves containing TAG_Long_Array or
-    strings longer than 32,767 bytes).
-- Add type conversion to NbtReader.ReadValueAs<T> and ReadListAsArray<T>:
-    a TAG_Int can be read as long, double, or string, a TAG_String as a
-    number, and integral values or member names as an enum type. Exact
-    types are still read directly.
-- Java flavors write modified UTF-8 like Minecraft Java, so emoji and other
-    astral characters round-trip. Reads accept both encodings under every
-    flavor.
+- NbtReader.ReadValueAs<T> now performs the same numeric and string
+    conversions as ReadListAsArray<T>, and both read integral values or member
+    names as an enum type.
 - NbtCompound now guarantees insertion order. Enumeration, Names, Tags,
-    ToString, and saved documents all list tags in the order they were added,
-    and the order survives removals, so saves are deterministic and a
-    re-saved document keeps the tag order it was loaded with.
-- Much faster and leaner performance: parsing allocates about half what it did,
-    skips and lookups run several times faster, and .NET 8 reads and writes
-    int and long arrays in bulk.
-- Readers now tolerate empty lists declaring any element type, and treat
-    negative list and array lengths as empty, to maximize compatibility.
-- NbtWriter now separates recoverable failures from unrecoverable ones. Most
-    refused writes, e.g. an over-long string or name, do not write any data
-    and can be retried or skipped. A write that fails after emitting bytes
-    still leaves an incomplete document, which is now clearly reported by
-    throwing from Finish and via the new IsInErrorState property.
-- Fixed NbtWriter.WriteIntArray and WriteLongArray writing too few elements
-    when given a non-zero offset and producing a bad NBT document.
-- Fixed NbtReader.ReadListAsArray throwing when called on an element of the
-    list instead of the list itself.
-- Fixed NbtReader.ReadValue returning the previous tag's cached value after
-    ReadListAsArray finished the list or the cursor moved onto an End tag
-    with CacheTagValues on.
-- Fixed corrupt compressed documents sometimes loading silently. Loads now
-    verify the checksum on every kind of stream, seekable or not.
-- Add NbtReader.LongTagStartOffset; TagStartOffset now throws
-    OverflowException past 2 GiB instead of wrapping. ReadListAsArray<T>
-    rejects an unusable T before reading anything, and ReadAsTag accepts a
-    value already read with CacheTagValues on and refuses every End tag
-    without moving.
-- NbtFile.Flavor is now fixed at construction, and NbtFile gains flavor
-    constructors. To re-save a document under a different flavor, create a
-    new NbtFile over the same RootTag.
-- Old BigEndian properties and params are deprecated. The bool constructors
-    and getters still work, but the BigEndian and BigEndianByDefault setters
-    are removed; use NbtOptions.DefaultFlavor or a flavor constructor
-    instead.
+    ToString, and saved documents all list tags in the order they were added.
+- Improve performance: repeated-name parsing allocates about half as much,
+    NbtReader.Skip runs 2.5x faster with almost no allocation, selector skips
+    allocate 99% less, and NbtComparer compares arrays 4x to 30x faster
+    without allocating.
+- Readers now accept any element type for empty lists and treat negative list
+    and array lengths as empty.
+- Most invalid NbtWriter writes are rejected before emitting data, leaving the
+    writer usable. If a write fails after output begins, IsInErrorState reports
+    that the output is incomplete and should be discarded. Every later call
+    throws. The underlying stream remains accessible through BaseStream.
+- Fix NbtWriter.WriteIntArray and WriteLongArray with a non-zero offset.
+- Compressed loads now verify checksums for every stream type and target,
+    including .NET Standard 2.0. Seekable compressed loads now leave the source
+    at its end. The returned byte count covers everything read.
+- Fix NbtReader.ReadListAsArray when called on a list element, stale ReadValue
+    results, and ReadAsTag after a cached read.
+- Add NbtReader.LongTagStartOffset for documents past 2 GiB. TagStartOffset now
+    throws OverflowException instead of wrapping.
+- Add NbtFile constructors that take NbtFlavor or NbtOptions. Flavor is fixed at
+    construction. To re-save under another flavor, create a new NbtFile over
+    the same RootTag. BigEndian and BigEndianByDefault are now obsolete,
+    read-only properties.
+- The bool NbtReader and NbtWriter constructors and bool ReadRootTagName
+    overloads are now obsolete but still work. Their parameters map true to
+    Java and false to Bedrock.
+- Set AssemblyVersion to 2.0.0.0 for all 2.x releases.
 
 ## 1.1.1 (fNbt)
 - Every code path now rejects tags nested more than 512 levels deep, matching
