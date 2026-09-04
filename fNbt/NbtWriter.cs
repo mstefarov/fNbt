@@ -778,18 +778,32 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is null </exception>
         public void WriteTag(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
-            ValidateConstraints(tag.Name, tag.TagType);
+            NbtTagType type = tag.TagType;
+            string? name = tag.Name;
+            ValidateConstraints(name, type);
             // Refusals the tag layer would make before writing a byte happen here instead, ahead
             // of the emission window, so they leave the writer usable
-            if (tag.TagType == NbtTagType.Compound || tag.TagType == NbtTagType.List) {
-                EnsureCanGoDown();
+            string? stringValue = null;
+            switch (type) {
+                case NbtTagType.Compound:
+                    EnsureCanGoDown();
+                    break;
+                case NbtTagType.List:
+                    EnsureCanGoDown();
+                    if (((NbtList)tag).ListType == NbtTagType.Unknown) {
+                        throw NbtFormatException.UnknownListType();
+                    }
+                    break;
+                case NbtTagType.String:
+                    stringValue = ((NbtString)tag).Value;
+                    break;
             }
-            if (tag is NbtList list && list.ListType == NbtTagType.Unknown) {
-                throw NbtFormatException.UnknownListType();
-            }
-            // Measured either way: with validation off nothing else checks them before emission
-            if (tag.Name != null) MeasureString(tag.Name, nameof(tag), out _);
-            if (tag is NbtString stringTag) MeasureString(stringTag.Value, nameof(tag), out _);
+            // Measured either way: with validation off nothing else checks them before emission.
+            // The counts feed the writes below, so neither string is scanned a second time.
+            int nameBytes = 0, valueBytes = 0;
+            bool nameModified = false, valueModified = false;
+            if (name != null) nameBytes = MeasureString(name, nameof(tag), out nameModified);
+            if (stringValue != null) valueBytes = MeasureString(stringValue, nameof(tag), out valueModified);
             int depthBudget = NbtTag.MaxDepth - OpenContainerCount;
             if (validates) {
                 // Walking an unrestricted tree twice is too expensive, so only restricting
@@ -797,8 +811,11 @@ namespace fNbt {
                 flavor.ValidateTree(tag, depthBudget);
             }
             NbtTagType parentType = BeginEmission();
-            if (tag.Name != null) {
-                tag.WriteTag(writer, depthBudget);
+            if (name != null) {
+                WriteHeader(type, name, nameBytes, nameModified);
+            }
+            if (stringValue != null) {
+                writer.Write(stringValue, valueBytes, valueModified);
             } else {
                 tag.WriteData(writer, depthBudget);
             }
