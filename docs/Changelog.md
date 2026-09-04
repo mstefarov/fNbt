@@ -1,4 +1,4 @@
-## 2.0.0 (fNbt, unreleased)
+## 2.0.0 (fNbt)
 - Add NbtFlavor support for Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube. A flavor
     determines tag types, encodings, and limits. NbtFile, NbtReader, and
