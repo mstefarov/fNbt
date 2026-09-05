@@ -31,6 +31,7 @@ namespace fNbt {
         int nameHits;
         bool nameCacheDisabled;
         const int NameCacheActivation = 64;
+        const int NameCacheJudgeAfter = 256;
         const int NameCacheInitialSlots = 128;
         const int NameCacheMaxSlots = 2048;
         const int NameCacheMaxProbe = 8;
@@ -300,8 +301,9 @@ namespace fNbt {
 
         string LookUpName(int length) {
             // A document of mostly unique names keeps missing; drop the cache so reads stop
-            // paying for hashing and probes, and do it before the table has grown much
-            if ((++nameLookups & 63) == 0 && nameHits * 4 < nameLookups) {
+            // paying for hashing and probes, before the table has grown much but not before a
+            // repetitive body has had a chance to follow a unique-key header
+            if ((++nameLookups & 63) == 0 && nameLookups >= NameCacheJudgeAfter && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;
                 return NbtStringCodec.Decode(this.buffer, 0, length);
