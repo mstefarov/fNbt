@@ -11,11 +11,24 @@ using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace fNbt.Benchmarks;
 
 class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
+
+#if NETFRAMEWORK
+    // On .NET Framework, BenchmarkDotNet builds a project-reference job with its in-place Roslyn
+    // toolchain: a bare csc call whose exe carries no TargetFrameworkAttribute. The runtime then
+    // applies pre-4.7.2 compatibility quirks to that process, and GZip/Deflate decompression
+    // falls back to the managed inflater (7x slower, 41 KB more per stream) while the NuGet job's
+    // csproj-built exe uses native zlib. Building every job through the csproj toolchain keeps
+    // the two processes alike.
+    static Job OnCsProjToolchain(Job job) {
+        return job.WithToolchain(CsProjClassicNetToolchain.Net48);
+    }
+#endif
     public const string VeryStable = "VeryStable";
     public const string Average = "Average";
     public const string Unstable = "Unstable";
@@ -69,6 +82,9 @@ class Program {
             Job job = parsedJobs.Length == 0 || parsedJobs[0].Meta.IsMutator
                 ? Job.Default
                 : parsedJobs[0];
+#if NETFRAMEWORK
+            job = OnCsProjToolchain(job);
+#endif
             if (customArgs.ServerGc) {
                 job = job.WithGcServer(true);
                 logger.WriteLineInfo("// Server GC scenario: jobs run with GcServer=true");
@@ -84,6 +100,11 @@ class Program {
                 .WithBaseline(true));
             logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
         }
+#if NETFRAMEWORK
+        else if (!parsedConfig.GetJobs().Any()) {
+            initialConfig.AddJob(OnCsProjToolchain(Job.Default));
+        }
+#endif
 
         // The switcher needs the args itself, not just the config built from them. Hand it an
         // empty array and it ignores --filter and drops into interactive selection.
