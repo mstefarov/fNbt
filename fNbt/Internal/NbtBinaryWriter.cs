@@ -409,6 +409,11 @@ namespace fNbt {
                 }
                 return;
             }
+#else
+            if (!useVarInt) {
+                WriteFixedWidth(data, offset, count);
+                return;
+            }
 #endif
             for (int i = 0; i < count; i++) {
                 Write(data[offset + i]);
@@ -439,11 +444,50 @@ namespace fNbt {
                 }
                 return;
             }
+#else
+            if (!useVarInt) {
+                WriteFixedWidth(data, offset, count);
+                return;
+            }
 #endif
             for (int i = 0; i < count; i++) {
                 Write(data[offset + i]);
             }
         }
+
+
+#if !NET8_0_OR_GREATER
+        // Stages 64 ints or 32 longs in the scratch buffer per stream call instead of one each.
+        // Bytes go out the way Write(int) and Write(long) emit them.
+        void WriteFixedWidth(int[] data, int offset, int count) {
+            for (int written = 0; written < count;) {
+                int n = Math.Min(buffer.Length / sizeof(int), count - written);
+                int p = 0;
+                for (int i = 0; i < n; i++, written++) {
+                    int value = data[offset + written];
+                    for (int k = 0; k < sizeof(int); k++) {
+                        buffer[p++] = (byte)(value >> (swapNeeded ? 24 - 8 * k : 8 * k));
+                    }
+                }
+                stream.Write(buffer, 0, p);
+            }
+        }
+
+
+        void WriteFixedWidth(long[] data, int offset, int count) {
+            for (int written = 0; written < count;) {
+                int n = Math.Min(buffer.Length / sizeof(long), count - written);
+                int p = 0;
+                for (int i = 0; i < n; i++, written++) {
+                    long value = data[offset + written];
+                    for (int k = 0; k < sizeof(long); k++) {
+                        buffer[p++] = (byte)(value >> (swapNeeded ? 56 - 8 * k : 8 * k));
+                    }
+                }
+                stream.Write(buffer, 0, p);
+            }
+        }
+#endif
 
 
 #if NET8_0_OR_GREATER

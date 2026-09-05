@@ -640,6 +640,11 @@ namespace fNbt {
                 }
                 return result;
             }
+#else
+            if (!useVarInt) {
+                ReadFixedWidth(result);
+                return result;
+            }
 #endif
             for (int i = 0; i < length; i++) result[i] = ReadInt32();
             return result;
@@ -667,10 +672,49 @@ namespace fNbt {
                 }
                 return result;
             }
+#else
+            if (!useVarInt) {
+                ReadFixedWidth(result);
+                return result;
+            }
 #endif
             for (int i = 0; i < length; i++) result[i] = ReadInt64();
             return result;
         }
+
+
+#if !NET8_0_OR_GREATER
+        // Fills the array through the scratch buffer, 16 ints or 8 longs per stream call instead
+        // of one each. Bytes compose the way ReadInt32 and ReadInt64 do.
+        void ReadFixedWidth(int[] result) {
+            for (int i = 0; i < result.Length;) {
+                int n = Math.Min(buffer.Length / sizeof(int), result.Length - i);
+                FillBuffer(n * sizeof(int));
+                for (int p = 0; p < n * sizeof(int); p += sizeof(int), i++) {
+                    int value = 0;
+                    for (int k = 0; k < sizeof(int); k++) {
+                        value |= buffer[p + k] << (bigEndian ? 24 - 8 * k : 8 * k);
+                    }
+                    result[i] = value;
+                }
+            }
+        }
+
+
+        void ReadFixedWidth(long[] result) {
+            for (int i = 0; i < result.Length;) {
+                int n = Math.Min(buffer.Length / sizeof(long), result.Length - i);
+                FillBuffer(n * sizeof(long));
+                for (int p = 0; p < n * sizeof(long); p += sizeof(long), i++) {
+                    long value = 0;
+                    for (int k = 0; k < sizeof(long); k++) {
+                        value |= (long)buffer[p + k] << (bigEndian ? 56 - 8 * k : 8 * k);
+                    }
+                    result[i] = value;
+                }
+            }
+        }
+#endif
 
 
         public TagSelector? Selector { get; set; }
