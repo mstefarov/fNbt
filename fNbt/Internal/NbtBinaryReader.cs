@@ -299,9 +299,9 @@ namespace fNbt {
 
 
         string LookUpName(int length) {
-            // A document of mostly unique names keeps missing; drop the cache so reads
-            // stop paying for hashing and probes
-            if ((++nameLookups & 1023) == 0 && nameHits * 4 < nameLookups) {
+            // A document of mostly unique names keeps missing; drop the cache so reads stop
+            // paying for hashing and probes, and do it before the table has grown much
+            if ((++nameLookups & 63) == 0 && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;
                 return NbtStringCodec.Decode(this.buffer, 0, length);
