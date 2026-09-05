@@ -622,8 +622,10 @@ namespace fNbt {
                 if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
                 }
-                byte[] buffer = new byte[size];
-                SaveToStream(new MemoryStream(buffer, 0, buffer.Length, true, true), NbtCompression.None);
+                byte[] buffer = ArrayAllocator.ForOverwrite<byte>((int)size, size);
+                MemoryStream output = new MemoryStream(buffer, 0, buffer.Length, true, true);
+                SaveToStream(output, NbtCompression.None);
+                NbtCodec.ClearUnwrittenTail(buffer, output.Position);
                 return buffer;
             }
 

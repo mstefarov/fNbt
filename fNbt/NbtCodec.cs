@@ -459,9 +459,20 @@ namespace fNbt {
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
-            byte[] result = new byte[size];
-            WriteTag(tag, new MemoryStream(result, 0, result.Length, true));
+            byte[] result = ArrayAllocator.ForOverwrite<byte>((int)size, size);
+            MemoryStream output = new MemoryStream(result, 0, result.Length, true);
+            WriteTag(tag, output);
+            ClearUnwrittenTail(result, output.Position);
             return result;
+        }
+
+
+        // An exact buffer starts uninitialized, so a tree that shrank between the sizing and
+        // the writing walk must not leak whatever memory the tail held.
+        internal static void ClearUnwrittenTail(byte[] buffer, long written) {
+            if (written < buffer.Length) {
+                Array.Clear(buffer, (int)written, buffer.Length - (int)written);
+            }
         }
 
         #endregion

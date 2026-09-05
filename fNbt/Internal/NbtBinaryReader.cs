@@ -611,7 +611,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
-            byte[] result = new byte[length];
+            byte[] result = ArrayAllocator.ForOverwrite<byte>(length, length);
             ReadExactly(result, length);
             return result;
         }
@@ -622,7 +622,7 @@ namespace fNbt {
             EnsureAllocation((long)length * sizeof(int));
             // Varint elements are at least one byte each; fixed-width math would over-estimate
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
-            int[] result = new int[length];
+            int[] result = ArrayAllocator.ForOverwrite<int>(length, (long)length * sizeof(int));
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
@@ -650,7 +650,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<long>();
             EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
-            long[] result = new long[length];
+            long[] result = ArrayAllocator.ForOverwrite<long>(length, (long)length * sizeof(long));
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());

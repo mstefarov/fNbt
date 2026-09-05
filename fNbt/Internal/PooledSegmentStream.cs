@@ -61,7 +61,7 @@ namespace fNbt {
             if (total > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
             }
-            byte[] result = new byte[total];
+            byte[] result = ArrayAllocator.ForOverwrite<byte>((int)total, total);
             int position = 0;
             if (fullSegments != null) {
                 foreach (byte[] segment in fullSegments) {
