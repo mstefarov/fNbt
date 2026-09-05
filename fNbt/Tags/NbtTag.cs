@@ -397,11 +397,10 @@ namespace fNbt {
         public abstract object Clone();
 
 
-        // Depth-budgeted clone, used by deep copies of compounds and lists.
-        // Throws for ridiculously deep nesting instead of overflowing the stack.
-        internal virtual NbtTag Clone(int depthBudget) {
-            return (NbtTag)Clone(); // Default implementation for Value tags that do not recurse.
-        }
+        // Depth-budgeted clone, used by deep copies of compounds and lists. Throws for
+        // ridiculously deep nesting instead of overflowing the stack. Leaves ignore the budget
+        // but still override it, so a deep copy costs one virtual call per tag, not two.
+        internal abstract NbtTag Clone(int depthBudget);
 
 
         /// <summary> Prints contents of this tag, and any child tags, to a string.

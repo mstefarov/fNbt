@@ -83,6 +83,11 @@ namespace fNbt {
         }
 
 
+        internal override NbtTag Clone(int depthBudget) {
+            return new NbtString(this);
+        }
+
+
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
             PrettyPrintHeader(sb, indentString, indentLevel);
             sb.Append(": \"");

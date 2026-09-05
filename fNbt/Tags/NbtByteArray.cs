@@ -112,6 +112,11 @@ namespace fNbt {
         }
 
 
+        internal override NbtTag Clone(int depthBudget) {
+            return new NbtByteArray(this);
+        }
+
+
         internal override void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget) {
             PrettyPrintHeader(sb, indentString, indentLevel);
             sb.AppendFormat(CultureInfo.InvariantCulture, ": [{0} bytes]", bytes.Length);
