@@ -392,14 +392,19 @@ namespace fNbt {
                 if (!swapNeeded) {
                     WriteSpanChunked(System.Runtime.InteropServices.MemoryMarshal.AsBytes(source));
                 } else {
-                    // Reverse chunks into the scratch buffer, leaving the caller's array untouched
-                    Span<int> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(buffer);
-                    while (!source.IsEmpty) {
-                        int n = Math.Min(chunk.Length, source.Length);
-                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
-                            source.Slice(0, n), chunk.Slice(0, n));
-                        stream.Write(buffer, 0, n * sizeof(int));
-                        source = source.Slice(n);
+                    // Reverse chunks into a staging buffer, leaving the caller's array untouched
+                    byte[] staging = RentSwapStaging((long)source.Length * sizeof(int));
+                    try {
+                        Span<int> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(staging);
+                        while (!source.IsEmpty) {
+                            int n = Math.Min(chunk.Length, source.Length);
+                            System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
+                                source.Slice(0, n), chunk.Slice(0, n));
+                            stream.Write(staging, 0, n * sizeof(int));
+                            source = source.Slice(n);
+                        }
+                    } finally {
+                        ReturnSwapStaging(staging);
                     }
                 }
                 return;
@@ -418,13 +423,18 @@ namespace fNbt {
                 if (!swapNeeded) {
                     WriteSpanChunked(System.Runtime.InteropServices.MemoryMarshal.AsBytes(source));
                 } else {
-                    Span<long> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(buffer);
-                    while (!source.IsEmpty) {
-                        int n = Math.Min(chunk.Length, source.Length);
-                        System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
-                            source.Slice(0, n), chunk.Slice(0, n));
-                        stream.Write(buffer, 0, n * sizeof(long));
-                        source = source.Slice(n);
+                    byte[] staging = RentSwapStaging((long)source.Length * sizeof(long));
+                    try {
+                        Span<long> chunk = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, long>(staging);
+                        while (!source.IsEmpty) {
+                            int n = Math.Min(chunk.Length, source.Length);
+                            System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(
+                                source.Slice(0, n), chunk.Slice(0, n));
+                            stream.Write(staging, 0, n * sizeof(long));
+                            source = source.Slice(n);
+                        }
+                    } finally {
+                        ReturnSwapStaging(staging);
                     }
                 }
                 return;
@@ -437,6 +447,25 @@ namespace fNbt {
 
 
 #if NET8_0_OR_GREATER
+        // Large swapped arrays go out through a rented 64 KiB staging buffer instead of the
+        // 256-byte scratch, which would cost one stream call per 64 ints. Renting only pays
+        // off past a few KiB.
+        const int SwapStagingSize = 64 * 1024;
+        const int SwapStagingThreshold = 4 * 1024;
+
+
+        byte[] RentSwapStaging(long byteCount) {
+            return byteCount <= SwapStagingThreshold
+                ? buffer
+                : System.Buffers.ArrayPool<byte>.Shared.Rent((int)Math.Min(byteCount, SwapStagingSize));
+        }
+
+
+        void ReturnSwapStaging(byte[] staging) {
+            if (staging != buffer) System.Buffers.ArrayPool<byte>.Shared.Return(staging);
+        }
+
+
         void WriteSpanChunked(ReadOnlySpan<byte> data) {
             while (data.Length > MaxWriteChunk) {
                 stream.Write(data.Slice(0, MaxWriteChunk));
