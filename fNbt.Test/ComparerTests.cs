@@ -84,13 +84,16 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void CompoundTagsIgnoresOrder() {
+            // A shared prefix followed by a swapped pair exercises both the positional and the lookup paths
             var compA = new NbtCompound("c")
             {
+                new NbtByte("p", 0),
                 new NbtByte("a", 1),
                 new NbtByte("b", 2)
             };
             var compB = new NbtCompound("c")
             {
+                new NbtByte("p", 0),
                 new NbtByte("b", 2),
                 new NbtByte("a", 1)
             };

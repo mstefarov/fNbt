@@ -163,10 +163,20 @@ namespace fNbt {
                         NbtCompound yc = (NbtCompound)y;
                         if (xc.Count != yc.Count) return false;
                         NbtTag[] xChildren = xc.ItemArray;
-                        for (int i = 0; i < xc.Count; i++) {
+                        NbtTag[] yChildren = yc.ItemArray;
+                        // Parsed and cloned trees keep the same order, so compare positions while
+                        // the names line up and fall back to lookups only from the first mismatch.
+                        int i = 0;
+                        for (; i < xc.Count; i++) {
+                            NbtTag xChild = xChildren[i];
+                            NbtTag yChild = yChildren[i];
+                            if (xChild.Name != yChild.Name) break;
+                            if (!SameNameEquals(xChild, yChild, childDepthBudget)) return false;
+                        }
+                        for (; i < xc.Count; i++) {
                             NbtTag xChild = xChildren[i];
                             NbtTag? yChild = yc.Get(xChild.Name!);
-                            if (yChild == null || !Equals(xChild, yChild, childDepthBudget)) return false;
+                            if (yChild == null || !SameNameEquals(xChild, yChild, childDepthBudget)) return false;
                         }
                         return true;
                     }
@@ -184,6 +194,13 @@ namespace fNbt {
                     // END and unknown
                     throw new ArgumentException("Cannot compare tags of type " + x.TagType);
             }
+        }
+
+
+        // Equals for two children already known to carry the same name
+        bool SameNameEquals(NbtTag x, NbtTag y, int depthBudget) {
+            if (ReferenceEquals(x, y)) return true;
+            return x.TagType == y.TagType && DeepEquals(x, y, depthBudget);
         }
 
 
