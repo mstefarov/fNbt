@@ -250,6 +250,64 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void ReadToNextSiblingMatchesWalkingListElements() {
+            NbtList[] lists = {
+                new NbtList("items") {
+                    new NbtCompound { new NbtCompound("nested") { new NbtInt("discard", 1) } },
+                    new NbtCompound { new NbtInt("keep", 2) }
+                },
+                new NbtList("items") {
+                    new NbtList { new NbtCompound { new NbtInt("discard", 3) } },
+                    new NbtList { new NbtString("keep"), new NbtString("second") }
+                }
+            };
+            foreach (NbtList list in lists) {
+                NbtCompound root = new NbtCompound("root") { list, new NbtInt("after", 99) };
+                foreach (bool skipEndTags in new[] { true, false }) {
+                    NbtReader skipped = TestFiles.OpenReader(root);
+                    NbtReader walked = TestFiles.OpenReader(root);
+                    skipped.SkipEndTags = walked.SkipEndTags = skipEndTags;
+                    Assert.IsTrue(skipped.ReadToFollowing("items"));
+                    Assert.IsTrue(walked.ReadToFollowing("items"));
+                    Assert.IsTrue(skipped.ReadToFollowing());
+                    Assert.IsTrue(walked.ReadToFollowing());
+
+                    int elementDepth = walked.Depth;
+                    do {
+                        Assert.IsTrue(walked.ReadToFollowing());
+                    } while (walked.Depth > elementDepth);
+                    Assert.IsTrue(skipped.ReadToNextSibling());
+
+                    Assert.AreEqual(walked.TagType, skipped.TagType);
+                    Assert.AreEqual(walked.TagName, skipped.TagName);
+                    Assert.AreEqual(walked.Depth, skipped.Depth);
+                    Assert.AreEqual(walked.ListType, skipped.ListType);
+                    Assert.AreEqual(walked.ListIndex, skipped.ListIndex);
+                    Assert.AreEqual(walked.TagLength, skipped.TagLength);
+                    Assert.AreEqual(walked.ParentName, skipped.ParentName);
+                    Assert.AreEqual(walked.ParentTagType, skipped.ParentTagType);
+                    Assert.AreEqual(walked.ParentTagLength, skipped.ParentTagLength);
+                    Assert.AreEqual(walked.TagsRead, skipped.TagsRead);
+                    Assert.AreEqual(walked.LongTagStartOffset, skipped.LongTagStartOffset);
+
+                    NbtAssert.AreEqual(list[1], skipped.ReadAsTag());
+                    NbtAssert.AreEqual(list[1], walked.ReadAsTag());
+                    Assert.AreEqual("after", skipped.TagName);
+                    Assert.AreEqual(99, skipped.ReadValueAs<int>());
+                    Assert.AreEqual(99, walked.ReadValueAs<int>());
+                    while (walked.ReadToFollowing()) {
+                        Assert.IsTrue(skipped.ReadToFollowing());
+                        Assert.AreEqual(walked.TagType, skipped.TagType);
+                    }
+                    Assert.IsFalse(skipped.ReadToFollowing());
+                    Assert.AreEqual(walked.TagsRead, skipped.TagsRead);
+                    Assert.AreEqual(skipped.BaseStream.Length, skipped.BaseStream.Position);
+                }
+            }
+        }
+
+
+        [TestMethod]
         public void ReadToNextSiblingStopsAtParentEnd() {
             var reader = new NbtReader(TestFiles.MakeNestedContainersStream());
             Assert.IsTrue(reader.ReadToFollowing("inComp1"));

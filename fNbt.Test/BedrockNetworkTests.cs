@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace fNbt.Test {
@@ -112,6 +113,29 @@ namespace fNbt.Test {
             NbtReader reader = TestFiles.OpenReader(GoldenDoc, NbtFlavor.BedrockNetwork);
             Assert.IsTrue(reader.ReadToFollowing("list"));
             CollectionAssert.AreEqual(new[] { 1, -1, 64 }, reader.ReadListAsArray<int>());
+
+            (NbtList List, Array Values)[] cases = {
+                (new NbtList("list") {
+                    new NbtLong(-1), new NbtLong(0), new NbtLong(1), new NbtLong(63), new NbtLong(-64)
+                }, new long[] { -1, 0, 1, 63, -64 }),
+                (new NbtList("list") {
+                    new NbtString(""), new NbtString(""), new NbtString(""), new NbtString("")
+                }, new[] { "", "", "", "" })
+            };
+            foreach ((NbtList list, Array expected) in cases) {
+                // No trailing payload can hide a fixed-width overestimate of these one-byte elements.
+                NbtCompound root = new NbtCompound("") { list };
+                reader = TestFiles.OpenReader(root, new NbtOptions(NbtFlavor.BedrockNetwork));
+                Assert.IsTrue(reader.ReadToFollowing("list"));
+                Array values = list.ListType == NbtTagType.Long
+                    ? reader.ReadListAsArray<long>()
+                    : reader.ReadListAsArray<string>();
+                CollectionAssert.AreEqual(expected, values);
+                Assert.AreEqual(expected.Length, reader.ListIndex);
+                Assert.AreEqual(expected.Length + 2, reader.TagsRead);
+                Assert.IsFalse(reader.ReadToFollowing());
+                Assert.AreEqual(reader.BaseStream.Length, reader.BaseStream.Position);
+            }
         }
 
 

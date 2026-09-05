@@ -89,23 +89,31 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void OffsetArrayWritesRoundTripAcrossStagingChunks() {
-            // Large enough to rent a staging buffer, and not a whole number of chunks
-            int[] ints = new int[16_389];
-            long[] longs = new long[8_197];
-            for (int i = 0; i < ints.Length; i++) ints[i] = unchecked(i * 16_777_619 ^ (int)0xA5A5A5A5);
-            for (int i = 0; i < longs.Length; i++) longs[i] = unchecked((long)i * 1_099_511_627_791L ^ (long)0xA5A5A5A5A5A5A5A5UL);
+            foreach ((NbtFlavor flavor, int chunkBytes) in new[] {
+                (NbtFlavor.Java, 64 * 1024),
+                (NbtFlavor.Bedrock, NbtBinaryWriter.MaxWriteChunk)
+            }) {
+                // Exclude two elements at each end; one written element spills into the final chunk.
+                int[] ints = new int[chunkBytes / sizeof(int) + 5];
+                long[] longs = new long[chunkBytes / sizeof(long) + 5];
+                for (int i = 0; i < ints.Length; i++) ints[i] = unchecked(i * 16_777_619 ^ (int)0xA5A5A5A5);
+                for (int i = 0; i < longs.Length; i++) longs[i] = unchecked((long)i * 1_099_511_627_791L ^ (long)0xA5A5A5A5A5A5A5A5UL);
 
-            var stream = new MemoryStream();
-            var writer = new NbtBinaryWriter(stream, NbtFlavor.Java);
-            writer.Write(ints, 2, ints.Length - 4);
-            writer.Write(longs, 2, longs.Length - 4);
-            stream.Position = 0;
-            var reader = new NbtBinaryReader(stream, NbtFlavor.Java);
-            int[] intsRead = reader.ReadInt32Array(ints.Length - 4);
-            long[] longsRead = reader.ReadInt64Array(longs.Length - 4);
-            for (int i = 0; i < intsRead.Length; i++) Assert.AreEqual(ints[i + 2], intsRead[i]);
-            for (int i = 0; i < longsRead.Length; i++) Assert.AreEqual(longs[i + 2], longsRead[i]);
-            Assert.AreEqual(stream.Length, stream.Position);
+                int intCount = ints.Length - 4;
+                int longCount = longs.Length - 4;
+                using (MemoryStream stream = new MemoryStream(intCount * sizeof(int) + longCount * sizeof(long))) {
+                    NbtBinaryWriter writer = new NbtBinaryWriter(stream, flavor);
+                    writer.Write(ints, 2, intCount);
+                    writer.Write(longs, 2, longCount);
+                    stream.Position = 0;
+                    NbtBinaryReader reader = new NbtBinaryReader(stream, flavor);
+                    int[] intsRead = reader.ReadInt32Array(intCount);
+                    long[] longsRead = reader.ReadInt64Array(longCount);
+                    for (int i = 0; i < intsRead.Length; i++) Assert.AreEqual(ints[i + 2], intsRead[i]);
+                    for (int i = 0; i < longsRead.Length; i++) Assert.AreEqual(longs[i + 2], longsRead[i]);
+                    Assert.AreEqual(stream.Length, stream.Position);
+                }
+            }
         }
     }
 }
