@@ -394,12 +394,15 @@ namespace fNbt {
 
         /// <summary> Creates a deep copy of this tag. </summary>
         /// <returns> A new NbtTag object that is a deep copy of this instance. </returns>
-        public abstract object Clone();
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
+        public object Clone() {
+            return Clone(MaxDepth);
+        }
 
 
-        // Depth-budgeted clone, used by deep copies of compounds and lists. Throws for
-        // ridiculously deep nesting instead of overflowing the stack. Leaves ignore the budget
-        // but still override it, so a deep copy costs one virtual call per tag, not two.
+        // Depth-budgeted clone: the one copy each tag implements. Compounds and lists spend the
+        // budget on their children and throw for ridiculously deep nesting instead of
+        // overflowing the stack; leaves ignore it.
         internal abstract NbtTag Clone(int depthBudget);
 
 

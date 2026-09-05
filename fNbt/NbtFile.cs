@@ -116,7 +116,8 @@ namespace fNbt {
         NbtFile(NbtOptions.Resolved resolved) {
             flavor = resolved.Flavor;
             validateOnRead = resolved.ValidateOnRead;
-            validateOnWrite = resolved.ValidateOnWrite;
+            // Only restrictive flavors have anything to validate on write
+            validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;
             maxAllocation = resolved.MaxAllocation;
             BufferSize = DefaultBufferSize;
             rootTag = new NbtCompound("");
@@ -619,15 +620,14 @@ namespace fNbt {
                 // Sizing up front buys an exact array from a single write pass, and the sizing
                 // walk validates as it goes.
                 EnsureRootNamed();
-                long size = NbtSizer.SizeDocument(
-                    rootTag, withName: true, flavor, validateOnWrite && flavor.HasRestrictions);
+                long size = NbtSizer.SizeDocument(rootTag, withName: true, flavor, validateOnWrite);
                 if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
                 }
-                byte[] buffer = ArrayAllocator.ForOverwrite<byte>((int)size, size);
+                byte[] buffer = ArrayAllocator.ForOverwrite<byte>((int)size);
                 MemoryStream output = new MemoryStream(buffer, 0, buffer.Length, true, true);
                 rootTag.WriteTag(new NbtBinaryWriter(output, flavor), NbtTag.MaxDepth);
-                NbtCodec.ClearUnwrittenTail(buffer, output.Position);
+                ArrayAllocator.EnsureFilled(buffer, output.Position);
                 return buffer;
             }
 
@@ -675,7 +675,7 @@ namespace fNbt {
             }
 
             EnsureRootNamed();
-            if (validateOnWrite && flavor.HasRestrictions) {
+            if (validateOnWrite) {
                 flavor.ValidateTree(rootTag, NbtTag.MaxDepth);
             }
 

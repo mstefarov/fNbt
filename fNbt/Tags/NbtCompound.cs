@@ -104,13 +104,13 @@ namespace fNbt {
             items = clones;
             count = n;
             if (n > IndexThreshold) {
+                // A clean table of the right size copies straight across; one with tombstones,
+                // or left oversized by removals, is rebuilt for this count
                 ulong[]? otherTable = other.table;
-                if (otherTable != null && other.tombstones == 0) {
+                if (otherTable != null && other.tombstones == 0 && otherTable.Length == TableSizeFor(n)) {
                     table = (ulong[])otherTable.Clone();
                 } else {
-                    int size = InitialTableSize;
-                    while (n * 2 >= size) size *= 4;
-                    BuildTable(size);
+                    BuildTable();
                 }
             }
         }
@@ -176,7 +176,7 @@ namespace fNbt {
             if (t == null) {
                 if (FindLinearPosition(tagName) >= 0) return false;
                 Append(tag);
-                if (table == null && count > IndexThreshold) BuildTable(InitialTableSize);
+                if (table == null && count > IndexThreshold) BuildTable();
                 return true;
             }
             uint hash = NameHash(tagName);
@@ -255,7 +255,7 @@ namespace fNbt {
                 return;
             }
             Append(tag);
-            if (count > IndexThreshold) BuildTable(InitialTableSize);
+            if (count > IndexThreshold) BuildTable();
         }
 
 
@@ -269,8 +269,17 @@ namespace fNbt {
         }
 
 
-        void BuildTable(int size) {
-            ulong[] t = new ulong[size];
+        // Smallest table that keeps this many entries at or below half load, quadrupling the way
+        // GrowTable does
+        static int TableSizeFor(int count) {
+            int size = InitialTableSize;
+            while (count * 2 >= size) size *= 4;
+            return size;
+        }
+
+
+        void BuildTable() {
+            ulong[] t = new ulong[TableSizeFor(count)];
             NbtTag[] local = items;
             for (int position = 0; position < count; position++) {
                 AddTableEntry(t, NameHash(local[position].name!), position);
@@ -767,13 +776,6 @@ namespace fNbt {
         }
 
         #endregion
-
-
-        /// <inheritdoc />
-        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
-        public override object Clone() {
-            return new NbtCompound(this, MaxDepth);
-        }
 
 
         internal override NbtTag Clone(int depthBudget) {

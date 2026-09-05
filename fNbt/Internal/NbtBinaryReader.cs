@@ -598,10 +598,22 @@ namespace fNbt {
         // Rejects impossible array/list lengths that can't fit in the remaining stream,
         // to prevent massive allocations. Only seekable streams can be efficiently checked.
         public void EnsureCanRead(long byteCount) {
-            if (BaseStream.CanSeek && byteCount > BaseStream.Length - BaseStream.Position) {
+            if (TryGetRemaining(out long remaining) && byteCount > remaining) {
                 throw new EndOfStreamException(
                     "Declared data size (" + byteCount + " bytes) runs past the end of the stream.");
             }
+        }
+
+
+        // How much a seekable stream still holds. Queried live: a stream's length can change
+        // mid-read. Unknown on a non-seekable stream.
+        public bool TryGetRemaining(out long remaining) {
+            if (stream.CanSeek) {
+                remaining = stream.Length - stream.Position;
+                return true;
+            }
+            remaining = 0;
+            return false;
         }
 
 
@@ -611,7 +623,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
-            byte[] result = ArrayAllocator.ForOverwrite<byte>(length, length);
+            byte[] result = ArrayAllocator.ForOverwrite<byte>(length);
             ReadExactly(result, length);
             return result;
         }
@@ -622,7 +634,7 @@ namespace fNbt {
             EnsureAllocation((long)length * sizeof(int));
             // Varint elements are at least one byte each; fixed-width math would over-estimate
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
-            int[] result = ArrayAllocator.ForOverwrite<int>(length, (long)length * sizeof(int));
+            int[] result = ArrayAllocator.ForOverwrite<int>(length);
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
@@ -655,7 +667,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<long>();
             EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
-            long[] result = ArrayAllocator.ForOverwrite<long>(length, (long)length * sizeof(long));
+            long[] result = ArrayAllocator.ForOverwrite<long>(length);
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
@@ -684,8 +696,8 @@ namespace fNbt {
 
 
 #if !NET8_0_OR_GREATER
-        // Fills the array through the scratch buffer, 16 ints or 8 longs per stream call instead
-        // of one each. Bytes compose the way ReadInt32 and ReadInt64 do.
+        // Fills the array through the scratch buffer, a buffer's worth of elements per stream
+        // call instead of one each. Bytes compose the way ReadInt32 and ReadInt64 do.
         void ReadFixedWidth(int[] result) {
             for (int i = 0; i < result.Length;) {
                 int n = Math.Min(buffer.Length / sizeof(int), result.Length - i);

@@ -69,12 +69,6 @@ namespace fNbt {
         }
 
 
-        /// <inheritdoc />
-        public override object Clone() {
-            return new NbtShort(this);
-        }
-
-
         internal override NbtTag Clone(int depthBudget) {
             return new NbtShort(this);
         }

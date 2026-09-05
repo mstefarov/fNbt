@@ -105,6 +105,9 @@ namespace fNbt {
                     }
                     long size = 1 + SizeCount(list.tags.Count, flavor);
                     foreach (NbtTag child in list.tags) {
+                        // A list child can be renamed after it is added; the name is not written
+                        // but ValidateTree checks it, so keep the two walks in agreement
+                        if (Validates<TMode>() && child.Name != null) flavor.ValidateString(child.Name);
                         size += SizePayload<TMode>(child, flavor, childDepthBudget);
                     }
                     return size;
@@ -140,7 +143,7 @@ namespace fNbt {
                 ? value.Length
                 : NbtStringCodec.GetByteCount(value, flavor.UsesModifiedUtf8);
             if (Validates<TMode>() && bytes > flavor.MaxStringBytes) {
-                throw flavor.StringTooLong(bytes);
+                throw NbtFormatException.StringTooLong(flavor, bytes);
             }
             if (flavor.UsesVarInts) {
                 return UnsignedVarIntLength((ulong)bytes) + bytes;

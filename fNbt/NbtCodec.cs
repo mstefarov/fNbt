@@ -318,10 +318,7 @@ namespace fNbt {
         public void WriteTag(NbtTag? tag, Stream stream) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             if (tag == null) {
-                if (!flavor.AllowsNonCompoundRoot) {
-                    throw new ArgumentNullException(nameof(tag),
-                                                    flavor.Name + " requires a TAG_Compound root and cannot represent an absent document.");
-                }
+                EnsureAbsentDocumentAllowed();
                 stream.WriteByte((byte)NbtTagType.End);
                 return;
             }
@@ -421,6 +418,14 @@ namespace fNbt {
         }
 
 
+        void EnsureAbsentDocumentAllowed() {
+            if (!flavor.AllowsNonCompoundRoot) {
+                throw new ArgumentNullException("tag",
+                                                flavor.Name + " requires a TAG_Compound root and cannot represent an absent document.");
+            }
+        }
+
+
         void ValidateRoot(NbtTag tag) {
             if (!flavor.AllowsNonCompoundRoot && tag.TagType != NbtTagType.Compound) {
                 throw new NbtFormatException(
@@ -457,32 +462,23 @@ namespace fNbt {
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
+            // An absent document is a lone TAG_End byte
+            if (tag == null) {
+                EnsureAbsentDocumentAllowed();
+                return new[] { (byte)NbtTagType.End };
+            }
             // Sizing the tree up front buys an exact array from a single write pass, and the
-            // sizing walk validates as it goes. An absent document is a lone TAG_End byte, and
-            // WriteTag still checks that the flavor allows one.
-            if (tag != null) ValidateRoot(tag);
-            long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor, validateOnWrite);
+            // sizing walk validates as it goes
+            ValidateRoot(tag);
+            long size = NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor, validateOnWrite);
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
-            byte[] result = ArrayAllocator.ForOverwrite<byte>((int)size, size);
+            byte[] result = ArrayAllocator.ForOverwrite<byte>((int)size);
             MemoryStream output = new MemoryStream(result, 0, result.Length, true);
-            if (tag == null) {
-                WriteTag(null, output);
-            } else {
-                WriteDocument(tag, CreateWriter(output));
-            }
-            ClearUnwrittenTail(result, output.Position);
+            WriteDocument(tag, CreateWriter(output));
+            ArrayAllocator.EnsureFilled(result, output.Position);
             return result;
-        }
-
-
-        // An exact buffer starts uninitialized, so a tree that shrank between the sizing and
-        // the writing walk must not leak whatever memory the tail held.
-        internal static void ClearUnwrittenTail(byte[] buffer, long written) {
-            if (written < buffer.Length) {
-                Array.Clear(buffer, (int)written, buffer.Length - (int)written);
-            }
         }
 
         #endregion

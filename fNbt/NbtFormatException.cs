@@ -20,6 +20,13 @@ namespace fNbt {
         }
 
 
+        internal static NbtFormatException StringTooLong(NbtFlavor flavor, long byteCount) {
+            return new NbtFormatException(
+                "String is " + byteCount + " bytes, but the " + flavor.Name +
+                " flavor allows at most " + flavor.MaxStringBytes + ".");
+        }
+
+
         internal static NbtFormatException NotCompoundRoot() {
             return new NbtFormatException("Given NBT stream does not start with a TAG_Compound.");
         }

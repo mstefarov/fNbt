@@ -5,7 +5,7 @@ namespace fNbt.Test {
     // endian-swap paths, so every byte must come out written and the caller's data untouched.
     [TestClass]
     public class LargeArrayTests {
-        const int LargeByteCount = 85_000 + 257;
+        const int LargeByteCount = ArrayAllocator.LargeObjectThreshold + 257;
 
 
         [TestMethod]

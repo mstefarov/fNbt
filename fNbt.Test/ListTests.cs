@@ -404,14 +404,13 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ParsedListCapacityFollowsPlausibleDeclaredCount() {
-            var list = new NbtList("items", NbtTagType.Int);
-            for (int i = 0; i < 100; i++) list.Add(new NbtInt(i));
+            // Each element is nine bytes on the wire, more than the reference it costs up front
+            var list = new NbtList("items", NbtTagType.Compound);
+            for (int i = 0; i < 100; i++) list.Add(new NbtCompound { new NbtInt("v", i) });
             byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
 
             // A complete seekable input vouches for the count, so storage is exact
-            var seekable = new NbtFile();
-            seekable.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
-            NbtList fromBuffer = seekable.RootTag.Get<NbtList>("items");
+            NbtList fromBuffer = TestFiles.Load(doc).RootTag.Get<NbtList>("items");
             Assert.AreEqual(100, fromBuffer.Count);
             Assert.AreEqual(100, fromBuffer.tags.Capacity);
 

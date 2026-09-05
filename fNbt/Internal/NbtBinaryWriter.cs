@@ -457,7 +457,7 @@ namespace fNbt {
 
 
 #if !NET8_0_OR_GREATER
-        // Stages 64 ints or 32 longs in the scratch buffer per stream call instead of one each.
+        // Stages a scratch buffer's worth of elements per stream call instead of one each.
         // Bytes go out the way Write(int) and Write(long) emit them.
         void WriteFixedWidth(int[] data, int offset, int count) {
             for (int written = 0; written < count;) {
@@ -491,8 +491,8 @@ namespace fNbt {
 
 
 #if NET8_0_OR_GREATER
-        // Large swapped arrays go out through a rented 64 KiB staging buffer instead of the
-        // 256-byte scratch, which would cost one stream call per 64 ints. Renting only pays
+        // Large swapped arrays go out through a rented staging buffer instead of the small
+        // scratch, which would cost a stream call every few dozen elements. Renting only pays
         // off past a few KiB.
         const int SwapStagingSize = 64 * 1024;
         const int SwapStagingThreshold = 4 * 1024;

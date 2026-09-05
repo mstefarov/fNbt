@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Globalization;
 using System.Text;
 
@@ -283,14 +282,14 @@ namespace fNbt {
 
         #region Reading / Writing
 
-        // Every element takes at least one byte in every flavor, so on a complete seekable input a
-        // declared count that fits the remaining bytes is plausible and worth allocating up front.
+        // Past the cap, a complete seekable input can vouch for the count: the reference array is
+        // allowed to grow up front only as far as the bytes still in the stream, so a corrupt count
+        // costs at most the input's own size, and lists of small scalars still grow as they go.
         // A selector may drop elements, so it keeps the bounded growth.
         static int ReadCapacity(NbtBinaryReader readStream, int length) {
             if (length <= MaxPresizedCapacity) return length;
-            Stream stream = readStream.BaseStream;
-            if (readStream.Selector == null && stream.CanSeek && length <= stream.Length - stream.Position) {
-                return length;
+            if (readStream.Selector == null && readStream.TryGetRemaining(out long remaining)) {
+                return (int)Math.Min(length, remaining / IntPtr.Size);
             }
             return MaxPresizedCapacity;
         }
@@ -547,13 +546,6 @@ namespace fNbt {
         }
 
         #endregion
-
-
-        /// <inheritdoc />
-        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
-        public override object Clone() {
-            return new NbtList(this, MaxDepth);
-        }
 
 
         internal override NbtTag Clone(int depthBudget) {
