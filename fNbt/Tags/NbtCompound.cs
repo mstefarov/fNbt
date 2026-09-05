@@ -90,13 +90,28 @@ namespace fNbt {
             if (other == null) throw new ArgumentNullException(nameof(other));
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             name = other.name;
-            // Sized up front, and fresh clones can't be duplicate keys or cycles: no revalidation.
-            EnsureCapacity(other.count);
+            int n = other.count;
+            if (n == 0) return;
+            // Fresh clones can't be duplicate keys or cycles, and they land at the same
+            // positions under the same names, so the storage and index copy across directly.
+            NbtTag[] clones = new NbtTag[n];
             NbtTag[] otherItems = other.items;
-            for (int i = 0; i < other.count; i++) {
+            for (int i = 0; i < clones.Length; i++) {
                 NbtTag childClone = otherItems[i].Clone(childDepthBudget);
-                AppendVerified(childClone);
                 childClone.Parent = this;
+                clones[i] = childClone;
+            }
+            items = clones;
+            count = n;
+            if (n > IndexThreshold) {
+                ulong[]? otherTable = other.table;
+                if (otherTable != null && other.tombstones == 0) {
+                    table = (ulong[])otherTable.Clone();
+                } else {
+                    int size = InitialTableSize;
+                    while (n * 2 >= size) size *= 4;
+                    BuildTable(size);
+                }
             }
         }
 
@@ -161,7 +176,7 @@ namespace fNbt {
             if (t == null) {
                 if (FindLinearPosition(tagName) >= 0) return false;
                 Append(tag);
-                if (table == null && count > IndexThreshold) BuildTable();
+                if (table == null && count > IndexThreshold) BuildTable(InitialTableSize);
                 return true;
             }
             uint hash = NameHash(tagName);
@@ -240,7 +255,7 @@ namespace fNbt {
                 return;
             }
             Append(tag);
-            if (count > IndexThreshold) BuildTable();
+            if (count > IndexThreshold) BuildTable(InitialTableSize);
         }
 
 
@@ -254,8 +269,8 @@ namespace fNbt {
         }
 
 
-        void BuildTable() {
-            ulong[] t = new ulong[InitialTableSize];
+        void BuildTable(int size) {
+            ulong[] t = new ulong[size];
             NbtTag[] local = items;
             for (int position = 0; position < count; position++) {
                 AddTableEntry(t, NameHash(local[position].name!), position);

@@ -120,6 +120,70 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void CloneOfIndexedCompoundIsIndependent() {
+            NbtCompound original = MakeIndexed(520);
+            NbtCompound clone = (NbtCompound)original.Clone();
+
+            CollectionAssert.AreEqual(original.Names.ToList(), clone.Names.ToList());
+            for (int i = 0; i < original.Count; i++) {
+                NbtTag clonedChild = clone["t" + i];
+                Assert.AreNotSame(original["t" + i], clonedChild);
+                Assert.AreEqual(i, clonedChild.IntValue);
+                Assert.AreSame(clone, clonedChild.Parent);
+            }
+
+            // Renames and removals on either side must not leak through a shared index
+            clone["t10"].Name = "clone10";
+            original["t20"].Name = "original20";
+            Assert.AreEqual(10, original["t10"].IntValue);
+            Assert.IsNull(original["clone10"]);
+            Assert.AreEqual(20, clone["t20"].IntValue);
+            Assert.IsNull(clone["original20"]);
+            Assert.IsTrue(clone.Remove("t30"));
+            Assert.AreEqual(30, original["t30"].IntValue);
+        }
+
+
+        [TestMethod]
+        public void CloneOfEditedIndexedCompoundRebuildsIndex() {
+            NbtCompound original = MakeIndexed(128);
+            for (int i = 0; i < 88; i++) {
+                Assert.IsTrue(original.Remove("t" + i));
+            }
+            original["t100"].Name = "renamed100";
+
+            NbtCompound clone = new NbtCompound(original);
+            CollectionAssert.AreEqual(original.Names.ToList(), clone.Names.ToList());
+            for (int i = 88; i < 128; i++) {
+                string name = i == 100 ? "renamed100" : "t" + i;
+                Assert.AreEqual(i, clone[name].IntValue);
+            }
+            Assert.IsTrue(clone.Remove("t90"));
+            Assert.AreEqual(90, original["t90"].IntValue);
+            Assert.Throws<ArgumentException>(() => clone.Add(new NbtInt("t92", -1)));
+        }
+
+
+        [TestMethod]
+        public void CloneOfShrunkIndexedCompoundGrowsAgain() {
+            NbtCompound original = MakeIndexed(128);
+            for (int i = 0; i < 115; i++) {
+                Assert.IsTrue(original.Remove("t" + i));
+            }
+
+            NbtCompound clone = (NbtCompound)original.Clone();
+            Assert.AreEqual(13, clone.Count);
+            for (int i = 128; i < 140; i++) {
+                clone.Add(new NbtInt("t" + i, i));
+            }
+            for (int i = 115; i < 140; i++) {
+                Assert.AreEqual(i, clone["t" + i].IntValue);
+            }
+            Assert.IsNull(original["t139"]);
+        }
+
+
+        [TestMethod]
         public void RemoveByInstanceOnIndexedCompound() {
             NbtCompound compound = MakeIndexed(40);
             NbtTag inside = compound["t20"];
