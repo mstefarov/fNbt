@@ -1,20 +1,48 @@
 using System;
 
 namespace fNbt {
-    // Exact encoded size of a tree, byte for byte what NbtBinaryWriter will emit.
-    // Flavor conformance is left to the write pass that follows.
+    // Exact encoded size of a tree, byte for byte what NbtBinaryWriter will emit. With validation
+    // on, the same walk enforces the flavor's tag-type and string ceilings in ValidateTree's
+    // order. Validation rides along as a struct type argument: the JIT compiles a checking and a
+    // check-free copy of the walk from this one source, so the unvalidated walk pays nothing.
     internal static class NbtSizer {
+        struct Validated { }
+
+        struct Unvalidated { }
+
+
         // Size of one complete document: type byte, optional root name, payload.
-        public static long SizeDocument(NbtTag tag, bool withName, NbtFlavor flavor) {
-            long size = 1;
-            if (withName) {
-                size += SizeString(tag.Name ?? "", flavor);
-            }
-            return size + SizePayload(tag, flavor, NbtTag.MaxDepth);
+        public static long SizeDocument(NbtTag tag, bool withName, NbtFlavor flavor, bool validate) {
+            return validate
+                ? SizeDocument<Validated>(tag, withName, flavor)
+                : SizeDocument<Unvalidated>(tag, withName, flavor);
         }
 
 
-        static long SizePayload(NbtTag tag, NbtFlavor flavor, int depthBudget) {
+        // Folds to a constant in each instantiation
+        static bool Validates<TMode>() where TMode : struct {
+            return typeof(TMode) == typeof(Validated);
+        }
+
+
+        static long SizeDocument<TMode>(NbtTag tag, bool withName, NbtFlavor flavor) where TMode : struct {
+            NbtTagType type = tag.TagType;
+            if (Validates<TMode>() && type > flavor.MaxTagType) {
+                throw NbtFormatException.NotPermitted(flavor, type);
+            }
+            long size = 1;
+            if (withName) {
+                size += SizeString<TMode>(tag.Name ?? "", flavor);
+            } else if (Validates<TMode>() && tag.Name != null) {
+                flavor.ValidateString(tag.Name);
+            }
+            return size + SizePayload<TMode>(tag, flavor, NbtTag.MaxDepth);
+        }
+
+
+        // The switch reads the tag's own type: handing a caller-read type in defeats the JIT's
+        // guarded devirtualization, which folds the switch for the hottest tag class here.
+        static long SizePayload<TMode>(NbtTag tag, NbtFlavor flavor, int depthBudget) where TMode : struct {
             switch (tag.TagType) {
                 case NbtTagType.Byte:
                     return 1;
@@ -35,7 +63,7 @@ namespace fNbt {
                     return 8;
 
                 case NbtTagType.String:
-                    return SizeString(((NbtString)tag).Value, flavor);
+                    return SizeString<TMode>(((NbtString)tag).Value, flavor);
 
                 case NbtTagType.ByteArray: {
                     byte[] value = ((NbtByteArray)tag).Value;
@@ -67,13 +95,17 @@ namespace fNbt {
                 case NbtTagType.List: {
                     int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     NbtList list = (NbtList)tag;
-                    if (list.ListType == NbtTagType.Unknown) {
+                    NbtTagType listType = list.ListType;
+                    if (listType == NbtTagType.Unknown) {
                         // The write pass would refuse this list; fail the same way before it
                         throw NbtFormatException.UnknownListType();
                     }
+                    if (Validates<TMode>() && listType > flavor.MaxTagType) {
+                        throw NbtFormatException.NotPermitted(flavor, listType);
+                    }
                     long size = 1 + SizeCount(list.tags.Count, flavor);
                     foreach (NbtTag child in list.tags) {
-                        size += SizePayload(child, flavor, childDepthBudget);
+                        size += SizePayload<TMode>(child, flavor, childDepthBudget);
                     }
                     return size;
                 }
@@ -85,11 +117,14 @@ namespace fNbt {
                     long size = 1; // the closing TAG_End
                     for (int i = 0; i < compound.Count; i++) {
                         NbtTag child = children[i];
+                        if (Validates<TMode>() && child.TagType > flavor.MaxTagType) {
+                            throw NbtFormatException.NotPermitted(flavor, child.TagType);
+                        }
                         if (child.Name == null) {
                             throw NbtFormatException.UnnamedChild();
                         }
-                        size += 1 + SizeString(child.Name, flavor)
-                                  + SizePayload(child, flavor, childDepthBudget);
+                        size += 1 + SizeString<TMode>(child.Name, flavor)
+                                  + SizePayload<TMode>(child, flavor, childDepthBudget);
                     }
                     return size;
                 }
@@ -100,10 +135,13 @@ namespace fNbt {
         }
 
 
-        static long SizeString(string value, NbtFlavor flavor) {
+        static long SizeString<TMode>(string value, NbtFlavor flavor) where TMode : struct {
             long bytes = NbtStringCodec.IsAsciiNoNul(value)
                 ? value.Length
                 : NbtStringCodec.GetByteCount(value, flavor.UsesModifiedUtf8);
+            if (Validates<TMode>() && bytes > flavor.MaxStringBytes) {
+                throw flavor.StringTooLong(bytes);
+            }
             if (flavor.UsesVarInts) {
                 return UnsignedVarIntLength((ulong)bytes) + bytes;
             }

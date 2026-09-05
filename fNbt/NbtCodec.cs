@@ -414,13 +414,18 @@ namespace fNbt {
 
 
         void ValidateDocument(NbtTag tag) {
+            ValidateRoot(tag);
+            if (validateOnWrite) {
+                flavor.ValidateTree(tag, NbtTag.MaxDepth);
+            }
+        }
+
+
+        void ValidateRoot(NbtTag tag) {
             if (!flavor.AllowsNonCompoundRoot && tag.TagType != NbtTagType.Compound) {
                 throw new NbtFormatException(
                     flavor.Name + " requires a TAG_Compound root, but given tag is " +
                     NbtTag.GetCanonicalTagName(tag.TagType));
-            }
-            if (validateOnWrite) {
-                flavor.ValidateTree(tag, NbtTag.MaxDepth);
             }
         }
 
@@ -452,16 +457,21 @@ namespace fNbt {
         /// if a list has Unknown list type and no elements; if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
-            // Sizing the tree up front buys an exact array from a single write pass. An absent
-            // document is a lone TAG_End byte, and WriteTag still checks that the flavor
-            // allows one.
-            long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor);
+            // Sizing the tree up front buys an exact array from a single write pass, and the
+            // sizing walk validates as it goes. An absent document is a lone TAG_End byte, and
+            // WriteTag still checks that the flavor allows one.
+            if (tag != null) ValidateRoot(tag);
+            long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor, validateOnWrite);
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
             byte[] result = ArrayAllocator.ForOverwrite<byte>((int)size, size);
             MemoryStream output = new MemoryStream(result, 0, result.Length, true);
-            WriteTag(tag, output);
+            if (tag == null) {
+                WriteTag(null, output);
+            } else {
+                WriteDocument(tag, CreateWriter(output));
+            }
             ClearUnwrittenTail(result, output.Position);
             return result;
         }

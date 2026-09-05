@@ -164,10 +164,15 @@ namespace fNbt {
             }
             long byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {
-                throw new NbtFormatException(
-                    "String is " + byteCount + " bytes, but the " + Name +
-                    " flavor allows at most " + MaxStringBytes + ".");
+                throw StringTooLong(byteCount);
             }
+        }
+
+
+        internal NbtFormatException StringTooLong(long byteCount) {
+            return new NbtFormatException(
+                "String is " + byteCount + " bytes, but the " + Name +
+                " flavor allows at most " + MaxStringBytes + ".");
         }
 
 

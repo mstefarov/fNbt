@@ -616,15 +616,17 @@ namespace fNbt {
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] SaveToBuffer(NbtCompression compression) {
             if (compression == NbtCompression.None) {
-                // Sizing up front buys an exact array from a single write pass.
-                // Flavor validation happens in the write.
-                long size = NbtSizer.SizeDocument(rootTag, withName: true, flavor);
+                // Sizing up front buys an exact array from a single write pass, and the sizing
+                // walk validates as it goes.
+                EnsureRootNamed();
+                long size = NbtSizer.SizeDocument(
+                    rootTag, withName: true, flavor, validateOnWrite && flavor.HasRestrictions);
                 if (size > int.MaxValue) {
                     throw new NotSupportedException("This NBT document is too large to save to a single buffer.");
                 }
                 byte[] buffer = ArrayAllocator.ForOverwrite<byte>((int)size, size);
                 MemoryStream output = new MemoryStream(buffer, 0, buffer.Length, true, true);
-                SaveToStream(output, NbtCompression.None);
+                rootTag.WriteTag(new NbtBinaryWriter(output, flavor), NbtTag.MaxDepth);
                 NbtCodec.ClearUnwrittenTail(buffer, output.Position);
                 return buffer;
             }
@@ -672,11 +674,7 @@ namespace fNbt {
                     throw new ArgumentOutOfRangeException(nameof(compression));
             }
 
-            if (rootTag.Name == null) {
-                // This may trigger if root tag has been renamed
-                throw new NbtFormatException(
-                    "Cannot save NbtFile: Root tag is not named. Its name may be an empty string, but not null.");
-            }
+            EnsureRootNamed();
             if (validateOnWrite && flavor.HasRestrictions) {
                 flavor.ValidateTree(rootTag, NbtTag.MaxDepth);
             }
@@ -731,6 +729,15 @@ namespace fNbt {
                 return stream.Position - startOffset;
             } else {
                 return ((ByteCountingStream)stream).BytesWritten;
+            }
+        }
+
+
+        void EnsureRootNamed() {
+            if (rootTag.Name == null) {
+                // This may trigger if root tag has been renamed
+                throw new NbtFormatException(
+                    "Cannot save NbtFile: Root tag is not named. Its name may be an empty string, but not null.");
             }
         }
 
