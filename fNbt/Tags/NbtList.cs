@@ -282,10 +282,9 @@ namespace fNbt {
 
         #region Reading / Writing
 
-        // Past the cap, a complete seekable input can vouch for the count: the reference array is
-        // allowed to grow up front only as far as the bytes still in the stream, so a corrupt count
-        // costs at most the input's own size, and lists of small scalars still grow as they go.
-        // A selector may drop elements, so it keeps the bounded growth.
+        // Past the cap, a complete seekable input can vouch for the count. The reference array may
+        // take up front only as many bytes as the stream still holds, so a corrupt count costs at
+        // most the input's own size. A selector may drop elements, so it keeps the bounded growth.
         static int ReadCapacity(NbtBinaryReader readStream, int length) {
             if (length <= MaxPresizedCapacity) return length;
             if (readStream.Selector == null && readStream.TryGetRemaining(out long remaining)) {

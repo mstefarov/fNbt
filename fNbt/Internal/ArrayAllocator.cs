@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 
 namespace fNbt {
     // Arrays that are filled completely before anyone can see them skip the runtime's zeroing
-    // on .NET Core. Only large-object-heap sizes qualify: below that, gen0 memory is cleared in
-    // bulk ahead of allocation, so there is nothing to save.
+    // on .NET Core. Only large-object-heap sizes qualify: smaller arrays come out of memory the
+    // GC has already cleared, so there is nothing to save.
     internal static class ArrayAllocator {
         internal const int LargeObjectThreshold = 85_000;
 

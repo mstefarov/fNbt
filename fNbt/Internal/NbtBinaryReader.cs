@@ -300,9 +300,9 @@ namespace fNbt {
 
 
         string LookUpName(int length) {
-            // A document of mostly unique names keeps missing; drop the cache so reads stop
-            // paying for hashing and probes, before the table has grown much but not before a
-            // repetitive body has had a chance to follow a unique-key header
+            // A document of mostly unique names keeps missing, so drop the cache and stop paying
+            // for hashing and probes. Judge early enough to keep the table small, late enough
+            // that a repetitive body can follow a unique-key header.
             if ((++nameLookups & 63) == 0 && nameLookups >= NameCacheJudgeAfter && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;

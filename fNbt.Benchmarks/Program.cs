@@ -20,11 +20,9 @@ class Program {
 
 #if NETFRAMEWORK
     // On .NET Framework, BenchmarkDotNet builds a project-reference job with its in-place Roslyn
-    // toolchain: a bare csc call whose exe carries no TargetFrameworkAttribute. The runtime then
-    // applies pre-4.7.2 compatibility quirks to that process, and GZip/Deflate decompression
-    // falls back to the managed inflater (7x slower, 41 KB more per stream) while the NuGet job's
-    // csproj-built exe uses native zlib. Building every job through the csproj toolchain keeps
-    // the two processes alike.
+    // toolchain, a bare csc call whose exe carries no TargetFrameworkAttribute. The runtime then
+    // applies pre-4.7.2 quirks to that process, so its GZip reads fall back to the managed
+    // inflater while the NuGet job's csproj-built exe uses native zlib. Build every job the same way.
     static Job OnCsProjToolchain(Job job) {
         return job.WithToolchain(CsProjClassicNetToolchain.Net48);
     }

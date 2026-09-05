@@ -74,7 +74,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void OffsetArrayWritesRoundTripAcrossStagingChunks() {
-            // Past the 4 KiB staging threshold and not a multiple of the 64 KiB chunk
+            // Large enough to rent a staging buffer, and not a whole number of chunks
             int[] ints = new int[16_389];
             long[] longs = new long[8_197];
             for (int i = 0; i < ints.Length; i++) ints[i] = unchecked(i * 16_777_619 ^ (int)0xA5A5A5A5);
