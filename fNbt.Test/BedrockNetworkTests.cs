@@ -66,19 +66,14 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CodecReadsGoldenBytes() {
-            NbtTag root = NbtCodec.For(NbtFlavor.BedrockNetwork)
-                                  .ReadTag(GoldenDoc, 0, GoldenDoc.Length, out int bytesConsumed);
+        public void CodecReadsAndWritesGoldenBytes() {
+            NbtCodec codec = NbtCodec.For(NbtFlavor.BedrockNetwork);
+            NbtCompound expected = MakeGoldenTree();
+            CollectionAssert.AreEqual(GoldenDoc, codec.WriteTag(expected));
+
+            NbtTag root = codec.ReadTag(GoldenDoc, 0, GoldenDoc.Length, out int bytesConsumed);
             Assert.AreEqual(GoldenDoc.Length, bytesConsumed);
-            NbtAssert.AreEqual(MakeGoldenTree(), root);
-        }
-
-
-        [TestMethod]
-        public void CodecWritesGoldenBytes() {
-            // Insertion order is guaranteed, so the whole golden doc can be pinned byte for byte
-            CollectionAssert.AreEqual(GoldenDoc,
-                                      NbtCodec.For(NbtFlavor.BedrockNetwork).WriteTag(MakeGoldenTree()));
+            NbtAssert.AreEqual(expected, root);
         }
 
 

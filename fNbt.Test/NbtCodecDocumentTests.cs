@@ -25,35 +25,22 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ForReturnsCachedEquivalentCodec() {
-            Assert.AreSame(NbtCodec.For(NbtFlavor.Java), NbtCodec.For(NbtFlavor.Java));
+        public void FileFlavorsMatchNbtFileOutputAndRoundTrip() {
+            foreach (NbtFlavor flavor in new[] { NbtFlavor.Java, NbtFlavor.Bedrock }) {
+                NbtCompound root = MakeSampleRoot("hello");
+                NbtCodec codec = NbtCodec.For(flavor);
+                byte[] doc = codec.WriteTag(root);
+                Assert.AreSame(codec, NbtCodec.For(flavor), flavor.Name);
+                CollectionAssert.AreEqual(new NbtCodec(flavor).WriteTag(root), doc, flavor.Name);
 
-            NbtCompound root = MakeSampleRoot("hello");
-            byte[] cached = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
-            byte[] fresh = new NbtCodec(NbtFlavor.Bedrock).WriteTag(root);
-            CollectionAssert.AreEqual(fresh, cached);
-        }
+                NbtFile file = new NbtFile(root, flavor);
+                CollectionAssert.AreEqual(file.SaveToBuffer(NbtCompression.None), doc, flavor.Name);
 
-
-        [TestMethod]
-        public void JavaWriteMatchesNbtFileOutput() {
-            NbtCompound root = MakeSampleRoot("hello");
-            byte[] codecBytes = NbtCodec.For(NbtFlavor.Java).WriteTag(root);
-
-            var file = new NbtFile(root, NbtFlavor.Java);
-            byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
-            CollectionAssert.AreEqual(fileBytes, codecBytes);
-        }
-
-
-        [TestMethod]
-        public void BedrockWriteMatchesLittleEndianNbtFileOutput() {
-            NbtCompound root = MakeSampleRoot("hello");
-            byte[] codecBytes = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
-
-            var file = new NbtFile(root, NbtFlavor.Bedrock);
-            byte[] fileBytes = file.SaveToBuffer(NbtCompression.None);
-            CollectionAssert.AreEqual(fileBytes, codecBytes);
+                NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
+                Assert.AreEqual(doc.Length, bytesConsumed, flavor.Name);
+                Assert.AreEqual("hello", read.Name, flavor.Name);
+                NbtAssert.AreEqual(root, read, flavor.Name);
+            }
         }
 
 
@@ -76,31 +63,6 @@ namespace fNbt.Test {
                 0x01, 0x00, 0x00, 0x00, // value 1, little-endian
                 0x00
             }, bedrockDoc);
-        }
-
-
-        [TestMethod]
-        public void JavaRoundTripPreservesTree() {
-            NbtCompound root = MakeSampleRoot("hello");
-            NbtCodec codec = NbtCodec.For(NbtFlavor.Java);
-            byte[] doc = codec.WriteTag(root);
-
-            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
-            Assert.AreEqual(doc.Length, bytesConsumed);
-            Assert.AreEqual("hello", read.Name);
-            NbtAssert.AreEqual(root, read);
-        }
-
-
-        [TestMethod]
-        public void BedrockRoundTripPreservesTree() {
-            NbtCompound root = MakeSampleRoot("hello");
-            var codec = new NbtCodec(NbtFlavor.Bedrock);
-
-            byte[] doc = codec.WriteTag(root);
-            NbtTag read = codec.ReadTag(doc, 0, doc.Length, out int bytesConsumed);
-            Assert.AreEqual(doc.Length, bytesConsumed);
-            NbtAssert.AreEqual(root, read);
         }
 
 
@@ -209,6 +171,7 @@ namespace fNbt.Test {
             // LevelDB values are back-to-back little-endian roots
             NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             using (var ms = new MemoryStream()) {
+                Assert.AreEqual(0, codec.ReadConcatenatedTags(ms).Count());
                 for (int i = 0; i < 3; i++) {
                     codec.WriteTag(new NbtCompound("root" + i) { new NbtInt("i", i) }, ms);
                 }
@@ -221,14 +184,6 @@ namespace fNbt.Test {
                     Assert.AreEqual(i, tags[i]["i"].IntValue);
                 }
                 Assert.AreEqual(ms.Length, ms.Position);
-            }
-        }
-
-
-        [TestMethod]
-        public void ConcatenatedTagsOnEmptyStreamYieldsNothing() {
-            using (var ms = new MemoryStream()) {
-                Assert.AreEqual(0, NbtCodec.For(NbtFlavor.Bedrock).ReadConcatenatedTags(ms).Count());
             }
         }
 

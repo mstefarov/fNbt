@@ -18,12 +18,14 @@ namespace fNbt.Test {
         public void NbtFileFlavorRoundTrip() {
             NbtCompound root = MakeSampleRoot("hello");
             var file = new NbtFile(root, NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, file.Flavor);
             byte[] doc = file.SaveToBuffer(NbtCompression.None);
-
-            // Bytes match the codec's little-endian output exactly
-            CollectionAssert.AreEqual(NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root), doc);
+            NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, codec.Flavor);
+            CollectionAssert.AreEqual(codec.WriteTag(root), doc);
 
             NbtFile reloaded = TestFiles.Load(doc, NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, reloaded.Flavor);
             NbtAssert.AreEqual(root, reloaded.RootTag);
         }
 
@@ -55,17 +57,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void EntryPointsExposeTheirFlavor() {
-            Assert.AreSame(NbtFlavor.Bedrock, NbtCodec.For(NbtFlavor.Bedrock).Flavor);
-            Assert.AreSame(NbtFlavor.Bedrock, TestFiles.OpenReader(new byte[] { 0x0A }, NbtFlavor.Bedrock).Flavor);
-            using (var ms = new MemoryStream()) {
-                Assert.AreSame(NbtFlavor.Bedrock, new NbtWriter(ms, "r", NbtFlavor.Bedrock).Flavor);
-                Assert.AreSame(NbtFlavor.Java, new NbtWriter(ms, "r").Flavor);
-            }
-        }
-
-
-        [TestMethod]
         public void ReadRootTagNameWorksOnEveryFileFlavor() {
             NbtFlavor[] flavors = {
                 NbtFlavor.Java, NbtFlavor.JavaAnvil, NbtFlavor.JavaLegacy,
@@ -78,29 +69,18 @@ namespace fNbt.Test {
                     Assert.AreEqual("rootName",
                                     NbtFile.ReadRootTagName(ms, NbtCompression.None, flavor),
                                     flavor.Name);
+                    if (ReferenceEquals(flavor, NbtFlavor.Bedrock)) {
+                        ms.Position = 0;
+                        Assert.Throws<ArgumentNullException>(
+                            () => NbtFile.ReadRootTagName(ms, NbtCompression.None, (NbtFlavor)null));
+                        Assert.Throws<ArgumentException>(
+                            () => NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.JavaNetwork));
+#pragma warning disable 618
+                        Assert.AreEqual("rootName", NbtFile.ReadRootTagName(ms, NbtCompression.None, false, 0));
+#pragma warning restore 618
+                    }
                 }
             }
-        }
-
-
-        [TestMethod]
-        public void ReadRootTagNameTakesFlavor() {
-            NbtCompound root = MakeSampleRoot("hello");
-            byte[] doc = new NbtFile(root, NbtFlavor.Bedrock).SaveToBuffer(NbtCompression.None);
-            using (var ms = new MemoryStream(doc)) {
-                Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, NbtFlavor.Bedrock));
-            }
-            Assert.Throws<ArgumentNullException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.None, (NbtFlavor)null));
-            Assert.Throws<ArgumentException>(
-                () => NbtFile.ReadRootTagName(new MemoryStream(doc), NbtCompression.None, NbtFlavor.JavaNetwork));
-
-            // The obsolete bool overload still maps correctly
-#pragma warning disable 618
-            using (var ms = new MemoryStream(doc)) {
-                Assert.AreEqual("hello", NbtFile.ReadRootTagName(ms, NbtCompression.None, false, 0));
-            }
-#pragma warning restore 618
         }
 
 
@@ -132,8 +112,9 @@ namespace fNbt.Test {
             NbtCompound root = MakeSampleRoot("hello");
             byte[] doc = NbtCodec.For(NbtFlavor.Bedrock).WriteTag(root);
 
-            NbtTag read = TestFiles.OpenReader(doc, NbtFlavor.Bedrock).ReadAsTag();
-            NbtAssert.AreEqual(root, read);
+            NbtReader flavorReader = TestFiles.OpenReader(doc, NbtFlavor.Bedrock);
+            Assert.AreSame(NbtFlavor.Bedrock, flavorReader.Flavor);
+            NbtAssert.AreEqual(root, flavorReader.ReadAsTag());
 
             // The obsolete bool ctor still maps correctly
 #pragma warning disable 618
@@ -170,6 +151,7 @@ namespace fNbt.Test {
 
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "hello", NbtFlavor.Bedrock);
+                Assert.AreSame(NbtFlavor.Bedrock, writer.Flavor);
                 writer.WriteInt("id", 42);
                 writer.WriteString("motd", "Hello, world!");
                 writer.EndCompound();

@@ -78,18 +78,29 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void WriteValidationChecksEmptyListElementTypes() {
+        public void WriteValidationChecksListElementTypes() {
             // The element type is written even when no elements follow it
             var root = new NbtCompound("r") { new NbtList("l", NbtTagType.LongArray) };
-            Assert.Throws<NbtFormatException>(() => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(root));
+            NbtCodec strict = new NbtCodec(NbtFlavor.JavaLegacy);
+            Assert.Throws<NbtFormatException>(() => strict.WriteTag(root));
 
             // An unset element type gets the list's own message, not an empty type name
             var unset = new NbtCompound("r") { new NbtList("l") };
-            NbtFormatException ex = Assert.Throws<NbtFormatException>(
-                () => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(unset));
+            NbtFormatException ex = Assert.Throws<NbtFormatException>(() => strict.WriteTag(unset));
             StringAssert.Contains(ex.Message, "Unknown ListType");
             new NbtCodec(NbtFlavor.Java).WriteTag(root);
             new NbtCodec(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnWrite = false }).WriteTag(root);
+
+            using (MemoryStream output = new MemoryStream()) {
+                // Stream writes validate the tree without the buffer overload's sizing walk.
+                NbtAssert.WritesNothing<NbtFormatException>(output, () => strict.WriteTag(root, output));
+                ex = NbtAssert.WritesNothing<NbtFormatException>(output, () => strict.WriteTag(unset, output));
+                StringAssert.Contains(ex.Message, "Unknown ListType");
+
+                unset.Get<NbtList>("l").Add(new NbtInt(1));
+                strict.WriteTag(unset, output);
+                NbtAssert.AreEqual(unset, TestFiles.Load(output.ToArray(), NbtFlavor.JavaLegacy).RootTag);
+            }
 
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "r", NbtFlavor.Bedrock);

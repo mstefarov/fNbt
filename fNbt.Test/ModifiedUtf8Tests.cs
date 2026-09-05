@@ -78,13 +78,14 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void EmbeddedNulRoundTrips() {
-            byte[] javaDoc = StringDoc(NbtFlavor.Java, "a\0b");
-            CollectionAssert.AreEqual(new byte[] { 0x61, 0xC0, 0x80, 0x62 }, StringPayload(javaDoc, true));
-            Assert.AreEqual("a\0b", ReadStringDoc(NbtFlavor.Java, javaDoc));
+            const string value = "a\0\u00E9b";
+            byte[] javaDoc = StringDoc(NbtFlavor.Java, value);
+            CollectionAssert.AreEqual(new byte[] { 0x61, 0xC0, 0x80, 0xC3, 0xA9, 0x62 }, StringPayload(javaDoc, true));
+            Assert.AreEqual(value, ReadStringDoc(NbtFlavor.Java, javaDoc));
 
-            byte[] bedrockDoc = StringDoc(NbtFlavor.Bedrock, "a\0b");
-            CollectionAssert.AreEqual(new byte[] { 0x61, 0x00, 0x62 }, StringPayload(bedrockDoc, false));
-            Assert.AreEqual("a\0b", ReadStringDoc(NbtFlavor.Bedrock, bedrockDoc));
+            byte[] bedrockDoc = StringDoc(NbtFlavor.Bedrock, value);
+            CollectionAssert.AreEqual(new byte[] { 0x61, 0x00, 0xC3, 0xA9, 0x62 }, StringPayload(bedrockDoc, false));
+            Assert.AreEqual(value, ReadStringDoc(NbtFlavor.Bedrock, bedrockDoc));
 
             // A raw 00 byte inside a Java string also reads fine
             byte[] rawNul = MakeJavaStringDoc(new byte[] { 0x61, 0x00, 0x62 });
@@ -201,6 +202,12 @@ namespace fNbt.Test {
         public void LenientDecodeRejectsMalformedData() {
             // The overlong NUL forces the lenient path; each tail is invalid there
             byte[][] cases = {
+                new byte[] { 0xC0, 0x80, 0xC2 },                   // truncated 2-byte sequence
+                new byte[] { 0xC0, 0x80, 0xC1, 0xBF },             // overlong 2-byte ASCII
+                new byte[] { 0xC0, 0x80, 0xC0, 0x81 },             // overlong non-NUL with C0 lead
+                new byte[] { 0xC0, 0x80, 0xE1, 0x28, 0x80 },       // broken first continuation
+                new byte[] { 0xC0, 0x80, 0xE1, 0x80, 0x28 },       // broken second continuation
+                new byte[] { 0xC0, 0x80, 0xE0, 0x80, 0x80 },       // overlong 3-byte sequence
                 new byte[] { 0xC0, 0x80, 0xF8 },                   // 5-byte sequence lead
                 new byte[] { 0xC0, 0x80, 0xFF },                   // invalid lead byte
                 new byte[] { 0xC0, 0x80, 0xF0, 0x80, 0x80, 0x80 }, // overlong 4-byte sequence

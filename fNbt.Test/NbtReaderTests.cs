@@ -36,42 +36,44 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void CachedValuesCanBeReadTwice() {
-            NbtReader reader = TestFiles.OpenReader(TestFiles.MakeAllValuesRoot());
+        public void CachedValuesCanBeReadAgainAsValuesOrTags() {
+            NbtCompound root = TestFiles.MakeAllValuesRoot();
+            NbtReader reader = TestFiles.OpenReader(root);
             Assert.IsFalse(reader.CacheTagValues);
             reader.CacheTagValues = true;
             Assert.IsTrue(reader.ReadToFollowing()); // root
+            Assert.IsTrue(reader.ReadToFollowing()); // first value
 
-            Assert.IsTrue(reader.ReadToFollowing()); // byte
+            foreach (NbtTag expected in root) {
+                object value = reader.ReadValue();
+                if (value is Array array) {
+                    CollectionAssert.AreEqual(array, (Array)reader.ReadValue(), expected.Name);
+                } else {
+                    Assert.AreEqual(value, reader.ReadValue(), expected.Name);
+                }
+                NbtAssert.AreEqual(expected, reader.ReadAsTag());
+            }
+            Assert.IsTrue(reader.IsAtStreamEnd);
+
+            // Enabling the cache cannot recover an already consumed value.
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("byte"));
             Assert.AreEqual((byte)1, reader.ReadValue());
-            Assert.AreEqual((byte)1, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // short
+            reader.CacheTagValues = true;
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual("byte", reader.TagName);
+            Assert.IsFalse(reader.IsInErrorState);
+
+            Assert.IsTrue(reader.ReadToFollowing("short"));
             Assert.AreEqual((short)2, reader.ReadValue());
-            Assert.AreEqual((short)2, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // int
+            reader.CacheTagValues = false;
+            reader.CacheTagValues = true;
+            Assert.Throws<InvalidOperationException>(() => reader.ReadValue());
+            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
+            Assert.AreEqual("short", reader.TagName);
+            Assert.IsTrue(reader.ReadToFollowing("int"));
             Assert.AreEqual(3, reader.ReadValue());
             Assert.AreEqual(3, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // long
-            Assert.AreEqual(4L, reader.ReadValue());
-            Assert.AreEqual(4L, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // float
-            Assert.AreEqual(5f, reader.ReadValue());
-            Assert.AreEqual(5f, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // double
-            Assert.AreEqual(6d, reader.ReadValue());
-            Assert.AreEqual(6d, reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // byteArray
-            CollectionAssert.AreEqual(new byte[] { 10, 11, 12 }, (byte[])reader.ReadValue());
-            CollectionAssert.AreEqual(new byte[] { 10, 11, 12 }, (byte[])reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // intArray
-            CollectionAssert.AreEqual(new[] { 20, 21, 22 }, (int[])reader.ReadValue());
-            CollectionAssert.AreEqual(new[] { 20, 21, 22 }, (int[])reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing());
-            CollectionAssert.AreEqual(new long[] { 200, 210, 220 }, (long[])reader.ReadValue());
-            CollectionAssert.AreEqual(new long[] { 200, 210, 220 }, (long[])reader.ReadValue());
-            Assert.IsTrue(reader.ReadToFollowing()); // string
-            Assert.AreEqual("123", reader.ReadValue());
-            Assert.AreEqual("123", reader.ReadValue());
         }
 
 
@@ -416,6 +418,8 @@ namespace fNbt.Test {
             reader.ReadToFollowing("IntList");
             int[] ints = reader.ReadListAsArray<int>();
             CollectionAssert.AreEqual(new[] { 1, 2000, -3000000 }, ints);
+            Assert.AreEqual(0, reader.ReadListAsArray<int>().Length, "Reading a completed list again returns no elements.");
+            Assert.IsFalse(reader.IsInErrorState);
 
             // test long values
             reader.ReadToFollowing("LongList");
@@ -472,22 +476,6 @@ namespace fNbt.Test {
             Assert.Throws<EndOfStreamException>(() => reader.ReadListAsArray<int>());
             // Partial reads due to bad count are not recoverable.
             Assert.IsTrue(reader.IsInErrorState);
-        }
-
-
-        [TestMethod]
-        public void ReadListAsArrayTwiceReturnsEmpty() {
-            // Reading a value list to completion, then calling again, must return an empty array
-            // rather than reading past the list end.
-            NbtCompound intList = TestFiles.MakeAllListsRoot();
-            NbtReader reader = TestFiles.OpenReader(intList);
-
-            reader.ReadToFollowing("IntList");
-            int[] first = reader.ReadListAsArray<int>();
-            Assert.AreEqual(3, first.Length);
-            int[] second = reader.ReadListAsArray<int>();
-            Assert.AreEqual(0, second.Length);
-            Assert.IsFalse(reader.IsInErrorState);
         }
 
 
@@ -874,6 +862,8 @@ namespace fNbt.Test {
             var root = new NbtCompound("r") {
                 new NbtInt("i", 3),
                 new NbtByte("b", 5),
+                new NbtShort("short", 2),
+                new NbtLong("long", 6),
                 new NbtString("s", "Friday"),
                 new NbtString("bad", "Someday"),
                 new NbtDouble("d", 1.0)
@@ -885,6 +875,10 @@ namespace fNbt.Test {
             Assert.AreEqual((NbtTagType)3, reader.ReadValueAs<NbtTagType>());
             Assert.IsTrue(reader.ReadToFollowing("b"));
             Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("short"));
+            Assert.AreEqual(DayOfWeek.Tuesday, reader.ReadValueAs<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("long"));
+            Assert.AreEqual(DayOfWeek.Saturday, reader.ReadValueAs<DayOfWeek>());
             Assert.IsTrue(reader.ReadToFollowing("s"));
             Assert.AreEqual(DayOfWeek.Friday, reader.ReadValueAs<DayOfWeek>());
             Assert.IsTrue(reader.ReadToFollowing("bad"));
@@ -900,6 +894,9 @@ namespace fNbt.Test {
             var root = new NbtCompound("r") {
                 new NbtList("ints") { new NbtInt(1), new NbtInt(6) },
                 new NbtList("bytes") { new NbtByte(2), new NbtByte(0) },
+                new NbtList("types") { new NbtByte(1), new NbtByte(3) },
+                new NbtList("shorts") { new NbtShort(-1), new NbtShort(2) },
+                new NbtList("longs") { new NbtLong(-1), new NbtLong(1L << 40) },
                 new NbtList("names") { new NbtString("Monday"), new NbtString("Sunday") },
                 new NbtList("doubles") { new NbtDouble(1), new NbtDouble(2) },
                 new NbtInt("after", 9)
@@ -912,6 +909,18 @@ namespace fNbt.Test {
             // Other integral element types convert one at a time
             Assert.IsTrue(reader.ReadToFollowing("bytes"));
             CollectionAssert.AreEqual(new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
+            Assert.IsTrue(reader.ReadToFollowing("types"));
+            NbtTagType[] types = reader.ReadListAsArray<NbtTagType>();
+            CollectionAssert.AreEqual(new[] { NbtTagType.Byte, NbtTagType.Int }, types);
+            Assert.IsInstanceOfType<NbtTagType>(((System.Collections.IList)types)[0]);
+            Assert.IsTrue(reader.ReadToFollowing("shorts"));
+            ReaderShortEnum[] shorts = reader.ReadListAsArray<ReaderShortEnum>();
+            CollectionAssert.AreEqual(new[] { ReaderShortEnum.Negative, ReaderShortEnum.Positive }, shorts);
+            Assert.IsInstanceOfType<ReaderShortEnum>(((System.Collections.IList)shorts)[0]);
+            Assert.IsTrue(reader.ReadToFollowing("longs"));
+            ReaderLongEnum[] longs = reader.ReadListAsArray<ReaderLongEnum>();
+            CollectionAssert.AreEqual(new[] { ReaderLongEnum.Negative, ReaderLongEnum.Large }, longs);
+            Assert.IsInstanceOfType<ReaderLongEnum>(((System.Collections.IList)longs)[0]);
             Assert.IsTrue(reader.ReadToFollowing("names"));
             CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
 
@@ -921,33 +930,7 @@ namespace fNbt.Test {
             Assert.IsFalse(reader.IsInErrorState);
             CollectionAssert.AreEqual(new[] { 1.0, 2.0 }, reader.ReadListAsArray<double>());
             Assert.IsTrue(reader.ReadToFollowing("after"));
-        }
-
-
-        [TestMethod]
-        public void ReadAsTagUsesTheCachedValue() {
-            var root = new NbtCompound("r") {
-                new NbtInt("i", 5),
-                new NbtByteArray("a", new byte[] { 1, 2 }),
-                new NbtInt("after", 9)
-            };
-            NbtReader reader = TestFiles.OpenReader(root);
-            reader.CacheTagValues = true;
-            Assert.IsTrue(reader.ReadToFollowing("i"));
-            Assert.AreEqual(5, reader.ReadValue());
-            NbtAssert.AreEqual(new NbtInt("i", 5), reader.ReadAsTag());
-            Assert.AreEqual("a", reader.TagName);
-            CollectionAssert.AreEqual(new byte[] { 1, 2 }, (byte[])reader.ReadValue());
-            NbtAssert.AreEqual(new NbtByteArray("a", new byte[] { 1, 2 }), reader.ReadAsTag());
-            Assert.AreEqual("after", reader.TagName);
-
-            // Without the cache, the consumed value is gone and the reader stays put
-            reader = TestFiles.OpenReader(root);
-            Assert.IsTrue(reader.ReadToFollowing("i"));
-            reader.ReadValue();
-            Assert.Throws<InvalidOperationException>(() => reader.ReadAsTag());
-            Assert.AreEqual("i", reader.TagName);
-            Assert.IsFalse(reader.IsInErrorState);
+            Assert.AreEqual(9, reader.ReadValue());
         }
 
 
@@ -1035,21 +1018,16 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void ReadsOneByteAtATime() {
-            // read the whole thing as one tag, one byte at a time
-            TestFiles.AssertAllValues(PartialReadTestInternal(new NbtFile(TestFiles.MakeAllValuesRoot())));
-            TestFiles.AssertSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile()));
-            TestFiles.AssertBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big)));
-        }
-
-
-        [TestMethod]
-        public void ReadsInFourByteBatches() {
-            // read the whole thing as one tag, in batches of 4 bytes
-            // Verifies fix for https://github.com/fragmer/fNbt/issues/26
-            TestFiles.AssertAllValues(PartialReadTestInternal(new NbtFile(TestFiles.MakeAllValuesRoot()), 4));
-            TestFiles.AssertSmallFile(PartialReadTestInternal(TestFiles.MakeSmallFile(), 4));
-            TestFiles.AssertBigFile(PartialReadTestInternal(new NbtFile(TestFiles.Big), 4));
+        public void PartialReadsPreserveWholeDocuments() {
+            NbtFile allValues = new NbtFile(TestFiles.MakeAllValuesRoot());
+            NbtFile small = TestFiles.MakeSmallFile();
+            NbtFile big = new NbtFile(TestFiles.Big);
+            // Four-byte batches retain the regression from https://github.com/fragmer/fNbt/issues/26.
+            foreach (int increment in new[] { 1, 4 }) {
+                TestFiles.AssertAllValues(PartialReadTestInternal(allValues, increment));
+                TestFiles.AssertSmallFile(PartialReadTestInternal(small, increment));
+                TestFiles.AssertBigFile(PartialReadTestInternal(big, increment));
+            }
         }
 
 

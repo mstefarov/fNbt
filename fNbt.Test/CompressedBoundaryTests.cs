@@ -323,6 +323,15 @@ namespace fNbt.Test {
                 .Concat(doc.Skip(10))
                 .ToArray();
 
+            // Truncate at every header byte, including within optional fields and their terminators.
+            for (int length = 0; length < headerBytes.Length + 2; length++) {
+                using (Stream truncated = new NonSeekableStream(new MemoryStream(fancy, 0, length))) {
+                    Assert.Throws<EndOfStreamException>(
+                        () => new NbtFile().LoadFromStream(truncated, NbtCompression.GZip),
+                        "Header length " + length);
+                }
+            }
+
             // A wrong header CRC is rejected on both paths
             byte[] badCrc = (byte[])fancy.Clone();
             badCrc[headerBytes.Length] ^= 0xFF;
@@ -337,6 +346,22 @@ namespace fNbt.Test {
                 Assert.Throws<InvalidDataException>(
                     () => new NbtFile().LoadFromStream(badSource, NbtCompression.GZip),
                     seekable ? "seekable" : "non-seekable");
+            }
+        }
+
+
+        [TestMethod]
+        public void NonSeekableGZipLoadRejectsInvalidHeaders() {
+            byte[] doc = MakeDoc(NbtCompression.GZip);
+            // Bad magic bytes, unsupported compression method, and reserved flag bits.
+            foreach (int index in new[] { 0, 1, 2, 3 }) {
+                byte[] malformed = (byte[])doc.Clone();
+                malformed[index] = 0xE0;
+                using (Stream source = new NonSeekableStream(new MemoryStream(malformed))) {
+                    Assert.Throws<InvalidDataException>(
+                        () => new NbtFile().LoadFromStream(source, NbtCompression.GZip),
+                        "Header byte " + index);
+                }
             }
         }
 

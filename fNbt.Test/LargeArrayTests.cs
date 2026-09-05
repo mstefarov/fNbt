@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace fNbt.Test {
@@ -12,29 +13,43 @@ namespace fNbt.Test {
         public void LargeExactBuffersMatchStreamOutput() {
             byte[] payload = new byte[LargeByteCount];
             for (int i = 0; i < payload.Length; i++) payload[i] = (byte)(i * 31 + 7);
-            var root = new NbtCompound("root") {
+            NbtCompound root = new NbtCompound("root") {
                 new NbtByteArray("bytes", payload),
                 new NbtString("tail", "done")
             };
 
-            var expectedStream = new MemoryStream();
-            new NbtFile(root).SaveToStream(expectedStream, NbtCompression.None);
-            byte[] expected = expectedStream.ToArray();
+            using (MemoryStream expectedStream = new MemoryStream())
+            using (MemoryStream writerStream = new MemoryStream()) {
+                new NbtFile(root).SaveToStream(expectedStream, NbtCompression.None);
+                byte[] expected = expectedStream.ToArray();
 
-            CollectionAssert.AreEqual(expected, new NbtFile(root).SaveToBuffer(NbtCompression.None));
-            CollectionAssert.AreEqual(expected, NbtCodec.For(NbtFlavor.Java).WriteTag(root));
+                CollectionAssert.AreEqual(expected, new NbtFile(root).SaveToBuffer(NbtCompression.None));
+                CollectionAssert.AreEqual(expected, NbtCodec.For(NbtFlavor.Java).WriteTag(root));
+
+                using (BufferedStream buffered = new BufferedStream(writerStream)) {
+                    NbtWriter writer = new NbtWriter(buffered, "root");
+                    writer.WriteByteArray("bytes", payload);
+                    writer.WriteString("tail", "done");
+                    writer.EndCompound();
+                    buffered.Flush();
+                    NbtFile reloaded = TestFiles.FinishAndReload(writer, writerStream);
+                    CollectionAssert.AreEqual(expected, writerStream.ToArray());
+                    NbtAssert.AreEqual(root, reloaded.RootTag);
+                }
+            }
         }
 
 
         [TestMethod]
         public void LargeCompressedBufferRoundTrips() {
             byte[] payload = new byte[LargeByteCount * 4];
-            for (int i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 251);
-            var file = new NbtFile(new NbtCompound("root") { new NbtByteArray("bytes", payload) });
+            new Random(12345).NextBytes(payload);
+            NbtFile file = new NbtFile(new NbtCompound("root") { new NbtByteArray("bytes", payload) });
 
             foreach (NbtCompression compression in new[] { NbtCompression.GZip, NbtCompression.ZLib }) {
                 byte[] buffer = file.SaveToBuffer(compression);
-                var reloaded = new NbtFile();
+                Assert.IsTrue(buffer.Length > 3 * 64 * 1024, compression.ToString());
+                NbtFile reloaded = new NbtFile();
                 reloaded.LoadFromBuffer(buffer, 0, buffer.Length, NbtCompression.AutoDetect);
                 CollectionAssert.AreEqual(payload, reloaded.RootTag["bytes"].ByteArrayValue);
             }

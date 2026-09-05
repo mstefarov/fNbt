@@ -151,6 +151,9 @@ namespace fNbt.Test {
             using (var nss = new NonSeekableStream(ms)) {
                 Assert.Throws<EndOfStreamException>(
                     () => file.LoadFromStream(nss, NbtCompression.None));
+                ms.Position = 0;
+                Assert.Throws<EndOfStreamException>(
+                    () => file.LoadFromStream(nss, NbtCompression.None, tag => tag.Name != "a"));
             }
         }
 
