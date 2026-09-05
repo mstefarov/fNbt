@@ -401,5 +401,26 @@ namespace fNbt.Test {
             // Inserting a tag should set ListType
             Assert.AreEqual(NbtTagType.Int, list.ListType);
         }
+
+        [TestMethod]
+        public void ParsedListCapacityFollowsPlausibleDeclaredCount() {
+            var list = new NbtList("items", NbtTagType.Int);
+            for (int i = 0; i < 100; i++) list.Add(new NbtInt(i));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            // A complete seekable input vouches for the count, so storage is exact
+            var seekable = new NbtFile();
+            seekable.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
+            NbtList fromBuffer = seekable.RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, fromBuffer.Count);
+            Assert.AreEqual(100, fromBuffer.tags.Capacity);
+
+            // A non-seekable input cannot, so the list grows past the small preset
+            var streamed = new NbtFile();
+            streamed.LoadFromStream(new NonSeekableStream(new MemoryStream(doc)), NbtCompression.None);
+            NbtList fromStream = streamed.RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, fromStream.Count);
+            Assert.AreEqual(128, fromStream.tags.Capacity);
+        }
     }
 }

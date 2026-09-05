@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Globalization;
 using System.Text;
 
@@ -15,7 +16,7 @@ namespace fNbt {
         internal readonly List<NbtTag> tags = new List<NbtTag>();
 
         // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
-        // of a corrupt length. Longer lists just grow as before.
+        // of a corrupt length. Longer lists grow as they go, unless the input can vouch for the count.
         const int MaxPresizedCapacity = 16;
 
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
@@ -282,6 +283,19 @@ namespace fNbt {
 
         #region Reading / Writing
 
+        // Every element takes at least one byte in every flavor, so on a complete seekable input a
+        // declared count that fits the remaining bytes is plausible and worth allocating up front.
+        // A selector may drop elements, so it keeps the bounded growth.
+        static int ReadCapacity(NbtBinaryReader readStream, int length) {
+            if (length <= MaxPresizedCapacity) return length;
+            Stream stream = readStream.BaseStream;
+            if (readStream.Selector == null && stream.CanSeek && length <= stream.Length - stream.Position) {
+                return length;
+            }
+            return MaxPresizedCapacity;
+        }
+
+
         internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
                 readStream.SkipPayload(NbtTagType.List, depthBudget);
@@ -301,7 +315,7 @@ namespace fNbt {
             // The reference array grows to hold every element, so it counts against the cap the
             // way an array payload does. The element objects themselves are not counted.
             readStream.EnsureAllocation((long)length * IntPtr.Size);
-            tags.Capacity = Math.Min(length, MaxPresizedCapacity);
+            tags.Capacity = ReadCapacity(readStream, length);
 
             for (int i = 0; i < length; i++) {
                 NbtTag newTag = NbtTag.Create(newListType);
