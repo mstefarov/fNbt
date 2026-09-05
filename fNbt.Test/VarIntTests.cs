@@ -209,5 +209,25 @@ namespace fNbt.Test {
                 Assert.AreEqual(ms.Length, ms.Position);
             }
         }
+
+        [TestMethod]
+        public void ExactBufferSizeMatchesStreamOutputAtVarIntBoundaries() {
+            // Sizes computed up front must agree with the bytes actually written on every varint
+            // length step, for values, counts, and string lengths alike
+            var root = new NbtCompound("r");
+            int[] boundaries = { 0, 63, 64, 127, 128, 8191, 8192, 16383, 16384, 1 << 20, (1 << 27) - 1, 1 << 27, int.MaxValue, int.MinValue, -1, -64, -65 };
+            foreach (int value in boundaries) root.Add(new NbtInt("i" + value, value));
+            root.Add(new NbtLong("lmin", long.MinValue));
+            root.Add(new NbtLong("lmax", long.MaxValue));
+            root.Add(new NbtLong("l56", 1L << 56));
+            root.Add(new NbtString("s127", new string('a', 127)));
+            root.Add(new NbtString("s128", new string('a', 128)));
+            root.Add(new NbtByteArray("b128", new byte[128]));
+
+            NbtCodec codec = NbtCodec.For(NbtFlavor.BedrockNetwork);
+            var stream = new MemoryStream();
+            codec.WriteTag(root, stream);
+            CollectionAssert.AreEqual(stream.ToArray(), codec.WriteTag(root));
+        }
     }
 }
