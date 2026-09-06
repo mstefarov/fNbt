@@ -34,6 +34,8 @@ namespace fNbt.Test {
             // operation names in any case, and an unquoted argument that reads as a string
             "Bool(1)", "BOOL(1)", "BOOL(true)", "UUID(\"123e4567-e89b-12d3-a456-426614174000\")",
             "uuid(123e4567-e89b-12d3-a456-426614174000)",
+            // array prefixes in either case
+            "[b;1]", "[i;1]", "[l;1]",
         };
 
         static readonly Regex Abbreviated = new Regex(@"\.\.\.\(\d+ chars\)$");

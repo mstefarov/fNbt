@@ -188,8 +188,13 @@ namespace fNbt.Test {
             Refuses("[I;4294967296]");
             Refuses("[B;1.0]");
             Refuses("[B;\"1\"]");
-            Refuses("[b;1]");
             Refuses("[B;1;2]");
+            // Prefixes in either case; other letters are not prefixes
+            Assert.AreEqual(NbtTagType.ByteArray, Parse("[b;1]").TagType);
+            Assert.AreEqual(NbtTagType.IntArray, Parse("[ i ; 1, 2 ]").TagType);
+            Assert.AreEqual(NbtTagType.LongArray, Parse("[l;]").TagType);
+            Refuses("[S;1]");
+            Refuses("[d;1]");
         }
 
 

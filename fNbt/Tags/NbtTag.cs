@@ -461,7 +461,8 @@ namespace fNbt {
         /// lists of mixed types, one trailing comma) with the earlier parser's readings wherever the
         /// modern one refuses (a token such as <c>1st</c>, <c>007</c> or <c>300b</c> is a string, an
         /// overflowing float is an infinity). <c>NaNf</c>, <c>Infinityd</c> and the like read as the
-        /// numbers they name, and a quoted empty key is allowed. A list of mixed types becomes a list
+        /// numbers they name, a quoted empty key is allowed, and array prefixes and operation names
+        /// are accepted in either case. A list of mixed types becomes a list
         /// of compounds with each element under an empty key, the form Minecraft 1.21.5 and later
         /// store on disk; an empty list has the <c>End</c> element type. A byte order mark at the
         /// start of the text is skipped. <c>\N{name}</c> escapes are not supported. </remarks>

@@ -630,7 +630,9 @@ namespace fNbt {
             int afterBracket = pos;
             SkipWhitespace();
             if (pos < text.Length) {
-                char letter = text[pos];
+                // Either case: the game takes uppercase only, and a lowercase letter before a
+                // semicolon could not have meant anything else
+                char letter = char.ToUpperInvariant(text[pos]);
                 if (letter == 'B' || letter == 'I' || letter == 'L') {
                     pos++;
                     SkipWhitespace();
