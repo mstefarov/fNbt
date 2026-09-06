@@ -5,11 +5,24 @@ namespace fNbt {
     /// parsing or serializing an NBT file. </summary>
     [Serializable]
     public sealed class NbtFormatException : Exception {
+        /// <summary> Zero-based index into the SNBT text where parsing failed, or -1 when this
+        /// exception did not come from parsing SNBT. </summary>
+        public int Index { get; }
+
         internal NbtFormatException(string message)
-            : base(message) { }
+            : base(message) {
+            Index = -1;
+        }
 
         internal NbtFormatException(string message, Exception innerException)
-            : base(message, innerException) { }
+            : base(message, innerException) {
+            Index = -1;
+        }
+
+        internal NbtFormatException(string message, int index)
+            : base(message) {
+            Index = index;
+        }
 
 
         // Conditions that several layers detect, worded once

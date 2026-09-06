@@ -420,6 +420,35 @@ namespace fNbt {
         }
 
 
+        /// <summary> Prints this tag and its children as SNBT (stringified NBT), the text notation
+        /// Minecraft Java uses in commands and <c>.snbt</c> files, in the layout given by
+        /// <see cref="SnbtOptions.DefaultWriteLayout"/>. The tag's <see cref="Name"/> is not written:
+        /// SNBT has no root name, and tags inside a compound are written with their keys already. </summary>
+        /// <remarks> The text is readable by every Minecraft Java version since 1.12 and by the
+        /// common NBT tools: strings are always quoted, with the delimiter Minecraft would choose and
+        /// only that delimiter and backslashes escaped; keys are bare when they consist of letters,
+        /// digits and <c>._+-</c> and start with a letter, <c>.</c> or <c>_</c>; numbers carry Java's
+        /// suffixes and spelling (<c>1b</c>, <c>1s</c>, <c>1L</c>, <c>1.0f</c>, <c>1.0E7d</c>);
+        /// compounds keep insertion order. Inside a list of compounds, a one-entry compound whose
+        /// key is empty prints as its value, the form Minecraft 1.21.5 and later store on disk for
+        /// lists of mixed types. </remarks>
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
+        public string ToSnbt() {
+            return SnbtWriter.Write(this, SnbtOptions.DefaultWriteLayout);
+        }
+
+
+        /// <summary> Prints this tag and its children as SNBT (stringified NBT) with the given
+        /// options. See <see cref="ToSnbt()"/> for what is written. </summary>
+        /// <param name="options"> Settings to use, read when the call starts. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="options"/> is <c>null</c>. </exception>
+        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
+        public string ToSnbt(SnbtOptions options) {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            return SnbtWriter.Write(this, options.WriteLayout);
+        }
+
+
         internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget);
 
 
