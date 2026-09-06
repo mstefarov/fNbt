@@ -30,7 +30,7 @@ namespace fNbt {
         int nameLookups;
         int nameHits;
         bool nameCacheDisabled;
-        const int NameCacheActivation = 64;
+        internal const int NameCacheActivation = 64;
         const int NameCacheJudgeAfter = 256;
         const int NameCacheInitialSlots = 128;
         const int NameCacheMaxSlots = 2048;

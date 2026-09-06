@@ -1,3 +1,11 @@
+## Unreleased (fNbt)
+- NbtReader.ReadListAsArray now uses the result element size when applying
+    MaxAllocation to enum, decimal, and bool arrays.
+- NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
+    an integral value does not fit the requested enum's underlying type.
+- Document cases where compressed loads can miss damaged or missing checksum
+    bytes.
+
 ## 2.0.0 (fNbt)
 - Add NbtFlavor support for Java (the default), JavaAnvil,
     JavaLegacy, JavaNetwork, Bedrock, BedrockNetwork, and ClassiCube. A flavor

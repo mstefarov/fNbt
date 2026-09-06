@@ -6,6 +6,9 @@ using System.Linq;
 namespace fNbt.Test {
     [TestClass]
     public sealed class NameCachingTests {
+        // Each warm-up compound supplies two short names.
+        const int WarmupCompoundCount = (NbtBinaryReader.NameCacheActivation + 1) / 2;
+
         static NbtCompound MakeSchemaDoc(int compoundCount, Func<int, int, string> namer) {
             var list = new NbtList("Items", NbtTagType.Compound);
             for (int i = 0; i < compoundCount; i++) {
@@ -21,15 +24,18 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void TreeAndStreamingReadersCacheShortNamesAlongsideLongNames() {
+            int firstCachedIndex = WarmupCompoundCount;
+            int secondCachedIndex = firstCachedIndex + 1;
+            int compoundCount = secondCachedIndex + 1;
             string longName = new string('x', 100);
-            byte[] doc = new NbtFile(MakeSchemaDoc(60, (i, f) => f == 2 ? longName : "field" + f))
+            byte[] doc = new NbtFile(MakeSchemaDoc(compoundCount, (i, f) => f == 2 ? longName : "field" + f))
                 .SaveToBuffer(NbtCompression.None);
             NbtCompound root = TestFiles.Load(doc).RootTag;
             var items = (NbtList)root["Items"];
-            Assert.AreEqual(60, items.Count);
-            Assert.AreEqual(50 * 3 + 2, items[50][longName].IntValue);
-            Assert.AreEqual("field0", ((NbtCompound)items[40]).Tags.First().Name);
-            Assert.AreSame(items[40]["field1"].Name, items[50]["field1"].Name);
+            Assert.AreEqual(compoundCount, items.Count);
+            Assert.AreEqual(secondCachedIndex * 3 + 2, items[secondCachedIndex][longName].IntValue);
+            Assert.AreEqual("field0", ((NbtCompound)items[firstCachedIndex]).Tags.First().Name);
+            Assert.AreSame(items[firstCachedIndex]["field1"].Name, items[secondCachedIndex]["field1"].Name);
 
             NbtReader reader = TestFiles.OpenReader(doc);
             var occurrences = new List<string>();
@@ -38,9 +44,8 @@ namespace fNbt.Test {
                     occurrences.Add(reader.TagName);
                 }
             }
-            Assert.AreEqual(60, occurrences.Count);
-            // Long names bypass the cache; enough short names must precede these occurrences.
-            Assert.AreSame(occurrences[40], occurrences[50]);
+            Assert.AreEqual(compoundCount, occurrences.Count);
+            Assert.AreSame(occurrences[firstCachedIndex], occurrences[secondCachedIndex]);
         }
 
 
@@ -75,7 +80,7 @@ namespace fNbt.Test {
                 }
                 BeginCompound(""); // root
                 // Cross the cache's activation threshold before testing alternate encodings.
-                for (int i = 0; i < 40; i++) {
+                for (int i = 0; i < WarmupCompoundCount; i++) {
                     BeginCompound("warm" + i);
                     WriteNamedByte(new byte[] { (byte)'w' }, 0);
                     ms.WriteByte(0x00);
@@ -115,7 +120,7 @@ namespace fNbt.Test {
             byte[] doc;
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
-                for (int i = 0; i < 40; i++) {
+                for (int i = 0; i < WarmupCompoundCount; i++) {
                     writer.BeginCompound("warm" + i);
                     writer.WriteByte("dup", 0);
                     writer.EndCompound();

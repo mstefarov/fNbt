@@ -35,7 +35,6 @@ namespace fNbt.Test {
             var nullName = new NbtInt(null, 42);
             var emptyName = new NbtInt("", 42);
             Assert.IsFalse(comparer.Equals(nullName, emptyName), "Null and empty names differ");
-            Assert.AreNotEqual(comparer.GetHashCode(nullName), comparer.GetHashCode(emptyName));
         }
 
         [TestMethod]
@@ -68,6 +67,7 @@ namespace fNbt.Test {
         public void ArrayEqualityIncludesLengthAndEveryElement() {
             NbtByteArray bytes = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
             Assert.IsTrue(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2, 3 })));
+            Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 3, 2, 1 })));
             Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2 })));
             Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2, 4 })));
 

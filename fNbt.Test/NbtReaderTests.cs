@@ -948,6 +948,70 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        [DataRow(-1)]
+        [DataRow(256)]
+        public void ReadValueAsRejectsOutOfRangeEnumValues(int value) {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtInt("i", value),
+                new NbtInt("after", 7)
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            reader.CacheTagValues = true;
+            Assert.IsTrue(reader.ReadToFollowing("i"));
+            Assert.Throws<OverflowException>(() => reader.ReadValueAs<byte>());
+            Assert.Throws<OverflowException>(() => reader.ReadValueAs<NbtTagType>());
+            Assert.AreEqual(value, reader.ReadValueAs<int>());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsTrue(reader.ReadToFollowing("after"));
+            Assert.AreEqual(7, reader.ReadValueAs<int>());
+        }
+
+
+        [TestMethod]
+        [DataRow(TypeCode.SByte)]
+        [DataRow(TypeCode.Byte)]
+        [DataRow(TypeCode.Int16)]
+        [DataRow(TypeCode.UInt16)]
+        [DataRow(TypeCode.Int32)]
+        [DataRow(TypeCode.UInt32)]
+        [DataRow(TypeCode.Int64)]
+        [DataRow(TypeCode.UInt64)]
+        public void EnumConversionsRespectUnderlyingRange(TypeCode underlyingCode) {
+            switch (underlyingCode) {
+                case TypeCode.SByte:
+                    ReaderEnumAssert.AcceptsRange<ReaderSByteEnum>(sbyte.MinValue, sbyte.MaxValue,
+                                                                sbyte.MinValue - 1L, sbyte.MaxValue + 1L);
+                    break;
+                case TypeCode.Byte:
+                    ReaderEnumAssert.AcceptsRange<NbtTagType>(byte.MinValue, byte.MaxValue, -1, byte.MaxValue + 1L);
+                    break;
+                case TypeCode.Int16:
+                    ReaderEnumAssert.AcceptsRange<ReaderShortEnum>(short.MinValue, short.MaxValue,
+                                                                short.MinValue - 1L, short.MaxValue + 1L);
+                    break;
+                case TypeCode.UInt16:
+                    ReaderEnumAssert.AcceptsRange<ReaderUShortEnum>(ushort.MinValue, ushort.MaxValue,
+                                                                 -1, ushort.MaxValue + 1L);
+                    break;
+                case TypeCode.Int32:
+                    ReaderEnumAssert.AcceptsRange<DayOfWeek>(int.MinValue, int.MaxValue, int.MinValue - 1L, int.MaxValue + 1L);
+                    break;
+                case TypeCode.UInt32:
+                    ReaderEnumAssert.AcceptsRange<ReaderUIntEnum>(uint.MinValue, uint.MaxValue, -1, uint.MaxValue + 1L);
+                    break;
+                case TypeCode.Int64:
+                    ReaderEnumAssert.AcceptsRange<ReaderLongEnum>(long.MinValue, long.MaxValue);
+                    break;
+                case TypeCode.UInt64:
+                    ReaderEnumAssert.AcceptsRange<ReaderULongEnum>(0, long.MaxValue, -1);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(underlyingCode));
+            }
+        }
+
+
+        [TestMethod]
         public void ReadListAsArrayConvertsToEnums() {
             var root = new NbtCompound("r") {
                 new NbtList("ints") { new NbtInt(1), new NbtInt(6) },
@@ -961,10 +1025,8 @@ namespace fNbt.Test {
             };
             NbtReader reader = TestFiles.OpenReader(root);
 
-            // Matching underlying type goes through the bulk int reader
             Assert.IsTrue(reader.ReadToFollowing("ints"));
             CollectionAssert.AreEqual(new[] { DayOfWeek.Monday, DayOfWeek.Saturday }, reader.ReadListAsArray<DayOfWeek>());
-            // Other integral element types convert one at a time
             Assert.IsTrue(reader.ReadToFollowing("bytes"));
             CollectionAssert.AreEqual(new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }, reader.ReadListAsArray<DayOfWeek>());
             Assert.IsTrue(reader.ReadToFollowing("types"));
@@ -989,6 +1051,24 @@ namespace fNbt.Test {
             CollectionAssert.AreEqual(new[] { 1.0, 2.0 }, reader.ReadListAsArray<double>());
             Assert.IsTrue(reader.ReadToFollowing("after"));
             Assert.AreEqual(9, reader.ReadValue());
+        }
+
+
+        [TestMethod]
+        [DataRow(-1)]
+        [DataRow(256)]
+        public void ReadListAsArrayRejectsOutOfRangeEnumValues(int value) {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtList("ints") { new NbtInt(1), new NbtInt(value) }
+            };
+            NbtReader reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("ints"));
+            CollectionAssert.AreEqual(new[] { 1, value }, reader.ReadListAsArray<int>());
+
+            reader = TestFiles.OpenReader(root);
+            Assert.IsTrue(reader.ReadToFollowing("ints"));
+            Assert.Throws<OverflowException>(() => reader.ReadListAsArray<NbtTagType>());
+            NbtAssert.ReaderIsPoisoned(reader);
         }
 
 
@@ -1055,6 +1135,71 @@ namespace fNbt.Test {
             Assert.AreEqual(1000, reader.ReadListAsArray<long>().Length);
             Assert.IsTrue(reader.ReadToFollowing("strings"));
             Assert.AreEqual(2000, reader.ReadListAsArray<string>().Length);
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationCapsEnumListArrays() {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtList("b") { new NbtByte(1), new NbtByte(2) }
+            };
+            NbtReader reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 2 * sizeof(long) });
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            CollectionAssert.AreEqual(new[] { (ReaderLongEnum)1, (ReaderLongEnum)2 },
+                                      reader.ReadListAsArray<ReaderLongEnum>());
+
+            reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 8 });
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<ReaderLongEnum>());
+            NbtAssert.ReaderIsPoisoned(reader);
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationCapsDecimalListArrays() {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtList("b") { new NbtByte(1), new NbtByte(2) }
+            };
+            NbtReader reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 2 * sizeof(decimal) });
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            CollectionAssert.AreEqual(new[] { 1m, 2m }, reader.ReadListAsArray<decimal>());
+
+            reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 8 });
+            Assert.IsTrue(reader.ReadToFollowing("b"));
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<decimal>());
+            NbtAssert.ReaderIsPoisoned(reader);
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationAllowsNarrowedEnumListArrays() {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtList("l") { new NbtLong(-1), new NbtLong(2), new NbtLong(-1) },
+                new NbtInt("x", 7)
+            };
+            NbtReader reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 8 });
+            Assert.IsTrue(reader.ReadToFollowing("l"));
+            CollectionAssert.AreEqual(new[] { ReaderShortEnum.Negative, ReaderShortEnum.Positive, ReaderShortEnum.Negative },
+                                      reader.ReadListAsArray<ReaderShortEnum>());
+            Assert.IsFalse(reader.IsInErrorState);
+            Assert.IsTrue(reader.ReadToFollowing("x"));
+            Assert.AreEqual(7, reader.ReadValueAs<int>());
+        }
+
+
+        [TestMethod]
+        public void MaxAllocationUsesBooleanArrayElementSize() {
+            NbtCompound root = new NbtCompound("r") {
+                new NbtList("l") { new NbtLong(0), new NbtLong(-1), new NbtLong(2) }
+            };
+            NbtReader reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 3 });
+            Assert.IsTrue(reader.ReadToFollowing("l"));
+            CollectionAssert.AreEqual(new[] { false, true, true }, reader.ReadListAsArray<bool>());
+
+            reader = TestFiles.OpenReader(root, new NbtOptions { MaxAllocation = 2 });
+            Assert.IsTrue(reader.ReadToFollowing("l"));
+            Assert.Throws<NbtFormatException>(() => reader.ReadListAsArray<bool>());
+            NbtAssert.ReaderIsPoisoned(reader);
         }
 
 

@@ -827,14 +827,14 @@ namespace fNbt {
         public T ReadValueAs<T>() {
             object value = ReadValue();
             if (value is T exact) return exact;
-            if (typeof(T).IsEnum) return (T)ConvertToEnum(value, typeof(T));
+            if (typeof(T).IsEnum) return (T)ConvertToEnum(value, typeof(T), Type.GetTypeCode(typeof(T)));
             return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
         }
 
 
-        // Enum.ToObject widens any integral value; names go through Enum.Parse, whose bad-name
-        // failure is reported like any other unparseable string
-        static object ConvertToEnum(object value, Type enumType) {
+        // Enum.ToObject can silently wrap numbers. Convert first to check that the value fits.
+        // Typed overloads avoid an extra allocation.
+        static object ConvertToEnum(object value, Type enumType, TypeCode underlyingCode) {
             if (value is string name) {
                 try {
                     return Enum.Parse(enumType, name);
@@ -843,7 +843,24 @@ namespace fNbt {
                 }
             }
             if (value is byte || value is short || value is int || value is long) {
-                return Enum.ToObject(enumType, value);
+                switch (underlyingCode) {
+                    case TypeCode.SByte:
+                        return Enum.ToObject(enumType, Convert.ToSByte(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Byte:
+                        return Enum.ToObject(enumType, Convert.ToByte(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int16:
+                        return Enum.ToObject(enumType, Convert.ToInt16(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt16:
+                        return Enum.ToObject(enumType, Convert.ToUInt16(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int32:
+                        return Enum.ToObject(enumType, Convert.ToInt32(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt32:
+                        return Enum.ToObject(enumType, Convert.ToUInt32(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int64:
+                        return Enum.ToObject(enumType, Convert.ToInt64(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt64:
+                        return Enum.ToObject(enumType, Convert.ToUInt64(value, CultureInfo.InvariantCulture));
+                }
             }
             throw new InvalidCastException("Cannot convert a " + value.GetType() + " value to " + enumType + ".");
         }
@@ -1005,8 +1022,8 @@ namespace fNbt {
 
             try {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
-                // The allocation estimate uses the managed element size, since T may be wider than the wire type.
-                reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
+                // Conversion can change the size of each element, so use the result type for the allocation limit.
+                reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>());
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType, reader.UsesVarInt));
 
                 // Exact-type matches skip boxing and conversion dispatch, and ints and longs
@@ -1127,8 +1144,9 @@ namespace fNbt {
                 return result;
             }
 #endif
+            TypeCode underlyingCode = Type.GetTypeCode(typeof(T));
             for (int i = 0; i < count; i++) {
-                result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T));
+                result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T), underlyingCode);
             }
             return result;
         }
@@ -1171,17 +1189,29 @@ namespace fNbt {
         }
 
 
-        // Size of one element of the array that ReadListAsArray is about to allocate. The wire
-        // size is the fallback for exotic conversion targets.
-        static int ManagedElementSize<T>(NbtTagType wireType) {
+        static int ManagedElementSize<T>() {
             Type target = typeof(T);
-            if (target == typeof(byte) || target == typeof(sbyte)) return 1;
+            if (target == typeof(byte) || target == typeof(sbyte) || target == typeof(bool)) return 1;
             if (target == typeof(short) || target == typeof(ushort) || target == typeof(char)) return 2;
             if (target == typeof(int) || target == typeof(uint) || target == typeof(float)) return 4;
             if (target == typeof(long) || target == typeof(ulong) || target == typeof(double)) return 8;
+            if (target == typeof(decimal)) return sizeof(decimal);
             // Array slots for reference types like string hold pointers
             if (!target.IsValueType) return IntPtr.Size;
-            return MinElementSize(wireType, false);
+            // Only enums remain; TypeCode gives their underlying type.
+            switch (Type.GetTypeCode(target)) {
+                case TypeCode.SByte:
+                case TypeCode.Byte:
+                    return 1;
+                case TypeCode.Int16:
+                case TypeCode.UInt16:
+                    return 2;
+                case TypeCode.Int32:
+                case TypeCode.UInt32:
+                    return 4;
+                default:
+                    return 8;
+            }
         }
 
 

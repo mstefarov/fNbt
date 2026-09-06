@@ -289,8 +289,8 @@ namespace fNbt {
 
 
         /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
-        /// <remarks> Compressed loads verify the container checksum on every kind of stream. On
-        /// .NET 6 and later, a document cut off inside its trailer may still load without error.
+        /// <remarks> Compressed loads check checksums. On .NET 6 and later, a document cut off
+        /// inside its trailer may still load without error.
         /// Seekable streams are left at their end, so the returned byte count is
         /// deterministic; non-seekable streams stay wherever decompression stopped, which can be
         /// past the document, since decompressors read ahead. Concatenated GZip members decompress
@@ -398,8 +398,8 @@ namespace fNbt {
         }
 
 
-        // Reading the decompressor to its end makes it process the trailer, so a corrupt checksum
-        // cannot slip past on an unlucky buffer alignment. Callers decide whether that is safe.
+        // Read to the end to finish the checksum check, including data after the root tag.
+        // The caller decides whether reading to the end is safe.
         void LoadAndDrain(Stream decompressed, TagSelector? selector, bool drain) {
             Stream input = bufferSize > 0 ? new BufferedStream(decompressed, bufferSize) : decompressed;
             LoadFromStreamInternal(input, selector);
@@ -414,9 +414,8 @@ namespace fNbt {
         }
 
 
-        // A raw DeflateStream stops at the end of the deflate data on every runtime, so this path
-        // finishes the member and checks its trailer without ever reading past it. The trailer
-        // values are computed here, since the raw inflater knows nothing of the GZip framing.
+        // DeflateStream does not wait for another GZip member. We read the header and
+        // check the trailer ourselves.
         void LoadNonSeekableGZip(Stream stream, TagSelector? selector) {
             SkipGZipHeader(stream);
             TrailerLocatingStream feed = new TrailerLocatingStream(stream);
