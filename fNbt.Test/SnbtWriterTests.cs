@@ -56,10 +56,10 @@ namespace fNbt.Test {
             Assert.AreEqual("NaNf", Snbt(new NbtFloat(float.NaN)));
             Assert.AreEqual("Infinityf", Snbt(new NbtFloat(float.PositiveInfinity)));
             Assert.AreEqual("-Infinityf", Snbt(new NbtFloat(float.NegativeInfinity)));
-#if NETCOREAPP
-            // .NET Framework prints these with a few more digits; both parse back exactly
-            Assert.AreEqual("1.1754944E-38f", Snbt(new NbtFloat(1.17549435E-38f)));
             Assert.AreEqual("-0.0f", Snbt(new NbtFloat(-0.0f)));
+#if NETCOREAPP
+            // .NET Framework prints this with a few more digits; both parse back exactly
+            Assert.AreEqual("1.1754944E-38f", Snbt(new NbtFloat(1.17549435E-38f)));
 #endif
         }
 
@@ -95,11 +95,11 @@ namespace fNbt.Test {
             Assert.AreEqual("NaNd", Snbt(new NbtDouble(double.NaN)));
             Assert.AreEqual("Infinityd", Snbt(new NbtDouble(double.PositiveInfinity)));
             Assert.AreEqual("-Infinityd", Snbt(new NbtDouble(double.NegativeInfinity)));
+            Assert.AreEqual("-0.0d", Snbt(new NbtDouble(-0.0)));
 #if NETCOREAPP
             // Java prints the subnormal minimum as 4.9E-324 (it prefers two digits when one would do);
-            // .NET's shortest is one digit. Both parse back to the same value.
+            // .NET's shortest is one digit and .NET Framework's is longer. All parse back the same.
             Assert.AreEqual("5.0E-324d", Snbt(new NbtDouble(double.Epsilon)));
-            Assert.AreEqual("-0.0d", Snbt(new NbtDouble(-0.0)));
 #endif
         }
 

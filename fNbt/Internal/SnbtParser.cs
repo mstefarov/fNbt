@@ -376,6 +376,8 @@ namespace fNbt {
             RegexOptions.CultureInvariant);
 
         static NbtTag? TryClassicFloat(string token) {
+            // Plain identifiers never match, so they skip the regexes
+            if (!CanStartNumber(token[0])) return null;
             bool isFloat = ClassicFloat.IsMatch(token);
             if (!isFloat && !ClassicDouble.IsMatch(token)) return null;
             char last = token[token.Length - 1];
@@ -624,7 +626,6 @@ namespace fNbt {
 
         NbtTag ReadListOrArray(int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            int errorAt = pos;
             pos++;
             int afterBracket = pos;
             SkipWhitespace();
@@ -635,7 +636,7 @@ namespace fNbt {
                     SkipWhitespace();
                     if (pos < text.Length && text[pos] == ';') {
                         pos++;
-                        return ReadArray(letter, childDepthBudget, errorAt);
+                        return ReadArray(letter, childDepthBudget);
                     }
                 }
             }
@@ -666,8 +667,10 @@ namespace fNbt {
         }
 
 
-        // Elements up to and including the closing bracket, with one trailing comma allowed
-        List<NbtTag> ReadElements(int childDepthBudget, NbtTagType numberType = NbtTagType.Int) {
+        // Elements up to and including the closing bracket, with one trailing comma allowed.
+        // Arrays ask for each element's start position, to report a bad element where it is.
+        List<NbtTag> ReadElements(int childDepthBudget, NbtTagType numberType = NbtTagType.Int,
+                                  List<int>? starts = null) {
             List<NbtTag> elements = new List<NbtTag>();
             SkipWhitespace();
             if (pos < text.Length && text[pos] == ']') {
@@ -675,6 +678,8 @@ namespace fNbt {
                 return elements;
             }
             while (true) {
+                SkipWhitespace();
+                starts?.Add(pos);
                 elements.Add(ReadElement(childDepthBudget, numberType));
                 SkipWhitespace();
                 if (pos >= text.Length) throw Error("Expected ',' or ']'");
@@ -707,28 +712,29 @@ namespace fNbt {
         // An unsuffixed element takes the array's type, and any integer tag whose value fits the
         // element, signed or unsigned, is taken: [B;0xFF], [B;255ub], [I;1b] and [L;1] are all
         // fine, as are true and false
-        NbtTag ReadArray(char letter, int childDepthBudget, int errorAt) {
+        NbtTag ReadArray(char letter, int childDepthBudget) {
             NbtTagType elementType = letter == 'B' ? NbtTagType.Byte : letter == 'I' ? NbtTagType.Int : NbtTagType.Long;
-            List<NbtTag> elements = ReadElements(childDepthBudget, elementType);
+            List<int> starts = new List<int>();
+            List<NbtTag> elements = ReadElements(childDepthBudget, elementType, starts);
             switch (letter) {
                 case 'B': {
                     byte[] values = new byte[elements.Count];
                     for (int i = 0; i < values.Length; i++) {
-                        values[i] = unchecked((byte)ArrayElement(elements[i], -128, 255, errorAt));
+                        values[i] = unchecked((byte)ArrayElement(elements[i], -128, 255, starts[i]));
                     }
                     return new NbtByteArray(values);
                 }
                 case 'I': {
                     int[] values = new int[elements.Count];
                     for (int i = 0; i < values.Length; i++) {
-                        values[i] = unchecked((int)ArrayElement(elements[i], int.MinValue, uint.MaxValue, errorAt));
+                        values[i] = unchecked((int)ArrayElement(elements[i], int.MinValue, uint.MaxValue, starts[i]));
                     }
                     return new NbtIntArray(values);
                 }
                 default: {
                     long[] values = new long[elements.Count];
                     for (int i = 0; i < values.Length; i++) {
-                        values[i] = ArrayElement(elements[i], long.MinValue, long.MaxValue, errorAt);
+                        values[i] = ArrayElement(elements[i], long.MinValue, long.MaxValue, starts[i]);
                     }
                     return new NbtLongArray(values);
                 }

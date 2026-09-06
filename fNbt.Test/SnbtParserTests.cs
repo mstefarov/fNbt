@@ -239,6 +239,9 @@ namespace fNbt.Test {
             Assert.AreEqual(0, Refuses("").Index);
             Assert.AreEqual(3, Refuses("{} x").Index);
             Assert.AreEqual(1, Refuses("\"\\q\"").Index);
+            // A bad array element is reported where it is, not at the bracket
+            Assert.AreEqual(6, Refuses("[B;1, 300]").Index);
+            Assert.AreEqual(5, Refuses("[I;1,\"x\"]").Index);
         }
 
 

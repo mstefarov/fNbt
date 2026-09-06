@@ -144,7 +144,10 @@ namespace fNbt {
                 this.tags.Add(tag);
                 tag.Parent = this;
             }
-            listType = effectiveType;
+            // An empty batch leaves a tolerated End type in place
+            if (toAdd.Count > 0) {
+                listType = effectiveType;
+            }
         }
 
 

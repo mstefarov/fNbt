@@ -446,6 +446,9 @@ namespace fNbt.Test {
             NbtList untouched = new NbtList(NbtTagType.End);
             untouched.AddRange(new NbtTag[0]);
             Assert.AreEqual(NbtTagType.End, untouched.ListType);
+            Assert.AreEqual(NbtTagType.End, new NbtList(new NbtTag[0], NbtTagType.End).ListType);
+            Assert.AreEqual(NbtTagType.End, new NbtList("copy", new NbtTag[0], NbtTagType.End).ListType);
+            TestFiles.Reload(new NbtCompound("root") { new NbtList("copy", new NbtTag[0], NbtTagType.End) });
             Assert.Throws<ArgumentException>(
                 () => untouched.AddRange(new NbtTag[] { new NbtByte(1), new NbtInt(2) }));
             Assert.AreEqual(NbtTagType.End, untouched.ListType);

@@ -291,10 +291,10 @@ namespace fNbt {
                 string text = value.ToString(format, CultureInfo.InvariantCulture);
                 if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float back) &&
                     back == value) {
-                    return text;
+                    return WithSign(text, value);
                 }
             }
-            return value.ToString("G9", CultureInfo.InvariantCulture);
+            return WithSign(value.ToString("G9", CultureInfo.InvariantCulture), value);
         }
 
 
@@ -303,10 +303,17 @@ namespace fNbt {
                 string text = value.ToString(format, CultureInfo.InvariantCulture);
                 if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double back) &&
                     back == value) {
-                    return text;
+                    return WithSign(text, value);
                 }
             }
-            return value.ToString("G17", CultureInfo.InvariantCulture);
+            return WithSign(value.ToString("G17", CultureInfo.InvariantCulture), value);
+        }
+
+
+        // .NET Framework formats negative zero as "0"; the sign comes from the bits instead
+        static string WithSign(string text, double value) {
+            if (BitConverter.DoubleToInt64Bits(value) < 0 && text[0] != '-') return "-" + text;
+            return text;
         }
 #endif
 
