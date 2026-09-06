@@ -449,6 +449,50 @@ namespace fNbt {
         }
 
 
+        /// <summary> Parses one SNBT (stringified NBT) value, which must be the whole text apart from
+        /// surrounding whitespace. Returns an unnamed tag of any type. </summary>
+        /// <remarks> Accepts every syntax Minecraft Java has used since 1.12 plus what common NBT
+        /// tools write, and reads the union of them: the 1.21.5 grammar (hex, binary and underscored
+        /// numbers, signedness suffixes, the full escape set, <c>bool()</c> and <c>uuid()</c>,
+        /// lists of mixed types, one trailing comma) with the earlier parser's readings wherever the
+        /// modern one refuses (a token such as <c>1st</c>, <c>007</c> or <c>300b</c> is a string, an
+        /// overflowing float is an infinity). <c>NaNf</c>, <c>Infinityd</c> and the like read as the
+        /// numbers they name, and a quoted empty key is allowed. A list of mixed types becomes a list
+        /// of compounds with each element under an empty key, the form Minecraft 1.21.5 and later
+        /// store on disk; an empty list has the <c>End</c> element type. <c>\N{name}</c> escapes are
+        /// not supported. </remarks>
+        /// <param name="text"> The SNBT text. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
+        /// <exception cref="NbtFormatException"> The text is not SNBT, has anything but whitespace
+        /// after the value, or nests deeper than 512 levels. <see cref="NbtFormatException.Index"/>
+        /// gives the position. </exception>
+        public static NbtTag ParseSnbt(string text) {
+            if (text == null) throw new ArgumentNullException(nameof(text));
+            return SnbtParser.ParseWhole(text);
+        }
+
+
+        /// <summary> Parses one SNBT (stringified NBT) value starting at the given index, stops
+        /// after it, and reports how many characters it consumed. Text after the value is left
+        /// alone, for pulling a value out of a longer command line. See <see cref="ParseSnbt(string)"/>
+        /// for what is accepted. </summary>
+        /// <param name="text"> Text containing the SNBT value. </param>
+        /// <param name="index"> Position at which the value starts; leading whitespace is skipped. </param>
+        /// <param name="charsConsumed"> Number of characters from <paramref name="index"/> to the end
+        /// of the value. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is negative or past
+        /// the end of the text. </exception>
+        /// <exception cref="NbtFormatException"> No value starts at the index, or the value nests
+        /// deeper than 512 levels. <see cref="NbtFormatException.Index"/> gives the position within
+        /// <paramref name="text"/>. </exception>
+        public static NbtTag ParseSnbt(string text, int index, out int charsConsumed) {
+            if (text == null) throw new ArgumentNullException(nameof(text));
+            if (index < 0 || index > text.Length) throw new ArgumentOutOfRangeException(nameof(index));
+            return SnbtParser.ParseValue(text, index, out charsConsumed);
+        }
+
+
         internal abstract void PrettyPrint(StringBuilder sb, string indentString, int indentLevel, int depthBudget);
 
 

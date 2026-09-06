@@ -42,6 +42,9 @@
     <None Update="TestFiles\entity_identifiers.nbt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="TestFiles\snbt-cases.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\fNbt\fNbt.csproj" />
