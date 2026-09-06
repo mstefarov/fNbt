@@ -23,6 +23,7 @@ now completely rewritten by Matvei Stefarov (fragmer).
 - Compound tags implement `ICollection<NbtTag>` and List tags implement `IList<NbtTag>`, for easy traversal and LINQ integration.
 - Good performance and low memory overhead.
 - Built-in pretty-printing of individual tags or whole files.
+- Converts to and from SNBT, the text form Minecraft Java uses in commands and `.snbt` files.
 - Every class and method is fully documented, annotated, and unit-tested.
 - Supports every NBT flavor: Java Edition files and network packets, Bedrock Edition files and
   network packets (varint encoding), and ClassiCube maps.
@@ -136,6 +137,18 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
 ```cs
     Console.WriteLine( myFile.ToString("\t") ); // tabs
     Console.WriteLine( myRandomTag.ToString("    ") ); // spaces
+```
+
+#### Converting to and from SNBT (stringified NBT)
+```cs
+    NbtTag tag = NbtTag.ParseSnbt("{Name:\"Steve\",Health:20.0f,Tags:[\"a\",\"b\"]}");
+    string compact = tag.ToSnbt();   // {Name:"Steve",Health:20.0f,Tags:["a","b"]}
+    string indented = tag.ToSnbt(new SnbtOptions { WriteLayout = SnbtLayout.Indented });
+
+    // An .snbt file holds one compound; give it a name to save it as a regular NBT file
+    var root = (NbtCompound)NbtTag.ParseSnbt(File.ReadAllText("structure.snbt"));
+    root.Name = "";
+    new NbtFile(root).SaveToFile("structure.nbt", NbtCompression.GZip);
 ```
 
 #### Check out unit tests in fNbt.Test for more examples.
