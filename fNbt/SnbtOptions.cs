@@ -2,12 +2,12 @@ using System;
 using System.Threading;
 
 namespace fNbt {
-    /// <summary> Settings for SNBT (stringified NBT) text. Members named <c>Write*</c> affect
-    /// <see cref="NbtTag.ToSnbt(SnbtOptions)"/> only, members named <c>Read*</c> would affect
-    /// parsing only, and unprefixed members both. Every call reads the values it needs when it
-    /// starts, so changing an instance later does not affect a call in progress. The static
-    /// <c>Default*</c> properties seed new instances and the overloads that take no options;
-    /// configure those during startup. </summary>
+    /// <summary> Settings for SNBT (stringified NBT) text. Member names say what they affect:
+    /// <c>Write*</c> members apply to <see cref="NbtTag.ToSnbt(SnbtOptions)"/>, <c>Read*</c> members
+    /// would apply to parsing (there are none yet), and unprefixed members to both. Every call reads
+    /// the values it needs when it starts, so changing an instance later does not affect a call in
+    /// progress. The static <c>Default*</c> properties seed new instances and the overloads that
+    /// take no options; configure those during startup. </summary>
     public sealed class SnbtOptions {
         static int defaultWriteLayout = (int)SnbtLayout.Compact;
 

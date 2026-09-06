@@ -427,11 +427,14 @@ namespace fNbt {
         /// <remarks> The text is readable by every Minecraft Java version since 1.12 and by the
         /// common NBT tools: strings are always quoted, with the delimiter Minecraft would choose and
         /// only that delimiter and backslashes escaped; keys are bare when they consist of letters,
-        /// digits and <c>._+-</c> and start with a letter, <c>.</c> or <c>_</c>; numbers carry Java's
-        /// suffixes and spelling (<c>1b</c>, <c>1s</c>, <c>1L</c>, <c>1.0f</c>, <c>1.0E7d</c>);
-        /// compounds keep insertion order. Inside a list of compounds, a one-entry compound whose
-        /// key is empty prints as its value, the form Minecraft 1.21.5 and later store on disk for
-        /// lists of mixed types. </remarks>
+        /// digits and <c>._+-</c>, start with a letter, <c>.</c> or <c>_</c>, and are not <c>true</c>
+        /// or <c>false</c>; numbers carry Java's suffixes and spelling (<c>1b</c>, <c>1s</c>, <c>1L</c>,
+        /// <c>1.0f</c>, <c>1.0E7d</c>); compounds keep insertion order. Inside a list of compounds, a
+        /// one-entry compound whose key is empty prints as its value, the form Minecraft 1.21.5 and
+        /// later store on disk for lists of mixed types. Two things no Minecraft version reads back:
+        /// <c>NaN</c> and infinities, printed as <c>NaNf</c> or <c>Infinityd</c> the way Minecraft
+        /// prints them, and an empty key. <see cref="ParseSnbt(string)"/> reads both. </remarks>
+        /// <returns> The SNBT text. </returns>
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToSnbt() {
             return SnbtWriter.Write(this, SnbtOptions.DefaultWriteLayout);
@@ -441,6 +444,7 @@ namespace fNbt {
         /// <summary> Prints this tag and its children as SNBT (stringified NBT) with the given
         /// options. See <see cref="ToSnbt()"/> for what is written. </summary>
         /// <param name="options"> Settings to use, read when the call starts. </param>
+        /// <returns> The SNBT text. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToSnbt(SnbtOptions options) {
@@ -459,9 +463,10 @@ namespace fNbt {
         /// overflowing float is an infinity). <c>NaNf</c>, <c>Infinityd</c> and the like read as the
         /// numbers they name, and a quoted empty key is allowed. A list of mixed types becomes a list
         /// of compounds with each element under an empty key, the form Minecraft 1.21.5 and later
-        /// store on disk; an empty list has the <c>End</c> element type. <c>\N{name}</c> escapes are
-        /// not supported. </remarks>
+        /// store on disk; an empty list has the <c>End</c> element type. A byte order mark at the
+        /// start of the text is skipped. <c>\N{name}</c> escapes are not supported. </remarks>
         /// <param name="text"> The SNBT text. </param>
+        /// <returns> The parsed tag, unnamed. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> The text is not SNBT, has anything but whitespace
         /// after the value, or nests deeper than 512 levels. <see cref="NbtFormatException.Index"/>
@@ -480,6 +485,7 @@ namespace fNbt {
         /// <param name="index"> Position at which the value starts; leading whitespace is skipped. </param>
         /// <param name="charsConsumed"> Number of characters from <paramref name="index"/> to the end
         /// of the value. </param>
+        /// <returns> The parsed tag, unnamed. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is negative or past
         /// the end of the text. </exception>

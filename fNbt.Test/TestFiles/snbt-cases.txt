@@ -1,6 +1,6 @@
 # One case per line: input (with the harness escapes ~uXXXX ~n ~t ~r ~~ ~D<n> ~L<n> ~S<n>),
 # a tab, the result of Minecraft 26.2 (OK plus Tag.toString(), or ERR), a tab, the result of 1.21.4.
-# Generated from tools/snbt-harness/results by the run recorded there; do not edit by hand.
+# Generated from the research harness that ran these inputs through the 1.21.4 and 26.2 server jars (2026-09-05); do not edit by hand.
 1	OK 1	OK 1
 +1	OK 1	OK 1
 -1	OK -1	OK -1

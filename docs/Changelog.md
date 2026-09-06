@@ -4,12 +4,14 @@
     one back; an overload parses one value out of a longer string and reports
     how much it consumed. Parsing accepts every syntax Minecraft has used since
     1.12 plus what common NBT tools write, including hex and binary numbers,
-    all escapes, bool() and uuid(), and lists of mixed types, which become the
-    wrapper compounds Minecraft 1.21.5 stores on disk. Output uses the shape
-    every Minecraft version and tool reads. SnbtOptions.WriteLayout selects
-    compact, spaced, or indented text, and SnbtOptions.DefaultWriteLayout sets
-    the process-wide default.
-- NbtFormatException.Index now gives the character position of an SNBT parse
+    every escape except \N{name}, bool() and uuid(), NaNf and Infinityd as the
+    numbers they name, and lists of mixed types, which become the wrapper
+    compounds Minecraft 1.21.5 stores on disk. Output uses the shape every
+    Minecraft version and tool reads, apart from non-finite numbers and empty
+    keys, which no Minecraft version reads back. SnbtOptions.WriteLayout
+    selects compact, spaced, or indented text, and SnbtOptions.DefaultWriteLayout
+    sets the process-wide default.
+- NbtFormatException.Index gives the character position of an SNBT parse
     error, or -1 for every other error.
 - The first tag added to an empty NbtList now sets its ListType whether that
     type was Unknown or End, so empty lists loaded from files accept new tags.

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 
 namespace fNbt.Test {
@@ -249,7 +250,7 @@ namespace fNbt.Test {
             Assert.AreEqual("{a:1,b:\"x y\"}", tag.ToSnbt());
             Assert.AreEqual("] 3", command.Substring(at + consumed));
 
-            Assert.AreEqual(1, NbtTag.ParseSnbt("  1abc", 0, out consumed).StringValue == "1abc" ? 1 : 0);
+            Assert.AreEqual("1abc", NbtTag.ParseSnbt("  1abc", 0, out consumed).StringValue);
             Assert.AreEqual(6, consumed);
             Assert.AreEqual("a", NbtTag.ParseSnbt("a b", 0, out consumed).StringValue);
             Assert.AreEqual(1, consumed);
@@ -267,7 +268,11 @@ namespace fNbt.Test {
             Assert.AreEqual(ok, Parse(ok).ToSnbt());
             NbtFormatException ex = Refuses(new string('[', 513) + new string(']', 513));
             Assert.AreEqual(512, ex.Index);
-            Refuses(new string('{', 1).PadLeft(0) + string.Concat(System.Linq.Enumerable.Repeat("{a:", 513)) + "1" + new string('}', 513));
+            StringAssert.Contains(ex.Message, "512 levels) at index 512");
+            Refuses(string.Concat(Enumerable.Repeat("{a:", 513)) + "1" + new string('}', 513));
+            // Operation calls nest like containers
+            Assert.AreEqual(1, Parse(string.Concat(Enumerable.Repeat("bool(", 512)) + "1" + new string(')', 512)).ByteValue);
+            Refuses(string.Concat(Enumerable.Repeat("bool(", 513)) + "1" + new string(')', 513));
         }
 
 

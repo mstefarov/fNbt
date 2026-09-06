@@ -15,6 +15,7 @@ namespace fNbt.Test {
         // from pmmp/BedrockData (CC0-1.0), commit bdb44a48fb6beffb6e9f6864f06d2232eb62b6a3
         public static readonly string CanonicalBlockStates = Path.Combine(DirName, "canonical_block_states.nbt");
         public static readonly string EntityIdentifiers = Path.Combine(DirName, "entity_identifiers.nbt");
+        public static readonly string SnbtCases = Path.Combine(DirName, "snbt-cases.txt");
 
 
         // Big-endian primitives for hand-building corrupt or exotic documents byte by byte

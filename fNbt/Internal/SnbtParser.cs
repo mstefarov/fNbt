@@ -25,6 +25,7 @@ namespace fNbt {
         // The whole text is one value, plus surrounding whitespace
         public static NbtTag ParseWhole(string text) {
             SnbtParser parser = new SnbtParser(text, 0);
+            parser.SkipByteOrderMark();
             NbtTag tag = parser.ReadValue(NbtTag.MaxDepth);
             parser.SkipWhitespace();
             if (parser.pos < text.Length) throw parser.Error("Unexpected trailing data");
@@ -35,6 +36,7 @@ namespace fNbt {
         // One value starting at index; whatever follows it is left alone
         public static NbtTag ParseValue(string text, int index, out int charsConsumed) {
             SnbtParser parser = new SnbtParser(text, index);
+            parser.SkipByteOrderMark();
             NbtTag tag = parser.ReadValue(NbtTag.MaxDepth);
             charsConsumed = parser.pos - index;
             return tag;
@@ -78,7 +80,7 @@ namespace fNbt {
             SkipWhitespace();
             if (pos < text.Length && text[pos] == '(') {
                 pos++;
-                return ReadOperation(token, depthBudget);
+                return ReadOperation(token, start, depthBudget);
             }
             pos = afterToken;
 
@@ -480,16 +482,15 @@ namespace fNbt {
         }
 
 
-        static void AppendCodePoint(StringBuilder sb, long codePoint, int errorAt) {
+        void AppendCodePoint(StringBuilder sb, long codePoint, int errorAt) {
             if (codePoint <= 0xFFFF) {
                 // Lone surrogates included, as the game stores them
                 sb.Append((char)codePoint);
             } else if (codePoint <= 0x10FFFF) {
                 sb.Append(char.ConvertFromUtf32((int)codePoint));
             } else {
-                throw new NbtFormatException(
-                    "Invalid Unicode character value: U+" + codePoint.ToString("X8", CultureInfo.InvariantCulture) +
-                    " at index " + errorAt, errorAt);
+                throw Error("Invalid Unicode character value: U+" + codePoint.ToString("X8", CultureInfo.InvariantCulture),
+                            errorAt);
             }
         }
 
@@ -498,16 +499,17 @@ namespace fNbt {
 
         #region Operations
 
-        // pos is just past the opening parenthesis
-        NbtTag ReadOperation(string name, int depthBudget) {
-            int errorAt = pos - 1 - name.Length;
+        // pos is just past the opening parenthesis. A call nests like a container, so it spends
+        // depth like one.
+        NbtTag ReadOperation(string name, int errorAt, int depthBudget) {
+            int childDepthBudget = ConsumeDepthBudget(depthBudget);
             List<NbtTag> args = new List<NbtTag>();
             SkipWhitespace();
             if (pos < text.Length && text[pos] == ')') {
                 pos++;
             } else {
                 while (true) {
-                    args.Add(ReadValue(depthBudget));
+                    args.Add(ReadValue(childDepthBudget));
                     SkipWhitespace();
                     if (pos >= text.Length) throw Error("Expected ',' or ')'");
                     char c = text[pos++];
@@ -688,7 +690,8 @@ namespace fNbt {
         }
 
 
-        // A value, except that inside an array an unsuffixed number takes the array's type
+        // A value, except that inside an array an unsuffixed number takes the array's type. Int is
+        // what ReadValue produces anyway, so lists skip the extra attempt.
         NbtTag ReadElement(int childDepthBudget, NbtTagType numberType) {
             SkipWhitespace();
             if (numberType != NbtTagType.Int && pos < text.Length && CanStartNumber(text[pos])) {
@@ -753,7 +756,7 @@ namespace fNbt {
 
 
         int ConsumeDepthBudget(int depthBudget) {
-            if (depthBudget <= 0) throw Error(NbtTag.DepthLimitMessage);
+            if (depthBudget <= 0) throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'));
             return depthBudget - 1;
         }
 
@@ -763,8 +766,13 @@ namespace fNbt {
         #region Plumbing
 
         void SkipWhitespace() {
-            // A byte order mark counts as whitespace, for text read without stripping one
-            while (pos < text.Length && (char.IsWhiteSpace(text[pos]) || text[pos] == '\uFEFF')) pos++;
+            while (pos < text.Length && char.IsWhiteSpace(text[pos])) pos++;
+        }
+
+
+        // For text read without stripping its byte order mark
+        void SkipByteOrderMark() {
+            if (pos < text.Length && text[pos] == '\uFEFF') pos++;
         }
 
 

@@ -279,14 +279,15 @@ namespace fNbt {
         }
 #else
         // .NET Framework's "R" is not shortest (15 digits, then 17), and its default is lossy. The
-        // shortest of G7 to G9 (G15 to G17) that parses back exactly is the closest available.
-        static readonly string[] FloatFormats = { "G7", "G8", "G9" };
-        static readonly string[] DoubleFormats = { "G15", "G16", "G17" };
+        // shortest of G7 to G9 (G15 to G17) that parses back exactly is the closest available; the
+        // longest always does.
+        static readonly string[] FloatProbes = { "G7", "G8" };
+        static readonly string[] DoubleProbes = { "G15", "G16" };
 
         // TryParse, not Parse: a rounded-up maximum overflows, which .NET Framework reports as
         // an exception from Parse and as false from TryParse
         static string ShortestFloat(float value) {
-            foreach (string format in FloatFormats) {
+            foreach (string format in FloatProbes) {
                 string text = value.ToString(format, CultureInfo.InvariantCulture);
                 if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float back) &&
                     back == value) {
@@ -298,7 +299,7 @@ namespace fNbt {
 
 
         static string ShortestDouble(double value) {
-            foreach (string format in DoubleFormats) {
+            foreach (string format in DoubleProbes) {
                 string text = value.ToString(format, CultureInfo.InvariantCulture);
                 if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double back) &&
                     back == value) {

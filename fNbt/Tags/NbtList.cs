@@ -175,7 +175,7 @@ namespace fNbt {
         /// <param name="tagIndex"> The zero-based index of the tag to get or set. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the NbtList. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> Given tag's type does not match ListType;
+        /// <exception cref="ArgumentException"> Given tag's type does not match the ListType of a non-empty list;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public override NbtTag this[int tagIndex] {
             get { return tags[tagIndex]; }
@@ -206,7 +206,7 @@ namespace fNbt {
         /// <summary> Adds all tags from the specified collection to the end of this NbtList. </summary>
         /// <param name="newTags"> The collection whose elements should be added to this NbtList. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTags"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If given tags do not match ListType or are of mixed types;
+        /// <exception cref="ArgumentException"> If given tags do not match the ListType of a non-empty list or are of mixed types;
         /// or a tag is named, already has a Parent, is this list or one of its ancestors,
         /// or appears more than once. </exception>
         public void AddRange(IEnumerable<NbtTag> newTags) {
@@ -404,7 +404,7 @@ namespace fNbt {
         /// <param name="newTag"> The tag to insert into this NbtList. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in this NbtList. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match ListType;
+        /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match the ListType of a non-empty list;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Insert(int tagIndex, NbtTag newTag) {
             NbtTagType effectiveType = TypeForAdd;
@@ -430,7 +430,7 @@ namespace fNbt {
         /// <summary> Adds a tag to this NbtList. </summary>
         /// <param name="newTag"> The tag to add to this NbtList. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match ListType;
+        /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match the ListType of a non-empty list;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Add(NbtTag newTag) {
             NbtTagType effectiveType = TypeForAdd;

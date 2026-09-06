@@ -53,7 +53,7 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void EveryHarnessCaseReadsAsTheGameDidOrMoreGenerously() {
-            string[] lines = File.ReadAllLines(Path.Combine(TestFiles.DirName, "snbt-cases.txt"));
+            string[] lines = File.ReadAllLines(TestFiles.SnbtCases);
             StringBuilder failures = new StringBuilder();
             int checkedCount = 0;
             foreach (string line in lines) {
