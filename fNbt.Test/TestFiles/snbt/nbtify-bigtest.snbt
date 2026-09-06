@@ -1,0 +1,36 @@
+{
+  longTest: 9223372036854775807l,
+  shortTest: 32767s,
+  stringTest: "HELLO WORLD THIS IS A TEST STRING ÅÄÖ!",
+  floatTest: 0.4982314705848694f,
+  intTest: 2147483647,
+  "nested compound test": {
+    ham: {
+      name: "Hampus",
+      value: 0.75f
+    },
+    egg: {
+      name: "Eggbert",
+      value: 0.5f
+    }
+  },
+  "listTest (long)": [11l, 12l, 13l, 14l, 15l],
+  "listTest (compound)": [
+    {
+      name: "Compound tag #0",
+      created-on: 1264099775885l
+    },
+    {
+      name: "Compound tag #1",
+      created-on: 1264099775885l
+    }
+  ],
+  byteTest: 127b,
+  doubleTest: 0.4931287132182315d,
+  byteArrayTest: [B;0b,62b,34b,16b,8b],
+  intArrayTest: [I;543,123,7567,244],
+  longArrayTest: [L;7676l,53534l,34534l,345345345l],
+  escapedString: '"noice, I gotchya"',
+  escapeSequences: '\b\f\n\r\t"\'\\',
+  otherEscape: "\""
+}

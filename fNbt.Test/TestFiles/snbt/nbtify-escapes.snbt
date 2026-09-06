@@ -1,0 +1,18 @@
+{
+  Characters: [
+    "\"This shouldn't error",
+    '\'Nether should this',
+    '"',
+    "'",
+    "\b",
+    '\b',
+    "\f",
+    '\f',
+    "\nHow about a new line?",
+    '\nOr a single-quoted new line?',
+    "\r",
+    '\r',
+    "\t",
+    '\t'
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  InvalidBecauseTheValuesArentOfTheSameType: [
+    false,
+    1b,
+    2s,
+    3,
+    4l,
+    5.0f,
+    6.0d,
+    "7",
+    [B;8b],
+    [9s],
+    { Ten: 10 },
+    [I;11],
+    [L;12l]
+  ],
+  SameAsylumAsBefore: "MyBookOfRegrets",
+  Permanating: "https://www.youtube.com/watch?v=gCVOW114zs0"
+}
