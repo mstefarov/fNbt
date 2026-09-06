@@ -1,8 +1,12 @@
 ## Unreleased (fNbt)
+- The first tag added to an empty NbtList now sets its ListType whether that
+    type was Unknown or End, so empty lists loaded from files accept new tags.
 - NbtReader.ReadListAsArray now uses the result element size when applying
     MaxAllocation to enum, decimal, and bool arrays.
 - NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
     an integral value does not fit the requested enum's underlying type.
+    Since fNbt exposes TAG_Byte as byte, reading Java's -1 as an enum backed
+    by sbyte now throws instead of returning -1, just as ReadValueAs<sbyte> does.
 - Document cases where compressed loads can miss damaged or missing checksum
     bytes.
 

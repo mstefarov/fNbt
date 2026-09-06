@@ -421,5 +421,39 @@ namespace fNbt.Test {
             Assert.AreEqual(100, fromStream.Count);
             Assert.AreEqual(128, fromStream.tags.Capacity);
         }
+
+
+        [TestMethod]
+        public void EmptyListTakesTypeOfFirstTagWhateverItsListType() {
+            // A loaded empty list carries End, the wire's spelling of "no elements"
+            NbtList loaded = TestFiles.Reload(new NbtCompound("root") {
+                new NbtList("empty", NbtTagType.End)
+            }).Get<NbtList>("empty");
+            Assert.AreEqual(NbtTagType.End, loaded.ListType);
+            loaded.Add(new NbtInt(1));
+            Assert.AreEqual(NbtTagType.Int, loaded.ListType);
+            Assert.AreEqual(1, loaded.Count);
+
+            NbtList inserted = new NbtList(NbtTagType.End);
+            inserted.Insert(0, new NbtString("a"));
+            Assert.AreEqual(NbtTagType.String, inserted.ListType);
+
+            NbtList ranged = new NbtList(NbtTagType.End);
+            ranged.AddRange(new NbtTag[] { new NbtByte(1), new NbtByte(2) });
+            Assert.AreEqual(NbtTagType.Byte, ranged.ListType);
+
+            // An empty batch leaves End in place, and a mixed batch is still refused whole
+            NbtList untouched = new NbtList(NbtTagType.End);
+            untouched.AddRange(new NbtTag[0]);
+            Assert.AreEqual(NbtTagType.End, untouched.ListType);
+            Assert.Throws<ArgumentException>(
+                () => untouched.AddRange(new NbtTag[] { new NbtByte(1), new NbtInt(2) }));
+            Assert.AreEqual(NbtTagType.End, untouched.ListType);
+            Assert.AreEqual(0, untouched.Count);
+
+            // Once the list has elements, its type is fixed and End can no longer be assigned
+            Assert.Throws<ArgumentException>(() => loaded.ListType = NbtTagType.End);
+            Assert.Throws<ArgumentException>(() => loaded.Add(new NbtByte(1)));
+        }
     }
 }

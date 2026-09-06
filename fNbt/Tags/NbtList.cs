@@ -18,7 +18,9 @@ namespace fNbt {
         // of a corrupt length. Longer lists grow as they go, unless the input can vouch for the count.
         const int MaxPresizedCapacity = 16;
 
-        /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
+        /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type.
+        /// An empty list may have the type <c>Unknown</c> or <c>End</c>; either way, the first tag added to
+        /// it sets the type. </summary>
         /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is not a recognized tag type. </exception>
         public NbtTagType ListType {
@@ -217,7 +219,18 @@ namespace fNbt {
                 tags.Add(tag);
                 tag.Parent = this;
             }
-            listType = effectiveType;
+            // An empty batch leaves a tolerated End type in place
+            if (toAdd.Count > 0) {
+                listType = effectiveType;
+            }
+        }
+
+
+        // The type the next added tag is checked against. An empty list has not committed to a
+        // type: End is only the wire's spelling of "no elements", so it counts as Unknown here and
+        // the first tag added decides.
+        NbtTagType TypeForAdd {
+            get { return tags.Count == 0 && listType == NbtTagType.End ? NbtTagType.Unknown : listType; }
         }
 
 
@@ -245,7 +258,7 @@ namespace fNbt {
         // Checks that every tag in the batch can be added, without changing any fields.
         // Returns the ListType the list would have after a successful add.
         NbtTagType ValidateForAdd(List<NbtTag> toAdd, string paramName) {
-            NbtTagType effectiveType = listType;
+            NbtTagType effectiveType = TypeForAdd;
             HashSet<NbtTag> seen = new HashSet<NbtTag>();
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
@@ -394,10 +407,11 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Insert(int tagIndex, NbtTag newTag) {
-            ValidateCanAttach(newTag, listType, nameof(newTag));
+            NbtTagType effectiveType = TypeForAdd;
+            ValidateCanAttach(newTag, effectiveType, nameof(newTag));
             tags.Insert(tagIndex, newTag);
             newTag.Parent = this;
-            if (listType == NbtTagType.Unknown) {
+            if (effectiveType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
         }
@@ -419,10 +433,11 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match ListType;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Add(NbtTag newTag) {
-            ValidateCanAttach(newTag, listType, nameof(newTag));
+            NbtTagType effectiveType = TypeForAdd;
+            ValidateCanAttach(newTag, effectiveType, nameof(newTag));
             tags.Add(newTag);
             newTag.Parent = this;
-            if (listType == NbtTagType.Unknown) {
+            if (effectiveType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
         }
