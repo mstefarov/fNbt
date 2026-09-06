@@ -272,8 +272,7 @@ namespace fNbt {
             try {
                 return Encoding.GetByteCount(value);
             } catch (EncoderFallbackException ex) {
-                throw new NbtFormatException(
-                    "String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+                throw NbtFormatException.StringEncoding(ex);
             }
         }
 

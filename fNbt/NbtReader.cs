@@ -976,12 +976,7 @@ namespace fNbt {
                 case ParseState.AtListBeginning:
                     // Validate before changing any state
                     elementType = ListType;
-                    if (!IsListValueType(elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
-                    }
-                    if (!IsConvertibleTarget(typeof(T), elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
-                    }
+                    EnsureTypesAreConvertible(elementType, typeof(T));
                     if (TagLength == 0) {
                         // Nothing to enter, so the cursor stays on the list and the next step
                         // treats it like any other list tag
@@ -999,12 +994,7 @@ namespace fNbt {
                     // element type comes from the node that entered it
                     NullableSupport.Assert(nodes != null);
                     elementType = nodes[nodeCount - 1].ListType;
-                    if (!IsListValueType(elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
-                    }
-                    if (!IsConvertibleTarget(typeof(T), elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
-                    }
+                    EnsureTypesAreConvertible(elementType, typeof(T));
                     if (ListIndex >= ParentTagLength) {
                         // An earlier bulk read consumed everything
                         unpublished = 0;
@@ -1093,27 +1083,41 @@ namespace fNbt {
         // Convert.ChangeType, and enums from integral values or names. Anything else would fail
         // only after elements were consumed. GetTypeCode reports an enum as its underlying type,
         // so enums are checked first.
-        static bool IsConvertibleTarget(Type type, NbtTagType elementType) {
-            if (type.IsEnum) {
+        static void EnsureTypesAreConvertible(NbtTagType elementType, Type targetType) {
+            if (targetType.IsEnum) {
                 switch (elementType) {
                     case NbtTagType.Byte:
                     case NbtTagType.Short:
                     case NbtTagType.Int:
                     case NbtTagType.Long:
                     case NbtTagType.String:
-                        return true;
+                        return;
                     default:
-                        return false;
+                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of integral types or strings when reading into an enum type.");
                 }
             }
-            switch (Type.GetTypeCode(type)) {
+
+            switch (elementType) {
+                case NbtTagType.Byte:
+                case NbtTagType.Short:
+                case NbtTagType.Int:
+                case NbtTagType.Long:
+                case NbtTagType.Float:
+                case NbtTagType.Double:
+                case NbtTagType.String:
+                    break;
+                default:
+                    throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+            }
+            
+            switch (Type.GetTypeCode(targetType)) {
                 case TypeCode.Object:
                 case TypeCode.DateTime:
                 case TypeCode.DBNull:
                 case TypeCode.Empty:
-                    return false;
+                    throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + targetType + ".");
                 default:
-                    return true;
+                    return;
             }
         }
 
@@ -1149,22 +1153,6 @@ namespace fNbt {
                 result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T), underlyingCode);
             }
             return result;
-        }
-
-
-        static bool IsListValueType(NbtTagType type) {
-            switch (type) {
-                case NbtTagType.Byte:
-                case NbtTagType.Short:
-                case NbtTagType.Int:
-                case NbtTagType.Long:
-                case NbtTagType.Float:
-                case NbtTagType.Double:
-                case NbtTagType.String:
-                    return true;
-                default:
-                    return false;
-            }
         }
 
 

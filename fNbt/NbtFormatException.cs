@@ -40,5 +40,9 @@ namespace fNbt {
         internal static NbtFormatException UnknownListType() {
             return new NbtFormatException("NbtList had no elements and an Unknown ListType");
         }
+
+        internal static NbtFormatException StringEncoding(Exception ex) {
+            return new NbtFormatException("String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+        }
     }
 }
