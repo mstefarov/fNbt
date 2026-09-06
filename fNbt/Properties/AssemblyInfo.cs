@@ -28,17 +28,6 @@ using System.Runtime.InteropServices;
 
 [assembly: Guid("9253db1f-f1d4-45aa-a277-4f3ba635d651")]
 
-// Version information for an assembly consists of the following four values:
-//
-//      Major Version
-//      Minor Version 
-//      Build Number
-//      Revision
-//
-// You can specify all the values or you can default the Build and Revision Numbers 
-// by using the '*' as shown below:
-// [assembly: AssemblyVersion("1.0.*")]
-
 // AssemblyVersion moves only on major versions, so Framework apps built against any 2.x
 // bind to later 2.x without redirects. AssemblyFileVersion tracks every release.
 [assembly: AssemblyVersion("2.0.0.0")]

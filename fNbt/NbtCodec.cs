@@ -44,8 +44,8 @@ namespace fNbt {
         readonly bool requireCompoundRootOnRead;
 
 
-        /// <summary> Creates a codec for the given flavor with the current default policy
-        /// settings. </summary>
+        /// <summary> Creates a codec for the given flavor with the current validation and
+        /// allocation defaults. </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtFlavor flavor)
@@ -53,8 +53,8 @@ namespace fNbt {
 
 
         /// <summary> Creates a codec with the given options. </summary>
-        /// <param name="options"> Settings to use, snapshotted here. Later changes to the
-        /// instance do not affect this codec. </param>
+        /// <param name="options"> Settings to copy. Later changes to these options do not
+        /// affect this codec. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtCodec(NbtOptions options)

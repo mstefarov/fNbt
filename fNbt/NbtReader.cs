@@ -1079,10 +1079,8 @@ namespace fNbt {
         }
 
 
-        // The types list values can be converted to: primitives, string and decimal through
-        // Convert.ChangeType, and enums from integral values or names. Anything else would fail
-        // only after elements were consumed. GetTypeCode reports an enum as its underlying type,
-        // so enums are checked first.
+        // Reject unsupported types before consuming any elements. Check enums first because
+        // GetTypeCode reports their underlying type, but they need different conversion rules.
         static void EnsureTypesAreConvertible(NbtTagType elementType, Type targetType) {
             if (targetType.IsEnum) {
                 switch (elementType) {

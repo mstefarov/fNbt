@@ -277,10 +277,9 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads a length-prefixed string like <see cref="ReadString"/>, but returns
-        /// the cached instance when the same name bytes repeat. Real documents draw tag names
-        /// from a small set, so most reads allocate nothing. Entries are keyed by encoded bytes;
-        /// alternate encodings of one name get separate entries that decode equal. </summary>
+        /// <summary> Reads a length-prefixed name, reusing cached strings for repeated name bytes.
+        /// The cache keys use encoded bytes, so alternate encodings can produce distinct string
+        /// instances with equal values. </summary>
         public string ReadTagName() {
             int length = ReadStringLength(maxStringBytes);
             if (length == 0) return "";

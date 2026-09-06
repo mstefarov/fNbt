@@ -19,10 +19,8 @@ class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
 
 #if NETFRAMEWORK
-    // On .NET Framework, BenchmarkDotNet builds a project-reference job with its in-place Roslyn
-    // toolchain, a bare csc call whose exe carries no TargetFrameworkAttribute. The runtime then
-    // applies pre-4.7.2 quirks to that process, so its GZip reads fall back to the managed
-    // inflater while the NuGet job's csproj-built exe uses native zlib. Build every job the same way.
+    // BenchmarkDotNet's in-place Framework toolchain omits TargetFrameworkAttribute, enabling
+    // legacy managed GZip inflation. Use csproj so local and NuGet jobs both use native zlib.
     static Job OnCsProjToolchain(Job job) {
         return job.WithToolchain(CsProjClassicNetToolchain.Net48);
     }
