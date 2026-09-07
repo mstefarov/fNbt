@@ -433,7 +433,8 @@ namespace fNbt {
         /// <see cref="NbtByte.Value"/> of 255 prints as <c>-1b</c>, its <see cref="NbtByte.SignedValue"/>);
         /// compounds keep insertion order. Inside a list of compounds, a
         /// one-entry compound whose key is empty prints as its value, the form Minecraft 1.21.5 and
-        /// later store on disk for lists of mixed types. Two things no Minecraft version reads back:
+        /// later store on disk for lists of mixed types (<see cref="NbtList.UnwrapMixed"/> reads the
+        /// same way). Two things no Minecraft version reads back:
         /// <c>NaN</c> and infinities, printed as <c>NaNf</c> or <c>Infinityd</c> the way Minecraft
         /// prints them, and an empty key. <see cref="ParseSnbt(string)"/> reads both. </remarks>
         /// <returns> The SNBT text. </returns>
@@ -468,7 +469,8 @@ namespace fNbt {
         /// version reads as a number, is the unsigned byte <see cref="NbtByte.Value"/> holds (<c>-1b</c>
         /// and <c>255b</c> are the same byte). A list of mixed types becomes a list
         /// of compounds with each element under an empty key, the form Minecraft 1.21.5 and later
-        /// store on disk; an empty list has the <c>End</c> element type. A byte order mark at the
+        /// store on disk and <see cref="NbtList.CreateMixed"/> builds; <see cref="NbtList.UnwrapMixed"/>
+        /// reads through it. An empty list has the <c>End</c> element type. A byte order mark at the
         /// start of the text is skipped. <c>\N{name}</c> escapes are not supported. </remarks>
         /// <param name="text"> The SNBT text. </param>
         /// <returns> The parsed tag, unnamed. </returns>

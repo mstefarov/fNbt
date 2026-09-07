@@ -169,6 +169,12 @@ namespace fNbt.Test {
             Assert.AreEqual(5, mixed.Get<NbtCompound>(4)[""][""].IntValue);
             Assert.AreEqual(1, mixed.Get<NbtCompound>(5)["k"].IntValue);
             Assert.AreEqual("[1,\"a\",{},[2],{\"\":5},{k:1}]", mixed.ToSnbt());
+            // A wrapper-shaped compound is wrapped again inside any list of compounds, as the game
+            // does on save, so a loaded document's text does not drift through repeated round trips
+            NbtList loaded = (NbtList)Parse("[{\"\":1},{\"\":2}]");
+            Assert.AreEqual(1, loaded.Get<NbtCompound>(0)[""][""].IntValue);
+            Assert.AreEqual("[{\"\":1},{\"\":2}]", loaded.ToSnbt());
+            Assert.AreEqual("[{\"\":1},{k:2}]", Parse("[{\"\":1},{k:2}]").ToSnbt());
 
             // Lists of lists may differ inside; lists of different array kinds are mixed
             Assert.AreEqual(NbtTagType.List, ((NbtList)Parse("[[1],[\"a\"]]")).ListType);

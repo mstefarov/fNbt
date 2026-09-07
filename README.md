@@ -149,6 +149,12 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
     var root = (NbtCompound)NbtTag.ParseSnbt(File.ReadAllText("structure.snbt"));
     root.Name = "";
     new NbtFile(root).SaveToFile("structure.nbt", NbtCompression.GZip);
+
+    // Minecraft stores a list of mixed types as compounds with each value under an empty key.
+    // CreateMixed builds that form and UnwrapMixed reads through it.
+    NbtList line = NbtList.CreateMixed(new NbtString("Hello "), new NbtCompound { new NbtString("text", "world") });
+    string json = line.ToSnbt();                                      // ["Hello ",{text:"world"}]
+    NbtTag[] parts = ((NbtList)NbtTag.ParseSnbt(json)).UnwrapMixed(); // NbtString, NbtCompound
 ```
 
 #### Check out unit tests in fNbt.Test for more examples.

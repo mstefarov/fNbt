@@ -650,26 +650,8 @@ namespace fNbt {
 
             List<NbtTag> elements = ReadElements(childDepthBudget);
             if (elements.Count == 0) return new NbtList(NbtTagType.End);
-            NbtTagType type = elements[0].TagType;
-            bool mixed = false;
-            foreach (NbtTag element in elements) {
-                if (element.TagType != type) {
-                    mixed = true;
-                    break;
-                }
-            }
-            if (!mixed) return new NbtList(elements, type);
-
-            // The game's on-disk form of a mixed list: every element that is not a plain compound
-            // is wrapped in a compound under an empty key, wrapper-shaped compounds included, so
-            // that unwrapping on print gives the list back
-            for (int i = 0; i < elements.Count; i++) {
-                NbtTag element = elements[i];
-                if (element is NbtCompound c && !(c.Count == 1 && c.Contains(""))) continue;
-                element.Name = "";
-                elements[i] = new NbtCompound(new[] { element });
-            }
-            return new NbtList(elements, NbtTagType.Compound);
+            // Stored the way the game saves it: mixed types become wrapper compounds
+            return NbtList.CreateMixed(elements.ToArray());
         }
 
 

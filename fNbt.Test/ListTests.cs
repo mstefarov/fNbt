@@ -457,5 +457,82 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentException>(() => loaded.ListType = NbtTagType.End);
             Assert.Throws<ArgumentException>(() => loaded.Add(new NbtByte(1)));
         }
+
+
+        [TestMethod]
+        public void CreateMixedStoresMixedTypesTheWayMinecraftDoes() {
+            // Tags of one type make an ordinary list
+            NbtList ints = NbtList.CreateMixed(new NbtInt(1), new NbtInt(2));
+            Assert.AreEqual(NbtTagType.Int, ints.ListType);
+            Assert.AreEqual(2, ints.Count);
+            Assert.AreEqual(0, NbtList.CreateMixed().Count);
+
+            // Mixed types become compounds with each tag under an empty key; plain compounds stay
+            NbtCompound plain = new NbtCompound { new NbtInt("k", 1) };
+            NbtCompound wrapperShaped = new NbtCompound { new NbtInt("", 5) };
+            NbtList mixed = NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), plain, wrapperShaped, new NbtList());
+            Assert.AreEqual(NbtTagType.Compound, mixed.ListType);
+            Assert.AreEqual(1, mixed.Get<NbtCompound>(0)[""].IntValue);
+            Assert.AreEqual("a", mixed.Get<NbtCompound>(1)[""].StringValue);
+            Assert.AreSame(plain, mixed[2]);
+            // A wrapper-shaped compound is wrapped again, so unwrapping gives it back
+            Assert.AreSame(wrapperShaped, mixed.Get<NbtCompound>(3)[""]);
+            Assert.AreEqual(NbtTagType.List, mixed.Get<NbtCompound>(4)[""].TagType);
+            Assert.AreEqual("[1,\"a\",{k:1},{\"\":5},[]]", mixed.ToSnbt());
+
+            // A list of compounds gets the same treatment, since that is what the wire holds
+            NbtList compounds = NbtList.CreateMixed(new NbtCompound { new NbtInt("", 5) }, new NbtCompound());
+            Assert.AreEqual(NbtTagType.Compound, compounds.ListType);
+            Assert.AreEqual(5, compounds.Get<NbtCompound>(0)[""][""].IntValue);
+            Assert.AreEqual(0, compounds.Get<NbtCompound>(1).Count);
+        }
+
+
+        [TestMethod]
+        public void CreateMixedRefusesWhatAddRefusesAndLeavesTheTagsAlone() {
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed((NbtTag[])null));
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed(new NbtInt(1), null));
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), null));
+            NbtInt named = new NbtInt("named", 1);
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(named, new NbtString("a")));
+            NbtInt twice = new NbtInt(1);
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(twice, new NbtString("a"), twice));
+            NbtInt parented = new NbtInt(1);
+            NbtList owner = new NbtList { parented };
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(parented, new NbtString("a")));
+            Assert.IsNull(twice.Parent);
+            Assert.IsNull(twice.Name);
+            Assert.AreSame(owner, parented.Parent);
+        }
+
+
+        [TestMethod]
+        public void UnwrapMixedReadsTheWayMinecraftLoads() {
+            NbtCompound plain = new NbtCompound { new NbtInt("k", 1) };
+            NbtList mixed = NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), plain,
+                                                new NbtCompound { new NbtInt("", 5) });
+            NbtTag[] parts = mixed.UnwrapMixed();
+            Assert.AreEqual(4, parts.Length);
+            Assert.AreEqual(1, parts[0].IntValue);
+            Assert.AreEqual("a", parts[1].StringValue);
+            Assert.AreSame(plain, parts[2]);
+            // One level comes off, so the wrapper-shaped compound is itself again
+            Assert.AreEqual(5, parts[3][""].IntValue);
+            // The tags are the list's own, not copies
+            Assert.AreSame(mixed.Get<NbtCompound>(0)[""], parts[0]);
+            Assert.IsNotNull(parts[0].Parent);
+
+            // A loaded list of compounds under empty keys reads as its values, as in the game;
+            // other lists come back as they are
+            NbtList loaded = new NbtList(new NbtTag[] {
+                new NbtCompound { new NbtInt("", 1) },
+                new NbtCompound { new NbtInt("", 2) }
+            });
+            Assert.AreEqual(1, loaded.UnwrapMixed()[0].IntValue);
+            Assert.AreEqual(2, loaded.UnwrapMixed()[1].IntValue);
+            NbtList ints = new NbtList(new NbtTag[] { new NbtInt(1) });
+            Assert.AreSame(ints[0], ints.UnwrapMixed()[0]);
+            Assert.AreEqual(0, new NbtList().UnwrapMixed().Length);
+        }
     }
 }

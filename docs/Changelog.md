@@ -11,6 +11,12 @@
     non-finite numbers and empty keys, which no Minecraft version reads back.
     SnbtOptions.WriteLayout selects compact, spaced, or indented text, and
     SnbtOptions.DefaultWriteLayout sets the process-wide default.
+- NbtList.CreateMixed builds a list from tags of different types the way
+    Minecraft 1.21.5 stores one, as compounds holding each tag under an empty
+    key, and NbtList.UnwrapMixed reads such a list back. ParseSnbt applies the
+    same rule as Minecraft's save does, wrapping a wrapper-shaped compound in
+    any list of compounds, so a document that holds one no longer changes on
+    each pass through text.
 - NbtByte.SignedValue reads the value as the signed byte Minecraft stores and
     takes one back: 255 is -1. ToSnbt prints bytes that way, and ParseSnbt
     reads either spelling, so -1b and 255b are the same byte.

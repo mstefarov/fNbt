@@ -73,11 +73,10 @@ namespace fNbt {
                 sb.Append("[]");
                 return;
             }
-            bool unwrap = list.ListType == NbtTagType.Compound;
-            bool expand = layout == SnbtLayout.Indented && HasContainer(list, unwrap);
+            bool expand = layout == SnbtLayout.Indented && HasContainer(list);
             sb.Append('[');
             for (int i = 0; i < list.Count; i++) {
-                NbtTag element = unwrap ? Unwrap(list[i]) : list[i];
+                NbtTag element = NbtList.TryUnwrap(list[i]);
                 if (i > 0) sb.Append(',');
                 BeginMember(sb, layout, expand, i, level + 1);
                 WriteTag(sb, element, layout, level + 1, childDepthBudget);
@@ -110,21 +109,10 @@ namespace fNbt {
         }
 
 
-        // The game's own rule for the wrapper compounds it writes for mixed lists: inside a list
-        // of compounds, a one-entry compound whose key is empty stands for its value
-        static NbtTag Unwrap(NbtTag element) {
-            NbtCompound compound = (NbtCompound)element;
-            if (compound.Count == 1) {
-                NbtTag? inner = compound[""];
-                if (inner != null) return inner;
-            }
-            return element;
-        }
-
-
-        static bool HasContainer(NbtList list, bool unwrap) {
+        // Elements print the way the game reads them: a wrapper compound stands for its value
+        static bool HasContainer(NbtList list) {
             foreach (NbtTag element in list) {
-                NbtTagType type = (unwrap ? Unwrap(element) : element).TagType;
+                NbtTagType type = NbtList.TryUnwrap(element).TagType;
                 if (type == NbtTagType.List || type == NbtTagType.Compound) return true;
             }
             return false;

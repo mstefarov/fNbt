@@ -299,6 +299,90 @@ namespace fNbt {
         }
 
 
+        /// <summary> Creates an unnamed list from tags of any types, stored the way Minecraft stores
+        /// a list of mixed types. Tags of one type make an ordinary list. Mixed types make a list of
+        /// compounds in which every tag that is not a plain compound sits under an empty key, the
+        /// wrapper compounds Minecraft 1.21.5 and later write to disk. A compound that already has
+        /// that shape is wrapped again, so <see cref="UnwrapMixed"/> gives every tag back as it was. </summary>
+        /// <param name="elements"> Tags to hold. Each must be unnamed and have no Parent. </param>
+        /// <returns> The new list. </returns>
+        /// <exception cref="ArgumentNullException"> <paramref name="elements"/> or a tag in it is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> A tag is named, already has a Parent, or appears more than once. </exception>
+        public static NbtList CreateMixed(params NbtTag[] elements) {
+            if (elements == null) throw new ArgumentNullException(nameof(elements));
+            if (RawElementType(elements) != NbtTagType.Compound) return new NbtList(elements);
+            // Validate before wrapping: wrapping names the tags and gives them a parent
+            HashSet<NbtTag> seen = new HashSet<NbtTag>();
+            foreach (NbtTag element in elements) {
+                if (element == null) {
+                    throw new ArgumentNullException(nameof(elements), "A tag in the collection is null.");
+                } else if (!seen.Add(element)) {
+                    throw new ArgumentException("The same tag instance was given more than once.", nameof(elements));
+                } else if (element.Parent != null) {
+                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+                } else if (element.Name != null) {
+                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
+                }
+            }
+            NbtTag[] wrapped = new NbtTag[elements.Length];
+            for (int i = 0; i < wrapped.Length; i++) {
+                wrapped[i] = WrapIfNeeded(elements[i]);
+            }
+            return new NbtList(wrapped, NbtTagType.Compound);
+        }
+
+
+        /// <summary> Returns the elements the way Minecraft reads them. In a list of compounds, a
+        /// compound holding one tag under an empty key stands for that tag, the wrapper form in
+        /// which Minecraft 1.21.5 and later store a list of mixed types; every other list returns
+        /// its elements as they are. One level of wrapping is removed. The tags are this list's
+        /// own, so <see cref="NbtTag.Clone()"/> one before adding it elsewhere. </summary>
+        /// <returns> The elements, unwrapped. </returns>
+        public NbtTag[] UnwrapMixed() {
+            NbtTag[] result = new NbtTag[tags.Count];
+            for (int i = 0; i < result.Length; i++) {
+                result[i] = TryUnwrap(tags[i]);
+            }
+            return result;
+        }
+
+
+        // Minecraft's rules for the list of mixed types the wire cannot hold. On save, a list
+        // whose elements are compounds or of mixed types wraps every element that is not a plain
+        // compound in a compound under an empty key, wrapper-shaped compounds included; on load,
+        // one such wrapper comes off each element of a compound list. The SNBT parser and writer
+        // apply the same two rules.
+        static NbtTagType RawElementType(NbtTag[] elements) {
+            NbtTagType type = NbtTagType.End;
+            foreach (NbtTag element in elements) {
+                if (element == null) continue;
+                if (type == NbtTagType.End) {
+                    type = element.TagType;
+                } else if (element.TagType != type) {
+                    return NbtTagType.Compound;
+                }
+            }
+            return type;
+        }
+
+
+        static NbtTag WrapIfNeeded(NbtTag element) {
+            if (element is NbtCompound compound && !IsWrapper(compound)) return element;
+            element.Name = "";
+            return new NbtCompound(new[] { element });
+        }
+
+
+        internal static NbtTag TryUnwrap(NbtTag element) {
+            return element is NbtCompound compound && IsWrapper(compound) ? compound[""]! : element;
+        }
+
+
+        static bool IsWrapper(NbtCompound compound) {
+            return compound.Count == 1 && compound.Contains("");
+        }
+
+
         #region Reading / Writing
 
         // Past the cap, a complete seekable input can vouch for the count. The reference array may
