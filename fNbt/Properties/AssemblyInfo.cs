@@ -31,7 +31,7 @@ using System.Runtime.InteropServices;
 // AssemblyVersion moves only on major versions, so Framework apps built against any 2.x
 // bind to later 2.x without redirects. AssemblyFileVersion tracks every release.
 [assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.1.0.0")]
 
 // Potentially speed up resource probes
 

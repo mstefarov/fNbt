@@ -9,7 +9,7 @@ Minecraft Java, Minecraft Bedrock, and ClassiCube use.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 2.0.0 (3 September 2026).
+Current released version is 2.1.0 (7 September 2026).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -161,7 +161,7 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
 
 
 ## API REFERENCE
-Online reference can be found at https://fcraft.net/fnbt/v2.0.0/
+Online reference can be found at https://fcraft.net/fnbt/v2.1.0/
 
 
 ## LICENSING

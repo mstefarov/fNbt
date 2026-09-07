@@ -1,44 +1,20 @@
-## Unreleased (fNbt)
+## 2.1.0 (fNbt)
 - Add SNBT (stringified NBT), the text form Minecraft Java uses in commands
-    and .snbt files. NbtTag.ToSnbt prints any tag and NbtTag.ParseSnbt reads
-    one back; an overload parses one value out of a longer string and reports
-    how much it consumed. Parsing accepts every syntax Minecraft has used since
-    1.12 plus what common NBT tools write, including hex and binary numbers,
-    every escape except \N{name}, bool() and uuid(), NaNf and Infinityd as the
-    numbers they name, byte literals up to 255b, and lists of mixed types,
-    which become the wrapper compounds Minecraft 1.21.5 stores on disk. Output
-    uses the shape every Minecraft version and tool reads, apart from
-    non-finite numbers and empty keys, which no Minecraft version reads back.
-    SnbtOptions.WriteLayout selects compact, spaced, or indented text, and
-    SnbtOptions.DefaultWriteLayout sets the process-wide default. Numbers print
-    exactly as Minecraft Java prints them and parse to the same bits on every
-    target framework.
-- NbtList.CreateMixed builds a list from tags of different types the way
-    Minecraft 1.21.5 stores one, as compounds holding each tag under an empty
-    key, and NbtList.UnwrapMixed reads such a list back. ParseSnbt applies the
-    same rule as Minecraft's save does, wrapping a wrapper-shaped compound in
-    any list of compounds, so a document that holds one no longer changes on
-    each pass through text.
-- NbtByte.SignedValue reads the value as the signed byte Minecraft stores and
-    takes one back: 255 is -1. ToSnbt prints bytes that way, and ParseSnbt
-    reads either spelling, so -1b and 255b are the same byte.
-- SnbtParseException, thrown by ParseSnbt and derived from NbtFormatException,
-    gives the index, line, and column of an SNBT parse error.
-    NbtFormatException is no longer sealed.
-- The first tag added to an empty NbtList now sets its ListType whether that
-    type was Unknown or End, so empty lists loaded from files accept new tags.
-    The type of an empty list is a constraint on what may be added, not part of
-    its value: NbtComparer now treats every empty list as equal to every other,
-    and a list that never received a type writes TAG_End, the type Minecraft
-    writes for every empty list, instead of throwing NbtFormatException.
-- NbtReader.ReadListAsArray now uses the result element size when applying
-    MaxAllocation to enum, decimal, and bool arrays.
+    and .snbt files: NbtTag.ToSnbt and NbtTag.ParseSnbt, SnbtOptions for the
+    layout, and SnbtParseException for errors. Parsing accepts every syntax
+    Minecraft has used since 1.12; output uses the shape every version reads.
+- Add NbtList.CreateMixed and UnwrapMixed for lists of mixed types, stored as
+    Minecraft 1.21.5 stores them.
+- Add NbtByte.SignedValue, the value as the signed byte Minecraft stores.
+- The first tag added to an empty NbtList now sets its type, so empty lists
+    loaded from files accept tags. NbtComparer treats every empty list as
+    equal, and an untyped empty list writes TAG_End instead of throwing.
+- Improve performance: comparing parsed or cloned trees is about 2x faster,
+    large array reads and uncompressed loads about 1.4x faster on .NET 8, and
+    fixed-width array reads and writes up to 2x faster on .NET Standard.
 - NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
-    an integral value does not fit the requested enum's underlying type.
-    Since fNbt exposes TAG_Byte as byte, reading Java's -1 as an enum backed
-    by sbyte now throws instead of returning -1, just as ReadValueAs<sbyte> does.
-- Document cases where compressed loads can miss damaged or missing checksum
-    bytes.
+    a value does not fit the requested enum's underlying type.
+- Document the cases where a compressed load can miss a damaged checksum.
 
 ## 2.0.0 (fNbt)
 - Add NbtFlavor support for Java (the default), JavaAnvil,
