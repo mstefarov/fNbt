@@ -11,7 +11,7 @@ namespace fNbt {
     // Framework is not correctly rounded in either direction (measured 2026-09-06 on 300,000
     // random doubles: Parse lands one unit off for 0.4% of shortest texts, ToString past 15 digits
     // is often wrong, and zero loses its sign both ways). The netstandard2.0 build routes SNBT
-    // numbers through this class both ways, the net8.0 build only subnormals; it is compiled
+    // numbers through this class both ways; net8.0 uses the runtime. This class is compiled
     // everywhere so the tests can check it against a correct runtime and against Java's output.
     internal static class FloatingDecimal {
         const int DoubleMantissaBits = 53;
@@ -135,50 +135,43 @@ namespace fNbt {
         // The correctly rounded double for a decimal text ("-12.5e-3", digits and an optional
         // point, exponent and sign), starting from the BCL's reading, which is within a few units
         public static double CorrectDouble(string text, double parsed) {
-            if (!Scan(text, out bool negative, out BigInteger digits, out int scale, out int digitCount)) return parsed;
-            if (digits.IsZero || digitCount + scale < -400) return negative ? -0.0 : 0.0;
-            long bits = BitConverter.DoubleToInt64Bits(parsed) & long.MaxValue;
-            for (int step = 0; step < 16; step++) {
-                int exponentField = (int)(bits >> 52);
-                if (exponentField == 0x7FF) break;
-                ulong mantissa = (ulong)bits & 0xFFFFFFFFFFFFFUL;
-                int exponent = DoubleMinExponent;
-                if (exponentField != 0) {
-                    mantissa |= 1UL << 52;
-                    exponent = exponentField - 1075;
-                }
-                int side = Compare(digits, scale, mantissa, exponent, DoubleMantissaBits, DoubleMinExponent);
-                if (side == 0) break;
-                bits += side;
-            }
-            double magnitude = BitConverter.Int64BitsToDouble(bits);
-            return negative ? -magnitude : magnitude;
+            return BitConverter.Int64BitsToDouble(CorrectBits(text, BitConverter.DoubleToInt64Bits(parsed),
+                DoubleMantissaBits, DoubleMinExponent, -400));
         }
 
 
         public static float CorrectSingle(string text, float parsed) {
-            if (!Scan(text, out bool negative, out BigInteger digits, out int scale, out int digitCount)) return parsed;
-            if (digits.IsZero || digitCount + scale < -60) return negative ? -0.0f : 0.0f;
-            int bits = SingleBits(parsed) & int.MaxValue;
-            for (int step = 0; step < 16; step++) {
-                int exponentField = bits >> 23;
-                if (exponentField == 0xFF) break;
-                ulong mantissa = (ulong)(bits & 0x7FFFFF);
-                int exponent = SingleMinExponent;
-                if (exponentField != 0) {
-                    mantissa |= 1UL << 23;
-                    exponent = exponentField - 150;
-                }
-                int side = Compare(digits, scale, mantissa, exponent, SingleMantissaBits, SingleMinExponent);
-                if (side == 0) break;
-                bits += side;
-            }
-            float magnitude = SingleFromBits(bits);
-            return negative ? -magnitude : magnitude;
+            return SingleFromBits(unchecked((int)CorrectBits(text, SingleBits(parsed),
+                SingleMantissaBits, SingleMinExponent, -60)));
         }
 
 
-        // Splits a decimal text into its digits (as one integer) and the power of ten they carry.
+        // Positive IEEE encodings are ordered integers, for both single and double precision.
+        static long CorrectBits(string text, long bits, int mantissaBits, int minExponent, int underflowCutoff) {
+            if (!Scan(text, out bool negative, out BigInteger digits, out int scale, out int digitCount)) return bits;
+            long magnitudeMask = mantissaBits == DoubleMantissaBits ? long.MaxValue : int.MaxValue;
+            long sign = negative ? ~magnitudeMask : 0;
+            if (digits.IsZero || digitCount + scale < underflowCutoff) return sign;
+            bits &= magnitudeMask;
+            ulong hiddenBit = 1UL << (mantissaBits - 1);
+            long infinity = magnitudeMask - (long)(hiddenBit - 1);
+            for (int step = 0; step < 16 && bits < infinity; step++) {
+                int exponentField = (int)(bits >> (mantissaBits - 1));
+                ulong mantissa = (ulong)bits & (hiddenBit - 1);
+                int exponent = minExponent;
+                if (exponentField != 0) {
+                    mantissa |= hiddenBit;
+                    exponent = exponentField + minExponent - 1;
+                }
+                int side = Compare(digits, scale, mantissa, exponent, mantissaBits, minExponent);
+                if (side == 0) break;
+                bits += side;
+            }
+            return bits | sign;
+        }
+
+
+        // Splits validated decimal text into its digits (as one integer) and their power of ten.
         // False for anything this class should leave to the BCL.
         static bool Scan(string text, out bool negative, out BigInteger digits, out int scale, out int digitCount) {
             negative = false;
@@ -191,16 +184,11 @@ namespace fNbt {
                 pos++;
             }
             int start = pos;
-            int fraction = 0;
-            bool afterPoint = false;
-            while (pos < text.Length && (text[pos] == '.' || (text[pos] >= '0' && text[pos] <= '9'))) {
-                if (text[pos] == '.') {
-                    afterPoint = true;
-                } else if (afterPoint) {
-                    fraction++;
-                }
-                pos++;
-            }
+            int exponentAt = text.IndexOf('e', start);
+            if (exponentAt < 0) exponentAt = text.IndexOf('E', start);
+            pos = exponentAt < 0 ? text.Length : exponentAt;
+            int pointAt = text.IndexOf('.', start, pos - start);
+            int fraction = pointAt < 0 ? 0 : pos - pointAt - 1;
             string mantissaText = text.Substring(start, pos - start).Replace(".", "");
             mantissaText = mantissaText.TrimStart('0');
             if (mantissaText.Length > MaxDigits) return false;

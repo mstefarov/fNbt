@@ -88,7 +88,7 @@ namespace fNbt {
             if (token.Equals("false", StringComparison.OrdinalIgnoreCase)) return new NbtByte(0);
             NbtTag? nonFinite = TryNonFinite(token);
             if (nonFinite != null) return nonFinite;
-            NbtTag? old = TryOldFloat(token);
+            NbtTag? old = TryOldOverflow(token);
             if (old != null) return old;
             return new NbtString(token);
         }
@@ -124,14 +124,14 @@ namespace fNbt {
             }
             if (pos >= text.Length) return null;
             int afterSign = pos;
-            NbtTag? tag = TryReadFloat(negative, defaultType);
+            NbtTag? tag = TryReadFloat(negative);
             if (tag != null) return tag;
             pos = afterSign;
             return TryReadInteger(negative, defaultType);
         }
 
 
-        NbtTag? TryReadFloat(bool negative, NbtTagType defaultType) {
+        NbtTag? TryReadFloat(bool negative) {
             string? whole = ReadDigitRun(10);
             if (whole == null) return null;
             int end = pos;
@@ -185,9 +185,9 @@ namespace fNbt {
             if (!hasDot && !hasExponent && !hasSuffix) return null;
             pos = end;
 
-            string cleaned = (negative ? "-" : "") + whole.Replace("_", "") +
-                             (hasDot ? "." + fraction.Replace("_", "") : "") +
-                             (hasExponent ? "e" + exponent.Replace("_", "") : "");
+            string cleaned = (negative ? "-" : "") + whole +
+                             (hasDot ? "." + fraction : "") +
+                             (hasExponent ? "e" + exponent : "");
             if (isFloat) {
                 if (!float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f)) return null;
 #if !NETCOREAPP
@@ -275,7 +275,6 @@ namespace fNbt {
 
             ulong magnitude = 0;
             foreach (char c in digits!) {
-                if (c == '_') continue;
                 int digit = c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10;
                 if (magnitude > (ulong.MaxValue - (ulong)digit) / (ulong)radix) return null;
                 magnitude = magnitude * (ulong)radix + (ulong)digit;
@@ -336,14 +335,14 @@ namespace fNbt {
         }
 
 
-        // A run of digits in the given radix with underscores between them. Empty when no digit
+        // Digits in the given radix, with separators removed. Empty when no digit
         // is present; null when an underscore starts or ends the run, which no reading accepts.
         string? ReadDigitRun(int radix) {
             int start = pos;
             while (pos < text.Length && (IsDigit(text[pos], radix) || text[pos] == '_')) pos++;
             if (pos == start) return "";
             if (text[start] == '_' || text[pos - 1] == '_') return null;
-            return text.Substring(start, pos - start);
+            return text.Substring(start, pos - start).Replace("_", "");
         }
 
 
@@ -385,24 +384,12 @@ namespace fNbt {
             @"^[-+]?(?:(?:[0-9]+\.?|[0-9]*\.[0-9]+)(?:[eE][-+]?[0-9]+)?[dD]|(?:[0-9]+\.|[0-9]*\.[0-9]+)(?:[eE][-+]?[0-9]+)?)$",
             RegexOptions.CultureInvariant);
 
-        static NbtTag? TryOldFloat(string token) {
+        static NbtTag? TryOldOverflow(string token) {
             // Plain identifiers never match, so they skip the regexes
             if (!CanStartNumber(token[0])) return null;
             bool isFloat = OldFloat.IsMatch(token);
             if (!isFloat && !OldDouble.IsMatch(token)) return null;
-            char last = token[token.Length - 1];
-            string digits = last == 'f' || last == 'F' || last == 'd' || last == 'D'
-                ? token.Substring(0, token.Length - 1)
-                : token;
-            if (!double.TryParse(digits, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)) {
-                // .NET Framework reports an overflow as a failure
-                value = digits[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
-            }
-#if !NETCOREAPP
-            else {
-                value = FloatingDecimal.CorrectDouble(digits, value);
-            }
-#endif
+            double value = token[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
             return isFloat ? new NbtFloat((float)value) : (NbtTag)new NbtDouble(value);
         }
 

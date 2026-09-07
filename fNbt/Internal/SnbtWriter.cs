@@ -233,8 +233,9 @@ namespace fNbt {
         // back as the value but at least two, the closest such decimal, laid out plain with at
         // least one fractional digit when the decimal exponent is in [-3, 7), and as d.dddE<exp>
         // otherwise, with no plus sign or padding on the exponent. The runtime's shortest form
-        // gives Java's digits for every normal value on .NET Core; FloatingDecimal gives them
-        // everywhere else. Checked against JDK 25 on 600,000 random values and every power of two.
+        // gives Java's digits on .NET Core after its one-digit forms get a second digit when
+        // closer; FloatingDecimal gives them elsewhere. Checked against JDK 25 on random values,
+        // powers of two, and neighbors of one-digit decimals.
 
         internal static void AppendFloat(StringBuilder sb, float value) {
             if (float.IsNaN(value)) {
@@ -242,7 +243,7 @@ namespace fNbt {
             } else if (float.IsInfinity(value)) {
                 sb.Append(value > 0 ? "Infinity" : "-Infinity");
             } else {
-                AppendJavaLayout(sb, ShortestFloat(value));
+                AppendJavaLayout(sb, Shortest(value));
             }
         }
 
@@ -253,36 +254,29 @@ namespace fNbt {
             } else if (double.IsInfinity(value)) {
                 sb.Append(value > 0 ? "Infinity" : "-Infinity");
             } else {
-                AppendJavaLayout(sb, ShortestDouble(value));
+                AppendJavaLayout(sb, Shortest(value));
             }
         }
 
 
 #if NETCOREAPP
-        // Subnormals are where the runtime's one-digit forms differ from Java's two-digit ones
-        static string ShortestFloat(float value) {
-            int bits = BitConverter.SingleToInt32Bits(value);
-            if ((bits & 0x7F800000) != 0) return value.ToString("R", CultureInfo.InvariantCulture);
-            string text = FloatingDecimal.ShortestSingle(value);
-            return bits < 0 ? "-" + text : text;
-        }
-
-
-        static string ShortestDouble(double value) {
-            long bits = BitConverter.DoubleToInt64Bits(value);
-            if ((bits & 0x7FF0000000000000L) != 0) return value.ToString("R", CultureInfo.InvariantCulture);
-            string text = FloatingDecimal.ShortestDouble(value);
-            return bits < 0 ? "-" + text : text;
+        // Java chooses the closest decimal with one or two digits when one digit round-trips.
+        // Those cases can differ from R only in scientific notation (the smallest subnormals).
+        static string Shortest<T>(T value) where T : IFormattable {
+            string text = value.ToString("R", CultureInfo.InvariantCulture);
+            return text.IndexOf('E') == (text[0] == '-' ? 2 : 1)
+                ? value.ToString("G2", CultureInfo.InvariantCulture)
+                : text;
         }
 #else
         // .NET Framework's formatting is not correctly rounded past 15 digits and its "R" is not
         // shortest, so every number goes through exact arithmetic
-        static string ShortestFloat(float value) {
+        static string Shortest(float value) {
             return WithSign(FloatingDecimal.ShortestSingle(value), value);
         }
 
 
-        static string ShortestDouble(double value) {
+        static string Shortest(double value) {
             return WithSign(FloatingDecimal.ShortestDouble(value), value);
         }
 
@@ -305,7 +299,7 @@ namespace fNbt {
             }
             int exponentAt = text.IndexOf('E', start);
             string mantissa = exponentAt < 0 ? text.Substring(start) : text.Substring(start, exponentAt - start);
-            int exponent = exponentAt < 0 ? 0 : ParseExponent(text, exponentAt + 1);
+            int exponent = exponentAt < 0 ? 0 : int.Parse(text.Substring(exponentAt + 1), CultureInfo.InvariantCulture);
 
             // The digits with the point removed, and where the point sits among them
             int dot = mantissa.IndexOf('.');
@@ -349,23 +343,6 @@ namespace fNbt {
                 sb.Append('E');
                 sb.Append(decimalExponent.ToString(CultureInfo.InvariantCulture));
             }
-        }
-
-        // The exponent .NET wrote: an optional sign and a few digits
-        static int ParseExponent(string text, int start) {
-            int sign = 1;
-            int i = start;
-            if (text[i] == '+') {
-                i++;
-            } else if (text[i] == '-') {
-                sign = -1;
-                i++;
-            }
-            int value = 0;
-            for (; i < text.Length; i++) {
-                value = value * 10 + (text[i] - '0');
-            }
-            return sign * value;
         }
 
         #endregion
