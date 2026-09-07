@@ -8,7 +8,7 @@ namespace fNbt {
     // Reads SNBT text into a tag tree. The grammar is Minecraft Java 1.21.5's, widened wherever an
     // older game version or a common tool produces something 1.21.5 rejects, as long as text the
     // modern game accepts keeps its meaning: an unquoted token that is not a modern number falls back
-    // to the classic (1.12 to 1.21.4) reading, which made it a string or an infinity; suffixed
+    // to the old (1.12 to 1.21.4) reading, which made it a string or an infinity; suffixed
     // NaN and Infinity read as numbers; empty quoted keys are allowed; mixed lists become the
     // wrapper compounds the game stores on disk.
     internal sealed class SnbtParser {
@@ -67,7 +67,7 @@ namespace fNbt {
             if (CanStartNumber(text[pos])) {
                 NbtTag? number = TryReadNumber(NbtTagType.Int);
                 // A number that runs straight into more token characters (1abc, 1.5.2, 1bx) is a
-                // classic-era string, not a number plus trailing data
+                // old-era string, not a number plus trailing data
                 if (number != null && !(pos < text.Length && IsUnquotedChar(text[pos]))) return number;
                 pos = start;
             }
@@ -88,8 +88,8 @@ namespace fNbt {
             if (token.Equals("false", StringComparison.OrdinalIgnoreCase)) return new NbtByte(0);
             NbtTag? nonFinite = TryNonFinite(token);
             if (nonFinite != null) return nonFinite;
-            NbtTag? classic = TryClassicFloat(token);
-            if (classic != null) return classic;
+            NbtTag? old = TryOldFloat(token);
+            if (old != null) return old;
             return new NbtString(token);
         }
 
@@ -114,7 +114,7 @@ namespace fNbt {
         // before the type letter). An unsuffixed integer takes defaultType: int on its own, the
         // element type inside an array. Whitespace is skipped before every part, as the game's
         // terminals do. Returns null, with pos unspecified, when the text is not a modern number;
-        // the caller rewinds and falls back to the classic reading.
+        // the caller rewinds and falls back to the old reading.
         NbtTag? TryReadNumber(NbtTagType defaultType) {
             bool negative = false;
             if (text[pos] == '+' || text[pos] == '-') {
@@ -250,11 +250,14 @@ namespace fNbt {
             NbtTagType type = defaultType;
             if (pos < text.Length) {
                 char c = text[pos];
-                if ((c == 'u' || c == 'U' || c == 's' || c == 'S') && pos + 1 < text.Length &&
-                    TryTypeLetter(text[pos + 1], out NbtTagType prefixed)) {
+                bool signedness = c == 'u' || c == 'U' || c == 's' || c == 'S';
+                // The game skips whitespace before every terminal, the type letter included
+                int letterAt = pos + 1;
+                while (signedness && letterAt < text.Length && IsWhitespace(text[letterAt])) letterAt++;
+                if (signedness && letterAt < text.Length && TryTypeLetter(text[letterAt], out NbtTagType prefixed)) {
                     unsigned = c == 'u' || c == 'U';
                     type = prefixed;
-                    end = pos + 2;
+                    end = letterAt + 1;
                 } else if (TryTypeLetter(c, out NbtTagType plain)) {
                     type = plain;
                     end = pos + 1;
@@ -264,7 +267,7 @@ namespace fNbt {
             // Hex and binary literals are unsigned by default, as in the game. So is a non-negative
             // decimal byte: NbtByte's value is unsigned while the wire's is signed, so 255b and -1b
             // are the same byte here, where the modern grammar refuses 128b through 255b and the
-            // classic parser read them as strings.
+            // old parser read them as strings.
             if (unsigned == null) unsigned = radix != 10 || (type == NbtTagType.Byte && !negative);
 
             ulong magnitude = 0;
@@ -369,21 +372,21 @@ namespace fNbt {
         }
 
 
-        // The classic parser's float and double patterns, reached only when the modern grammar has
-        // refused the token, which for these shapes means the value overflowed: the classic parser
+        // The old parser's float and double patterns, reached only when the modern grammar has
+        // refused the token, which for these shapes means the value overflowed: the old parser
         // stored an infinity, and so does this
-        static readonly Regex ClassicFloat = new Regex(
+        static readonly Regex OldFloat = new Regex(
             @"^[-+]?(?:[0-9]+\.?|[0-9]*\.[0-9]+)(?:[eE][-+]?[0-9]+)?[fF]$", RegexOptions.CultureInvariant);
 
-        static readonly Regex ClassicDouble = new Regex(
+        static readonly Regex OldDouble = new Regex(
             @"^[-+]?(?:(?:[0-9]+\.?|[0-9]*\.[0-9]+)(?:[eE][-+]?[0-9]+)?[dD]|(?:[0-9]+\.|[0-9]*\.[0-9]+)(?:[eE][-+]?[0-9]+)?)$",
             RegexOptions.CultureInvariant);
 
-        static NbtTag? TryClassicFloat(string token) {
+        static NbtTag? TryOldFloat(string token) {
             // Plain identifiers never match, so they skip the regexes
             if (!CanStartNumber(token[0])) return null;
-            bool isFloat = ClassicFloat.IsMatch(token);
-            if (!isFloat && !ClassicDouble.IsMatch(token)) return null;
+            bool isFloat = OldFloat.IsMatch(token);
+            if (!isFloat && !OldDouble.IsMatch(token)) return null;
             char last = token[token.Length - 1];
             string digits = last == 'f' || last == 'F' || last == 'd' || last == 'D'
                 ? token.Substring(0, token.Length - 1)
@@ -554,23 +557,28 @@ namespace fNbt {
         }
 
 
-        // Java's UUID.fromString: five hex groups of at most 8, 4, 4, 4 and 12 digits, any of them
-        // shorter, to the four big-endian ints Minecraft stores
+        // Java's UUID.fromString, which the game's uuid() calls: at most 36 characters, exactly
+        // five groups between dashes, each an optional plus sign and 1 to 16 hex digits that fit
+        // a signed long, masked to the group's width (32, 16, 16, 16 and 48 bits)
         static bool TryParseUuid(string value, out int[] words) {
             words = new int[4];
+            if (value.Length > 36) return false;
             string[] groups = value.Split('-');
-            int[] maxLengths = { 8, 4, 4, 4, 12 };
             if (groups.Length != 5) return false;
             ulong[] parts = new ulong[5];
             for (int i = 0; i < 5; i++) {
-                if (groups[i].Length == 0 || groups[i].Length > maxLengths[i]) return false;
-                foreach (char c in groups[i]) {
+                string group = groups[i];
+                int start = group.Length > 0 && group[0] == '+' ? 1 : 0;
+                if (group.Length - start < 1 || group.Length - start > 16) return false;
+                for (int j = start; j < group.Length; j++) {
+                    char c = group[j];
                     if (!IsDigit(c, 16)) return false;
                     parts[i] = parts[i] * 16 + (ulong)(c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10);
                 }
+                if (parts[i] > long.MaxValue) return false;
             }
-            ulong high = (parts[0] << 32) | (parts[1] << 16) | parts[2];
-            ulong low = (parts[3] << 48) | parts[4];
+            ulong high = ((parts[0] & 0xffffffffUL) << 32) | ((parts[1] & 0xffffUL) << 16) | (parts[2] & 0xffffUL);
+            ulong low = ((parts[3] & 0xffffUL) << 48) | (parts[4] & 0xffffffffffffUL);
             words[0] = unchecked((int)(high >> 32));
             words[1] = unchecked((int)high);
             words[2] = unchecked((int)(low >> 32));
@@ -629,7 +637,7 @@ namespace fNbt {
 
 
         NbtTag ReadListOrArray(int depthBudget) {
-            int childDepthBudget = ConsumeDepthBudget(depthBudget);
+            int bracketAt = pos;
             pos++;
             int afterBracket = pos;
             SkipWhitespace();
@@ -642,16 +650,30 @@ namespace fNbt {
                     SkipWhitespace();
                     if (pos < text.Length && text[pos] == ';') {
                         pos++;
-                        return ReadArray(letter, childDepthBudget);
+                        // An array is a value, not a container: it takes no nesting level here,
+                        // as it takes none when the tag layer walks a tree
+                        return ReadArray(letter, depthBudget);
                     }
                 }
             }
             pos = afterBracket;
 
-            List<NbtTag> elements = ReadElements(childDepthBudget);
+            int childDepthBudget = ConsumeDepthBudget(depthBudget, bracketAt);
+            List<int> starts = new List<int>();
+            List<NbtTag> elements = ReadElements(childDepthBudget, NbtTagType.Int, starts);
             if (elements.Count == 0) return new NbtList(NbtTagType.End);
             // Stored the way the game saves it: mixed types become wrapper compounds
-            return NbtList.CreateMixed(elements.ToArray());
+            NbtList list = NbtList.CreateMixed(elements.ToArray());
+            if (list.ListType == NbtTagType.Compound) {
+                // A wrapper is a nesting level the text did not show, so an element that used the
+                // whole budget below this list no longer fits under it
+                for (int i = 0; i < elements.Count; i++) {
+                    if (list[i] != elements[i] && ContainerDepth(elements[i]) >= childDepthBudget) {
+                        throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), starts[i]);
+                    }
+                }
+            }
+            return list;
         }
 
 
@@ -750,8 +772,34 @@ namespace fNbt {
 
 
         int ConsumeDepthBudget(int depthBudget) {
-            if (depthBudget <= 0) throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'));
+            return ConsumeDepthBudget(depthBudget, pos);
+        }
+
+
+        int ConsumeDepthBudget(int depthBudget, int errorAt) {
+            if (depthBudget <= 0) throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), errorAt);
             return depthBudget - 1;
+        }
+
+
+        // Container levels in a parsed subtree, wrapper compounds included
+        static int ContainerDepth(NbtTag tag) {
+            int deepest = 0;
+            if (tag is NbtList list) {
+                foreach (NbtTag child in list) {
+                    int depth = ContainerDepth(child);
+                    if (depth > deepest) deepest = depth;
+                }
+                return deepest + 1;
+            }
+            if (tag is NbtCompound compound) {
+                foreach (NbtTag child in compound) {
+                    int depth = ContainerDepth(child);
+                    if (depth > deepest) deepest = depth;
+                }
+                return deepest + 1;
+            }
+            return 0;
         }
 
         #endregion
@@ -760,7 +808,16 @@ namespace fNbt {
         #region Plumbing
 
         void SkipWhitespace() {
-            while (pos < text.Length && char.IsWhiteSpace(text[pos])) pos++;
+            while (pos < text.Length && IsWhitespace(text[pos])) pos++;
+        }
+
+
+        // Java's Character.isWhitespace, which both game parsers skip: .NET's set plus the four
+        // information separators U+001C to U+001F. .NET also counts U+0085 and the non-breaking
+        // spaces, which the game does not; they cannot appear outside quotes in text the game
+        // reads, so taking them as whitespace changes nothing that parses.
+        static bool IsWhitespace(char c) {
+            return char.IsWhiteSpace(c) || (c >= '\u001C' && c <= '\u001F');
         }
 
 

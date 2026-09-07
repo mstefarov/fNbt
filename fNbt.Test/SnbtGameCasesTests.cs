@@ -27,7 +27,7 @@ namespace fNbt.Test {
         }
 
 
-        // Inputs fNbt reads as values where both game versions refuse them or the classic parser
+        // Inputs fNbt reads as values where both game versions refuse them or the old parser
         // made strings of them, each a documented widening
         static readonly HashSet<string> KnownWidenings = new HashSet<string>(StringComparer.Ordinal) {
             // array elements that fit the element range whatever their suffix or signedness
@@ -67,9 +67,9 @@ namespace fNbt.Test {
                 string escaped = parts[0];
                 string input = Decode(escaped);
                 string modern = parts[1];
-                string classic = parts[2];
+                string old = parts[2];
                 string expectedText = modern.StartsWith("OK ", StringComparison.Ordinal) ? modern.Substring(3)
-                                    : classic.StartsWith("OK ", StringComparison.Ordinal) ? classic.Substring(3)
+                                    : old.StartsWith("OK ", StringComparison.Ordinal) ? old.Substring(3)
                                     : null;
                 checkedCount++;
                 try {

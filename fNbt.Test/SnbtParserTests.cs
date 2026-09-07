@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 
 namespace fNbt.Test {
-    // NbtTag.ParseSnbt: the generous reading (modern grammar with classic fall-backs), the
+    // NbtTag.ParseSnbt: the generous reading (modern grammar with old fall-backs), the
     // documented deviations, error positions, the index overload, and round trips through ToSnbt.
     // The game-verdict table is in SnbtGameCasesTests; these are the cases worth naming.
     [TestClass]
@@ -16,6 +16,14 @@ namespace fNbt.Test {
 
         static SnbtParseException Refuses(string text) {
             return Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt(text));
+        }
+
+
+        // [0,[0,...[]...]]: every level but the innermost is a list of mixed types
+        static string MixedNesting(int levels) {
+            string text = "[]";
+            for (int i = 0; i < levels; i++) text = "[0," + text + "]";
+            return text;
         }
 
 
@@ -62,11 +70,20 @@ namespace fNbt.Test {
                             Parse(" { a : 1 b , b : - 5 , c : 1 .5 , d : [ B ; 1 , 2 ] , e : bool ( 1 ) } ").ToSnbt());
             Assert.AreEqual("[1,2]", Parse("\t[\n1,\r\n2\n]\n").ToSnbt());
             Assert.AreEqual("{}", Parse("\uFEFF{}").ToSnbt());
+            // Between a signedness prefix and the type letter too, and before a float suffix
+            Assert.AreEqual("-16b", Parse("240u b").ToSnbt());
+            Assert.AreEqual("[I;-16]", Parse("[I;240u b]").ToSnbt());
+            Assert.AreEqual("-1", Parse("-1s i").ToSnbt());
+            Assert.AreEqual("1b", Parse("1 u b").ToSnbt());
+            Assert.AreEqual("1.5f", Parse("1.5 f").ToSnbt());
+            // Java's whitespace includes the four information separators, which .NET's does not
+            Assert.AreEqual("{a:1}", Parse("{a:1\u001C}").ToSnbt());
+            Assert.AreEqual("[1,2]", Parse("\u001F[1\u001D,\u001E2]").ToSnbt());
         }
 
 
         [TestMethod]
-        public void ClassicReadingsFillInWhereTheModernGrammarRefuses() {
+        public void OldReadingsFillInWhereTheModernGrammarRefuses() {
             Assert.AreEqual("1st", Parse("1st").StringValue);
             Assert.AreEqual("-foo", Parse("-foo").StringValue);
             Assert.AreEqual(".5x", Parse(".5x").StringValue);
@@ -84,7 +101,7 @@ namespace fNbt.Test {
             Assert.AreEqual("0_1", Parse("0_1").StringValue);
             Assert.AreEqual("1_", Parse("1_").StringValue);
             Assert.AreEqual("-0x1", Parse("-0x1").StringValue);
-            // Overflowing floats are the infinities the classic parser stored
+            // Overflowing floats are the infinities the old parser stored
             Assert.IsTrue(float.IsPositiveInfinity(Parse("1e39f").FloatValue));
             Assert.IsTrue(double.IsPositiveInfinity(Parse("1.0e1000").DoubleValue));
             Assert.IsTrue(double.IsNegativeInfinity(Parse("-1e999d").DoubleValue));
@@ -231,6 +248,12 @@ namespace fNbt.Test {
             CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
                                       ((NbtIntArray)Parse("uuid('123e4567-E89B-12d3-a456-426614174000')")).Value);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0\")")).Value);
+            // Java's UUID.fromString: any group width within 36 characters, a leading plus, masked to width
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0000000000001\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"+0-0-0-0-+1\")")).Value);
+            CollectionAssert.AreEqual(new[] { 591751049, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"123456789-0-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 591724544, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-12345-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 65535, -1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-7fffffffffffffff\")")).Value);
             StringAssert.Contains(Refuses("bool()").Message, "bool/0");
             StringAssert.Contains(Refuses("bool(1,2)").Message, "bool/2");
             StringAssert.Contains(Refuses("foo(1)").Message, "foo/1");
@@ -247,6 +270,10 @@ namespace fNbt.Test {
             Refuses("uuid(\"123e45678-e89b-12d3-a456-426614174000\")");
             Refuses("uuid(\"123e456g-e89b-12d3-a456-426614174000\")");
             Refuses("uuid(\"-0-0-0-0\")");
+            Refuses("uuid(\"0-0-0-0-ffffffffffffffff\")");
+            Refuses("uuid(\"0-0-0-0-\")");
+            Refuses("uuid(\"0-0-0-0-0-0\")");
+            Refuses("uuid(\"123e4567-e89b-12d3-a456-4266141740000\")");
             CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
                                       ((NbtIntArray)Parse("uuid(\"123e4567-e89b-12d3-a456-426614174000\",)")).Value);
         }
@@ -318,6 +345,13 @@ namespace fNbt.Test {
             // Operation calls nest like containers
             Assert.AreEqual(1, Parse(string.Concat(Enumerable.Repeat("bool(", 512)) + "1" + new string(')', 512)).ByteValue);
             Refuses(string.Concat(Enumerable.Repeat("bool(", 513)) + "1" + new string(')', 513));
+            // An array is a value, so it fits under the deepest list, as it does in a binary file
+            Assert.AreEqual(NbtTagType.List, Parse(new string('[', 512) + "[B;]" + new string(']', 512)).TagType);
+            Refuses(new string('[', 513) + "[B;]" + new string(']', 513));
+            // Wrapper compounds count: 255 mixed levels around [] make 511 containers, 256 make 513
+            Parse(MixedNesting(255)).Clone();
+            ex = Refuses(MixedNesting(256));
+            StringAssert.Contains(ex.Message, "512 levels");
         }
 
 
