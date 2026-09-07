@@ -220,6 +220,10 @@ end_of_line = crlf
 
 dotnet_diagnostic.CA1510.severity = none
 dotnet_diagnostic.CA1512.severity = none
+# Span-based string overloads are not in netstandard2.0, and the files that use Substring
+# compile for both targets
+dotnet_diagnostic.CA1845.severity = none
+dotnet_diagnostic.CA1846.severity = none
 
 # Dotnet style
 

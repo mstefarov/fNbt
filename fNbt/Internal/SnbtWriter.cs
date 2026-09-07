@@ -11,10 +11,19 @@ namespace fNbt {
     internal static class SnbtWriter {
         const string IndentUnit = "    ";
 
+        // One builder per thread, kept between calls up to a size worth keeping: growing a fresh
+        // one from nothing cost more allocation than the text itself on small documents
+        [ThreadStatic] static StringBuilder? cachedBuilder;
+        const int MaxCachedBuilderChars = 1 << 20;
+
         public static string Write(NbtTag tag, SnbtLayout layout) {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = cachedBuilder ?? new StringBuilder(256);
+            cachedBuilder = null;
+            sb.Clear();
             WriteTag(sb, tag, layout, 0, NbtTag.MaxDepth);
-            return sb.ToString();
+            string text = sb.ToString();
+            if (sb.Capacity <= MaxCachedBuilderChars) cachedBuilder = sb;
+            return text;
         }
 
 
@@ -22,16 +31,19 @@ namespace fNbt {
             switch (tag.TagType) {
                 case NbtTagType.Byte:
                     // Bytes travel signed, as in Java
-                    sb.Append(((NbtByte)tag).SignedValue.ToString(CultureInfo.InvariantCulture)).Append('b');
+                    AppendInteger(sb, ((NbtByte)tag).SignedValue);
+                    sb.Append('b');
                     break;
                 case NbtTagType.Short:
-                    sb.Append(((NbtShort)tag).Value.ToString(CultureInfo.InvariantCulture)).Append('s');
+                    AppendInteger(sb, ((NbtShort)tag).Value);
+                    sb.Append('s');
                     break;
                 case NbtTagType.Int:
-                    sb.Append(((NbtInt)tag).Value.ToString(CultureInfo.InvariantCulture));
+                    AppendInteger(sb, ((NbtInt)tag).Value);
                     break;
                 case NbtTagType.Long:
-                    sb.Append(((NbtLong)tag).Value.ToString(CultureInfo.InvariantCulture)).Append('L');
+                    AppendInteger(sb, ((NbtLong)tag).Value);
+                    sb.Append('L');
                     break;
                 case NbtTagType.Float:
                     AppendFloat(sb, ((NbtFloat)tag).Value);
@@ -140,7 +152,8 @@ namespace fNbt {
             sb.Append("[B;");
             for (int i = 0; i < values.Length; i++) {
                 BeginArrayElement(sb, layout, i);
-                sb.Append(((sbyte)values[i]).ToString(CultureInfo.InvariantCulture)).Append('B');
+                AppendInteger(sb, (sbyte)values[i]);
+                sb.Append('B');
             }
             sb.Append(']');
         }
@@ -150,7 +163,7 @@ namespace fNbt {
             sb.Append("[I;");
             for (int i = 0; i < values.Length; i++) {
                 BeginArrayElement(sb, layout, i);
-                sb.Append(values[i].ToString(CultureInfo.InvariantCulture));
+                AppendInteger(sb, values[i]);
             }
             sb.Append(']');
         }
@@ -160,9 +173,22 @@ namespace fNbt {
             sb.Append("[L;");
             for (int i = 0; i < values.Length; i++) {
                 BeginArrayElement(sb, layout, i);
-                sb.Append(values[i].ToString(CultureInfo.InvariantCulture)).Append('L');
+                AppendInteger(sb, values[i]);
+                sb.Append('L');
             }
             sb.Append(']');
+        }
+
+
+        // Invariant digits without a string per number where the runtime can format into a span
+        static void AppendInteger(StringBuilder sb, long value) {
+#if NETCOREAPP
+            Span<char> digits = stackalloc char[20];
+            value.TryFormat(digits, out int written, default, CultureInfo.InvariantCulture);
+            sb.Append(digits.Slice(0, written));
+#else
+            sb.Append(value.ToString(CultureInfo.InvariantCulture));
+#endif
         }
 
 

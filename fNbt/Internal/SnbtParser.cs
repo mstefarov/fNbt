@@ -15,6 +15,9 @@ namespace fNbt {
         readonly string text;
         int pos;
 
+        // Element start positions of the lists being read, innermost last, for depth errors
+        List<int>? elementStarts;
+
 
         SnbtParser(string text, int start) {
             this.text = text;
@@ -132,41 +135,36 @@ namespace fNbt {
 
 
         NbtTag? TryReadFloat(bool negative) {
-            string? whole = ReadDigitRun(10);
-            if (whole == null) return null;
+            int wholeStart = pos;
+            int wholeDigits = ScanDigitRun(10);
+            if (wholeDigits < 0) return null;
             int end = pos;
             SkipWhitespace();
 
             bool hasDot = false;
-            string fraction = "";
+            int fractionDigits = 0;
             if (pos < text.Length && text[pos] == '.') {
                 hasDot = true;
                 pos++;
                 end = pos;
                 SkipWhitespace();
-                string? run = ReadDigitRun(10);
-                if (run == null) return null;
-                fraction = run;
-                if (fraction.Length > 0) end = pos;
+                fractionDigits = ScanDigitRun(10);
+                if (fractionDigits < 0) return null;
+                if (fractionDigits > 0) end = pos;
                 SkipWhitespace();
             }
-            if (whole.Length == 0 && fraction.Length == 0) return null;
+            if (wholeDigits == 0 && fractionDigits == 0) return null;
 
             bool hasExponent = false;
-            string exponent = "";
             if (pos < text.Length && (text[pos] == 'e' || text[pos] == 'E')) {
                 pos++;
                 SkipWhitespace();
-                bool exponentNegative = false;
                 if (pos < text.Length && (text[pos] == '+' || text[pos] == '-')) {
-                    exponentNegative = text[pos] == '-';
                     pos++;
                     SkipWhitespace();
                 }
-                string? run = ReadDigitRun(10);
-                if (run == null || run.Length == 0) return null;
+                if (ScanDigitRun(10) <= 0) return null;
                 hasExponent = true;
-                exponent = (exponentNegative ? "-" : "") + run;
                 end = pos;
                 SkipWhitespace();
             }
@@ -184,10 +182,32 @@ namespace fNbt {
             }
             if (!hasDot && !hasExponent && !hasSuffix) return null;
             pos = end;
+            int literalEnd = hasSuffix ? end - 1 : end;
 
-            string cleaned = (negative ? "-" : "") + whole +
-                             (hasDot ? "." + fraction : "") +
-                             (hasExponent ? "e" + exponent : "");
+            // The runtime reads the literal as written, unless the whitespace and underscores the
+            // grammar allows sit inside it, which asks for a copy without them
+            string? cleaned = null;
+            for (int i = wholeStart; i < literalEnd; i++) {
+                if (text[i] == '_' || IsWhitespace(text[i])) {
+                    cleaned = CleanLiteral(negative, wholeStart, literalEnd);
+                    break;
+                }
+            }
+#if NETCOREAPP
+            if (cleaned == null) {
+                ReadOnlySpan<char> literal = text.AsSpan(wholeStart, literalEnd - wholeStart);
+                if (isFloat) {
+                    if (!float.TryParse(literal, NumberStyles.Float, CultureInfo.InvariantCulture, out float single)) return null;
+                    if (negative) single = -single;
+                    return float.IsInfinity(single) ? null : new NbtFloat(single);
+                }
+                if (!double.TryParse(literal, NumberStyles.Float, CultureInfo.InvariantCulture, out double value)) return null;
+                if (negative) value = -value;
+                return double.IsInfinity(value) ? null : new NbtDouble(value);
+            }
+#else
+            cleaned ??= (negative ? "-" : "") + text.Substring(wholeStart, literalEnd - wholeStart);
+#endif
             if (isFloat) {
                 bool parsed = float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f);
 #if NETCOREAPP
@@ -212,29 +232,65 @@ namespace fNbt {
         }
 
 
+        // The literal between the positions with the grammar's whitespace and underscores
+        // removed, signed, as the runtime and the correction read it
+        string CleanLiteral(bool negative, int start, int end) {
+            StringBuilder sb = new StringBuilder(end - start + 1);
+            if (negative) sb.Append('-');
+            for (int i = start; i < end; i++) {
+                char c = text[i];
+                if (c != '_' && !IsWhitespace(c)) sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+
         NbtTag? TryReadInteger(bool negative, NbtTagType defaultType) {
+            if (!TryReadIntegerValue(negative, defaultType, out long value, out NbtTagType type)) return null;
+            switch (type) {
+                case NbtTagType.Byte:
+                    return new NbtByte(unchecked((byte)value));
+                case NbtTagType.Short:
+                    return new NbtShort(unchecked((short)value));
+                case NbtTagType.Int:
+                    return new NbtInt(unchecked((int)value));
+                default:
+                    return new NbtLong(value);
+            }
+        }
+
+
+        // The modern integer grammar, folded straight from the text into the value the literal's
+        // type carries on the wire, sign extended: 255b, 255ub and -1b are all -1
+        bool TryReadIntegerValue(bool negative, NbtTagType defaultType, out long value, out NbtTagType type) {
+            value = 0;
+            type = defaultType;
             int radix = 10;
-            string? digits;
+            int digitsStart;
+            int digitsEnd;
             int end;
             if (text[pos] == '0') {
+                digitsStart = pos;
                 pos++;
+                digitsEnd = pos;
                 end = pos;
-                digits = "0";
                 SkipWhitespace();
                 if (pos < text.Length && (text[pos] == 'x' || text[pos] == 'X')) {
                     pos++;
                     SkipWhitespace();
-                    digits = ReadDigitRun(16);
-                    if (digits == null || digits.Length == 0) return null;
+                    digitsStart = pos;
+                    if (ScanDigitRun(16) <= 0) return false;
+                    digitsEnd = pos;
                     radix = 16;
                     end = pos;
                 } else if (pos < text.Length && (text[pos] == 'b' || text[pos] == 'B')) {
                     int beforeB = pos;
                     pos++;
                     SkipWhitespace();
-                    string? binary = ReadDigitRun(2);
-                    if (binary != null && binary.Length > 0) {
-                        digits = binary;
+                    int binaryStart = pos;
+                    if (ScanDigitRun(2) > 0) {
+                        digitsStart = binaryStart;
+                        digitsEnd = pos;
                         radix = 2;
                         end = pos;
                     } else {
@@ -243,20 +299,19 @@ namespace fNbt {
                     }
                 } else {
                     // Any digit after the zero is a leading zero, which the modern grammar refuses
-                    string? more = ReadDigitRun(10);
-                    if (more != null && more.Length > 0) return null;
+                    if (ScanDigitRun(10) > 0) return false;
                     pos = end;
                 }
             } else {
-                digits = ReadDigitRun(10);
-                if (digits == null || digits.Length == 0) return null;
+                digitsStart = pos;
+                if (ScanDigitRun(10) <= 0) return false;
+                digitsEnd = pos;
                 end = pos;
             }
             SkipWhitespace();
 
             // Suffix: [u|s] then b|s|i|l, or a lone type letter; a lone s is a short
             bool? unsigned = null;
-            NbtTagType type = defaultType;
             if (pos < text.Length) {
                 char c = text[pos];
                 bool signedness = c == 'u' || c == 'U' || c == 's' || c == 'S';
@@ -280,12 +335,14 @@ namespace fNbt {
             if (unsigned == null) unsigned = radix != 10 || (type == NbtTagType.Byte && !negative);
 
             ulong magnitude = 0;
-            foreach (char c in digits!) {
+            for (int i = digitsStart; i < digitsEnd; i++) {
+                char c = text[i];
+                if (c == '_') continue;
                 int digit = c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10;
-                if (magnitude > (ulong.MaxValue - (ulong)digit) / (ulong)radix) return null;
+                if (magnitude > (ulong.MaxValue - (ulong)digit) / (ulong)radix) return false;
                 magnitude = magnitude * (ulong)radix + (ulong)digit;
             }
-            return MakeInteger(type, unsigned.Value, negative, magnitude);
+            return TryIntegerValue(type, unsigned.Value, negative, magnitude, out value);
         }
 
 
@@ -314,41 +371,40 @@ namespace fNbt {
         }
 
 
-        // Range-checks the literal for its type and signedness and stores it the way the wire
-        // does: an unsigned 240ub and a signed -16sb are the same byte
-        static NbtTag? MakeInteger(NbtTagType type, bool unsigned, bool negative, ulong magnitude) {
+        // Range-checks the literal for its type and signedness and gives the value the wire
+        // carries, sign extended from the type's width: an unsigned 240ub and a signed -16sb are
+        // the same byte, -16
+        static bool TryIntegerValue(NbtTagType type, bool unsigned, bool negative, ulong magnitude, out long value) {
             int bits = type == NbtTagType.Byte ? 8 : type == NbtTagType.Short ? 16 : type == NbtTagType.Int ? 32 : 64;
+            value = 0;
             ulong max = bits == 64 ? ulong.MaxValue : (1UL << bits) - 1;
-            long value;
+            long raw;
             if (unsigned) {
-                if (negative || magnitude > max) return null;
-                value = unchecked((long)magnitude);
+                if (negative || magnitude > max) return false;
+                raw = unchecked((long)magnitude);
             } else {
                 ulong limit = (bits == 64 ? 1UL << 63 : (1UL << (bits - 1))) - (negative ? 0UL : 1UL);
-                if (magnitude > limit) return null;
-                value = negative ? unchecked(-(long)magnitude) : (long)magnitude;
+                if (magnitude > limit) return false;
+                raw = negative ? unchecked(-(long)magnitude) : (long)magnitude;
             }
-            switch (type) {
-                case NbtTagType.Byte:
-                    return new NbtByte(unchecked((byte)value));
-                case NbtTagType.Short:
-                    return new NbtShort(unchecked((short)value));
-                case NbtTagType.Int:
-                    return new NbtInt(unchecked((int)value));
-                default:
-                    return new NbtLong(value);
-            }
+            value = bits == 64 ? raw : (raw << (64 - bits)) >> (64 - bits);
+            return true;
         }
 
 
-        // Digits in the given radix, with separators removed. Empty when no digit
-        // is present; null when an underscore starts or ends the run, which no reading accepts.
-        string? ReadDigitRun(int radix) {
+        // Moves past a run of digits in the given radix with underscores between them. Returns
+        // the digit count, 0 when none is present, or -1 when an underscore starts or ends the
+        // run, which no reading accepts.
+        int ScanDigitRun(int radix) {
             int start = pos;
-            while (pos < text.Length && (IsDigit(text[pos], radix) || text[pos] == '_')) pos++;
-            if (pos == start) return "";
-            if (text[start] == '_' || text[pos - 1] == '_') return null;
-            return text.Substring(start, pos - start).Replace("_", "");
+            int digits = 0;
+            while (pos < text.Length && (IsDigit(text[pos], radix) || text[pos] == '_')) {
+                if (text[pos] != '_') digits++;
+                pos++;
+            }
+            if (pos == start) return 0;
+            if (text[start] == '_' || text[pos - 1] == '_') return -1;
+            return digits;
         }
 
 
@@ -631,9 +687,38 @@ namespace fNbt {
             char c = text[pos];
             if (c == '"' || c == '\'') return ReadQuotedString();
             int start = pos;
-            while (pos < text.Length && IsUnquotedChar(text[pos])) pos++;
+            uint hash = 2166136261u;
+            while (pos < text.Length && IsUnquotedChar(text[pos])) {
+                hash = (hash ^ text[pos]) * 16777619u;
+                pos++;
+            }
             if (pos == start) throw Error("Expected a key");
-            return text.Substring(start, pos - start);
+            return CachedKey(start, pos - start, hash);
+        }
+
+
+        // Keys repeat within a document and across documents (the same state names in every
+        // palette entry), so short unquoted keys come from a small process-wide table. A slot
+        // holds one string, compared character by character before it is used, so a stale or
+        // concurrently replaced entry costs a miss and nothing else.
+        const int KeyCacheSlots = 1024;
+        const int KeyCacheMaxLength = 48;
+        static readonly string?[] keyCache = new string?[KeyCacheSlots];
+
+        string CachedKey(int start, int length, uint hash) {
+            if (length > KeyCacheMaxLength) return text.Substring(start, length);
+            int slot = (int)(hash & (KeyCacheSlots - 1));
+            string? cached = keyCache[slot];
+#if NETCOREAPP
+            if (cached != null && cached.AsSpan().SequenceEqual(text.AsSpan(start, length))) return cached;
+#else
+            if (cached != null && cached.Length == length && string.CompareOrdinal(cached, 0, text, start, length) == 0) {
+                return cached;
+            }
+#endif
+            string key = text.Substring(start, length);
+            keyCache[slot] = key;
+            return key;
         }
 
 
@@ -660,28 +745,30 @@ namespace fNbt {
             pos = afterBracket;
 
             int childDepthBudget = ConsumeDepthBudget(depthBudget, bracketAt);
-            List<int> starts = new List<int>();
-            List<NbtTag> elements = ReadElements(childDepthBudget, NbtTagType.Int, starts);
+            List<int> starts = elementStarts ??= new List<int>();
+            int mark = starts.Count;
+            List<NbtTag> elements = ReadElements(childDepthBudget, starts);
             if (elements.Count == 0) return new NbtList(NbtTagType.End);
             // Stored the way the game saves it: mixed types become wrapper compounds
-            NbtList list = NbtList.CreateMixed(elements.ToArray());
+            NbtList list = NbtList.FromParsed(elements);
             if (list.ListType == NbtTagType.Compound) {
                 // A wrapper is a nesting level the text did not show, so an element that used the
                 // whole budget below this list no longer fits under it
                 for (int i = 0; i < elements.Count; i++) {
                     if (list[i] != elements[i] && ContainerDepth(elements[i]) >= childDepthBudget) {
-                        throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), starts[i]);
+                        throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), starts[mark + i]);
                     }
                 }
             }
+            starts.RemoveRange(mark, starts.Count - mark);
             return list;
         }
 
 
-        // Elements up to and including the closing bracket, with one trailing comma allowed.
-        // Arrays ask for each element's start position, to report a bad element where it is.
-        List<NbtTag> ReadElements(int childDepthBudget, NbtTagType numberType = NbtTagType.Int,
-                                  List<int>? starts = null) {
+        // Elements up to and including the closing bracket, with one trailing comma allowed;
+        // each element's start position goes on the list, for depth errors reported where the
+        // element is
+        List<NbtTag> ReadElements(int childDepthBudget, List<int> starts) {
             List<NbtTag> elements = new List<NbtTag>();
             SkipWhitespace();
             if (pos < text.Length && text[pos] == ']') {
@@ -690,8 +777,8 @@ namespace fNbt {
             }
             while (true) {
                 SkipWhitespace();
-                starts?.Add(pos);
-                elements.Add(ReadElement(childDepthBudget, numberType));
+                starts.Add(pos);
+                elements.Add(ReadValue(childDepthBudget));
                 SkipWhitespace();
                 if (pos >= text.Length) throw Error("Expected ',' or ']'");
                 char c = text[pos++];
@@ -706,50 +793,70 @@ namespace fNbt {
         }
 
 
-        // A value, except that inside an array an unsuffixed number takes the array's type. Int is
-        // what ReadValue produces anyway, so lists skip the extra attempt.
-        NbtTag ReadElement(int childDepthBudget, NbtTagType numberType) {
+
+
+        // An array: integer literals fold straight into values, with no tag in between, and
+        // anything else goes through the tag it makes, so that true, false and bool() still
+        // count. An unsuffixed element takes the array's type, and any integer that fits the
+        // element in either signedness is taken: [B;0xFF], [B;255ub], [I;1b] and [L;1] are all fine.
+        NbtTag ReadArray(char letter, int depthBudget) {
+            NbtTagType elementType = letter == 'B' ? NbtTagType.Byte : letter == 'I' ? NbtTagType.Int : NbtTagType.Long;
+            long min = letter == 'B' ? sbyte.MinValue : letter == 'I' ? int.MinValue : long.MinValue;
+            long max = letter == 'B' ? byte.MaxValue : letter == 'I' ? uint.MaxValue : long.MaxValue;
+            List<long> values = new List<long>();
             SkipWhitespace();
-            if (numberType != NbtTagType.Int && pos < text.Length && CanStartNumber(text[pos])) {
-                int start = pos;
-                NbtTag? number = TryReadNumber(numberType);
-                if (number != null && !(pos < text.Length && IsUnquotedChar(text[pos]))) return number;
-                pos = start;
+            if (pos < text.Length && text[pos] == ']') {
+                pos++;
+            } else {
+                while (true) {
+                    values.Add(ReadArrayValue(elementType, depthBudget, min, max));
+                    SkipWhitespace();
+                    if (pos >= text.Length) throw Error("Expected ',' or ']'");
+                    char c = text[pos++];
+                    if (c == ']') break;
+                    if (c != ',') throw Error("Expected ',' or ']'", pos - 1);
+                    SkipWhitespace();
+                    if (pos < text.Length && text[pos] == ']') {
+                        pos++;
+                        break;
+                    }
+                }
             }
-            return ReadValue(childDepthBudget);
+            switch (letter) {
+                case 'B': {
+                    byte[] bytes = new byte[values.Count];
+                    for (int i = 0; i < bytes.Length; i++) bytes[i] = unchecked((byte)values[i]);
+                    return new NbtByteArray(bytes);
+                }
+                case 'I': {
+                    int[] ints = new int[values.Count];
+                    for (int i = 0; i < ints.Length; i++) ints[i] = unchecked((int)values[i]);
+                    return new NbtIntArray(ints);
+                }
+                default:
+                    return new NbtLongArray(values.ToArray());
+            }
         }
 
 
-        // An unsuffixed element takes the array's type, and any integer tag whose value fits the
-        // element, signed or unsigned, is taken: [B;0xFF], [B;255ub], [I;1b] and [L;1] are all
-        // fine, as are true and false
-        NbtTag ReadArray(char letter, int childDepthBudget) {
-            NbtTagType elementType = letter == 'B' ? NbtTagType.Byte : letter == 'I' ? NbtTagType.Int : NbtTagType.Long;
-            List<int> starts = new List<int>();
-            List<NbtTag> elements = ReadElements(childDepthBudget, elementType, starts);
-            switch (letter) {
-                case 'B': {
-                    byte[] values = new byte[elements.Count];
-                    for (int i = 0; i < values.Length; i++) {
-                        values[i] = unchecked((byte)ArrayElement(elements[i], -128, 255, starts[i]));
-                    }
-                    return new NbtByteArray(values);
+        long ReadArrayValue(NbtTagType elementType, int depthBudget, long min, long max) {
+            SkipWhitespace();
+            int start = pos;
+            if (pos < text.Length && CanStartNumber(text[pos])) {
+                bool negative = false;
+                if (text[pos] == '+' || text[pos] == '-') {
+                    negative = text[pos] == '-';
+                    pos++;
+                    SkipWhitespace();
                 }
-                case 'I': {
-                    int[] values = new int[elements.Count];
-                    for (int i = 0; i < values.Length; i++) {
-                        values[i] = unchecked((int)ArrayElement(elements[i], int.MinValue, uint.MaxValue, starts[i]));
-                    }
-                    return new NbtIntArray(values);
+                if (pos < text.Length && TryReadIntegerValue(negative, elementType, out long value, out _) &&
+                    !(pos < text.Length && IsUnquotedChar(text[pos]))) {
+                    if (value < min || value > max) throw Error("Array element out of range", start);
+                    return value;
                 }
-                default: {
-                    long[] values = new long[elements.Count];
-                    for (int i = 0; i < values.Length; i++) {
-                        values[i] = ArrayElement(elements[i], long.MinValue, long.MaxValue, starts[i]);
-                    }
-                    return new NbtLongArray(values);
-                }
+                pos = start;
             }
+            return ArrayElement(ReadValue(depthBudget), min, max, start);
         }
 
 

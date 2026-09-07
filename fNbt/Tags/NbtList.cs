@@ -12,7 +12,7 @@ namespace fNbt {
             get { return NbtTagType.List; }
         }
 
-        internal readonly List<NbtTag> tags = new List<NbtTag>();
+        internal readonly List<NbtTag> tags;
 
         // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
         // of a corrupt length. Longer lists grow as they go, unless the input can vouch for the count.
@@ -135,6 +135,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
         /// or a tag is named, already has a Parent, or appears more than once. </exception>
         public NbtList(string? tagName, IEnumerable<NbtTag>? tags, NbtTagType givenListType) {
+            this.tags = new List<NbtTag>();
             name = tagName;
             ListType = givenListType;
 
@@ -167,7 +168,7 @@ namespace fNbt {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             name = other.name;
             listType = other.listType;
-            tags.Capacity = other.tags.Count;
+            tags = new List<NbtTag>(other.tags.Count);
             foreach (NbtTag tag in other.tags) {
                 NbtTag childClone = tag.Clone(childDepthBudget);
                 tags.Add(childClone);
@@ -347,12 +348,35 @@ namespace fNbt {
         }
 
 
+        // The parser's lists: the elements are fresh, unnamed and unparented, so nothing is
+        // checked, and a homogeneous batch becomes the list's own storage
+        internal static NbtList FromParsed(List<NbtTag> elements) {
+            NbtTagType type = RawElementType(elements);
+            if (type != NbtTagType.Compound) return new NbtList(elements, type);
+            List<NbtTag> wrapped = new List<NbtTag>(elements.Count);
+            foreach (NbtTag element in elements) {
+                wrapped.Add(WrapIfNeeded(element));
+            }
+            return new NbtList(wrapped, NbtTagType.Compound);
+        }
+
+
+        // Takes the collection as the list's storage, unchecked
+        NbtList(List<NbtTag> owned, NbtTagType type) {
+            tags = owned;
+            listType = type;
+            foreach (NbtTag tag in owned) {
+                tag.Parent = this;
+            }
+        }
+
+
         // Minecraft's rules for the list of mixed types the wire cannot hold. On save, a list
         // whose elements are compounds or of mixed types wraps every element that is not a plain
         // compound in a compound under an empty key, wrapper-shaped compounds included; on load,
         // one such wrapper comes off each element of a compound list. The SNBT parser and writer
         // apply the same two rules.
-        static NbtTagType RawElementType(NbtTag[] elements) {
+        static NbtTagType RawElementType(IEnumerable<NbtTag> elements) {
             NbtTagType type = NbtTagType.End;
             foreach (NbtTag element in elements) {
                 if (element == null) continue;
