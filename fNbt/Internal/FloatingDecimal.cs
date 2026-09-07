@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Numerics;
+using System.Threading;
 
 namespace fNbt {
     // Correctly rounded conversions between decimal digit strings and binary floating point, in
@@ -250,16 +251,26 @@ namespace fNbt {
         }
 
 
-        static readonly BigInteger[] powersOfTen = new BigInteger[1300];
+        // Boxed so a slot publishes atomically: BigInteger is a two-field struct, and a reader on
+        // another thread could see one field of a half-written copy
+        sealed class CachedPower {
+            public readonly BigInteger Value;
+
+            public CachedPower(BigInteger value) {
+                Value = value;
+            }
+        }
+
+        static readonly CachedPower?[] powersOfTen = new CachedPower?[1300];
 
         static BigInteger Pow10(int power) {
             if (power >= powersOfTen.Length) return BigInteger.Pow(10, power);
-            BigInteger cached = powersOfTen[power];
-            if (cached.IsZero) {
-                cached = BigInteger.Pow(10, power);
-                powersOfTen[power] = cached;
+            CachedPower? cached = Volatile.Read(ref powersOfTen[power]);
+            if (cached == null) {
+                cached = new CachedPower(BigInteger.Pow(10, power));
+                Volatile.Write(ref powersOfTen[power], cached);
             }
-            return cached;
+            return cached.Value;
         }
 
         #endregion

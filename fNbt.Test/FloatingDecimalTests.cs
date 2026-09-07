@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Reflection;
+using System.Threading;
 
 namespace fNbt.Test {
     // The exact decimal conversions behind SNBT numbers on netstandard2.0. On .NET Core the BCL is
@@ -234,5 +236,58 @@ namespace fNbt.Test {
             return Math.Max(1, mantissa.Length);
         }
 #endif
+
+
+        [TestMethod]
+        [Timeout(30000)]
+        public void ConcurrentCallersShareThePowerOfTenCache() {
+            double[] values = {
+                double.Epsilon, 2.2250738585072014E-308, 1e-300, 0.1, 1.0 / 3, 123456789.125, 1e300,
+                double.MaxValue,
+            };
+            string[] texts = {
+                "0.1000000000000000055511151231257827021181583404541015625", "2.2250738585072011e-308",
+                "1.7976931348623157e308", "4.9e-324", "123456789.123456789e-5",
+            };
+            string[] expectedShortest = new string[values.Length];
+            for (int i = 0; i < values.Length; i++) expectedShortest[i] = FloatingDecimal.ShortestDouble(values[i]);
+            double[] expectedCorrected = new double[texts.Length];
+            for (int i = 0; i < texts.Length; i++) {
+                expectedCorrected[i] = FloatingDecimal.CorrectDouble(texts[i], double.Parse(texts[i], CultureInfo.InvariantCulture));
+            }
+
+            // Empty the cache so the threads race to fill it
+            FieldInfo cacheField = typeof(FloatingDecimal).GetField("powersOfTen", BindingFlags.NonPublic | BindingFlags.Static);
+            Array cache = (Array)cacheField.GetValue(null);
+            Array.Clear(cache, 0, cache.Length);
+
+            Exception failure = null;
+            Thread[] threads = new Thread[8];
+            for (int t = 0; t < threads.Length; t++) {
+                threads[t] = new Thread(() => {
+                    try {
+                        for (int round = 0; round < 40; round++) {
+                            for (int i = 0; i < values.Length; i++) {
+                                string actual = FloatingDecimal.ShortestDouble(values[i]);
+                                if (actual != expectedShortest[i]) {
+                                    throw new InvalidOperationException(values[i].ToString("R", CultureInfo.InvariantCulture) + " printed as " + actual);
+                                }
+                            }
+                            for (int i = 0; i < texts.Length; i++) {
+                                double actual = FloatingDecimal.CorrectDouble(texts[i], double.Parse(texts[i], CultureInfo.InvariantCulture));
+                                if (DoubleBits(actual) != DoubleBits(expectedCorrected[i])) {
+                                    throw new InvalidOperationException(texts[i] + " read as " + actual.ToString("R", CultureInfo.InvariantCulture));
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        failure = e;
+                    }
+                });
+            }
+            foreach (Thread thread in threads) thread.Start();
+            foreach (Thread thread in threads) thread.Join();
+            Assert.IsNull(failure, failure?.Message);
+        }
     }
 }
