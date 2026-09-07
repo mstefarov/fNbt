@@ -261,7 +261,11 @@ namespace fNbt {
                 }
             }
             pos = end;
-            if (unsigned == null) unsigned = radix != 10;
+            // Hex and binary literals are unsigned by default, as in the game. So is a non-negative
+            // decimal byte: NbtByte's value is unsigned while the wire's is signed, so 255b and -1b
+            // are the same byte here, where the modern grammar refuses 128b through 255b and the
+            // classic parser read them as strings.
+            if (unsigned == null) unsigned = radix != 10 || (type == NbtTagType.Byte && !negative);
 
             ulong magnitude = 0;
             foreach (char c in digits!) {
@@ -748,7 +752,7 @@ namespace fNbt {
             long value;
             switch (element.TagType) {
                 case NbtTagType.Byte:
-                    value = (sbyte)element.ByteValue;
+                    value = ((NbtByte)element).SignedValue;
                     break;
                 case NbtTagType.Short:
                 case NbtTagType.Int:

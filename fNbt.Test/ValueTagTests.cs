@@ -148,6 +148,21 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        public void SignedValueSharesTheBitsOfValue() {
+            Assert.AreEqual(0, new NbtByte(0).SignedValue);
+            Assert.AreEqual(127, new NbtByte(127).SignedValue);
+            Assert.AreEqual(-128, new NbtByte(128).SignedValue);
+            Assert.AreEqual(-1, new NbtByte(255).SignedValue);
+            NbtByte tag = new NbtByte("Slot") { SignedValue = -106 };
+            Assert.AreEqual(150, tag.Value);
+            tag.SignedValue = 127;
+            Assert.AreEqual(127, tag.Value);
+            tag.SignedValue = -128;
+            Assert.AreEqual(128, tag.Value);
+        }
+
+
+        [TestMethod]
         public void DefaultValuesAreZeroOrEmpty() {
             // test default values of all value tags
             Assert.AreEqual(0, new NbtByte("test").Value);

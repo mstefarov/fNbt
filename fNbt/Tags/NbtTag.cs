@@ -429,7 +429,9 @@ namespace fNbt {
         /// only that delimiter and backslashes escaped; keys are bare when they consist of letters,
         /// digits and <c>._+-</c>, start with a letter, <c>.</c> or <c>_</c>, and are not <c>true</c>
         /// or <c>false</c>; numbers carry Java's suffixes and spelling (<c>1b</c>, <c>1s</c>, <c>1L</c>,
-        /// <c>1.0f</c>, <c>1.0E7d</c>); compounds keep insertion order. Inside a list of compounds, a
+        /// <c>1.0f</c>, <c>1.0E7d</c>), with bytes signed the way Minecraft stores them (a
+        /// <see cref="NbtByte.Value"/> of 255 prints as <c>-1b</c>, its <see cref="NbtByte.SignedValue"/>);
+        /// compounds keep insertion order. Inside a list of compounds, a
         /// one-entry compound whose key is empty prints as its value, the form Minecraft 1.21.5 and
         /// later store on disk for lists of mixed types. Two things no Minecraft version reads back:
         /// <c>NaN</c> and infinities, printed as <c>NaNf</c> or <c>Infinityd</c> the way Minecraft
@@ -461,8 +463,10 @@ namespace fNbt {
         /// lists of mixed types, one trailing comma) with the earlier parser's readings wherever the
         /// modern one refuses (a token such as <c>1st</c>, <c>007</c> or <c>300b</c> is a string, an
         /// overflowing float is an infinity). <c>NaNf</c>, <c>Infinityd</c> and the like read as the
-        /// numbers they name, a quoted empty key is allowed, and array prefixes and operation names
-        /// are accepted in either case. A list of mixed types becomes a list
+        /// numbers they name, a quoted empty key is allowed, array prefixes and operation names are
+        /// accepted in either case, and a byte literal from <c>128b</c> to <c>255b</c>, which no Minecraft
+        /// version reads as a number, is the unsigned byte <see cref="NbtByte.Value"/> holds (<c>-1b</c>
+        /// and <c>255b</c> are the same byte). A list of mixed types becomes a list
         /// of compounds with each element under an empty key, the form Minecraft 1.21.5 and later
         /// store on disk; an empty list has the <c>End</c> element type. A byte order mark at the
         /// start of the text is skipped. <c>\N{name}</c> escapes are not supported. </remarks>

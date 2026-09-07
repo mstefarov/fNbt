@@ -19,6 +19,7 @@ namespace fNbt.Test {
             Assert.AreEqual("127b", Snbt(new NbtByte(127)));
             Assert.AreEqual("-128b", Snbt(new NbtByte(128)));
             Assert.AreEqual("-1b", Snbt(new NbtByte(255)));
+            Assert.AreEqual("-106b", Snbt(new NbtByte { SignedValue = -106 }));
             Assert.AreEqual("-32768s", Snbt(new NbtShort(short.MinValue)));
             Assert.AreEqual("32767s", Snbt(new NbtShort(short.MaxValue)));
             Assert.AreEqual("-2147483648", Snbt(new NbtInt(int.MinValue)));

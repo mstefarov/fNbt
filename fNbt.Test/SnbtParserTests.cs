@@ -38,6 +38,9 @@ namespace fNbt.Test {
             Assert.AreEqual(5, Parse("0B101").IntValue);
             Assert.AreEqual(1000000L, Parse("1_000_000L").LongValue);
             Assert.AreEqual(255, Parse("255ub").ByteValue);
+            Assert.AreEqual(255, Parse("255b").ByteValue);
+            Assert.AreEqual(128, Parse("128B").ByteValue);
+            Assert.AreEqual(-106, ((NbtByte)Parse("-106b")).SignedValue);
             Assert.AreEqual(240, Parse("-16sb").ByteValue);
             Assert.AreEqual(-1, Parse("0xFFFFFFFF").IntValue);
             Assert.AreEqual(-1L, Parse("18446744073709551615ul").LongValue);
@@ -69,6 +72,8 @@ namespace fNbt.Test {
             Assert.AreEqual(".5x", Parse(".5x").StringValue);
             Assert.AreEqual("007", Parse("007").StringValue);
             Assert.AreEqual("300b", Parse("300b").StringValue);
+            Assert.AreEqual("-129b", Parse("-129b").StringValue);
+            Assert.AreEqual("255sb", Parse("255sb").StringValue);
             Assert.AreEqual("4294967296", Parse("4294967296").StringValue);
             Assert.AreEqual("1e", Parse("1e").StringValue);
             Assert.AreEqual("1.5.2", Parse("1.5.2").StringValue);

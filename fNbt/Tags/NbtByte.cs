@@ -12,6 +12,13 @@ namespace fNbt {
         /// <summary> Value/payload of this tag (a single byte). </summary>
         public byte Value { get; set; }
 
+        /// <summary> <see cref="Value"/> read as the signed byte Minecraft stores: the same eight
+        /// bits, so 255 reads as -1 and assigning -1 stores 255. </summary>
+        public sbyte SignedValue {
+            get { return unchecked((sbyte)Value); }
+            set { Value = unchecked((byte)value); }
+        }
+
 
         /// <summary> Creates an unnamed NbtByte tag with the default value of 0. </summary>
         public NbtByte() { }

@@ -27,10 +27,13 @@ namespace fNbt.Test {
         }
 
 
-        // Inputs both game versions refuse that fNbt reads, each a documented widening
+        // Inputs fNbt reads as values where both game versions refuse them or the classic parser
+        // made strings of them, each a documented widening
         static readonly HashSet<string> KnownWidenings = new HashSet<string>(StringComparer.Ordinal) {
             // array elements that fit the element range whatever their suffix or signedness
             "[B;1s]", "[B;1i]", "[B;1L]", "[B;128]", "[B;255]", "[I;1L]", "[I;1uL]", "[I;true]",
+            // byte literals in the unsigned range, the same bytes as -128b and -1b
+            "128b", "255b",
             // operation names in any case, and an unquoted argument that reads as a string
             "Bool(1)", "BOOL(1)", "BOOL(true)", "UUID(\"123e4567-e89b-12d3-a456-426614174000\")",
             "uuid(123e4567-e89b-12d3-a456-426614174000)",
@@ -81,9 +84,13 @@ namespace fNbt.Test {
 
 
         static void Check(string escaped, string input, string expectedText) {
+            if (KnownWidenings.Contains(escaped)) {
+                NbtTag.ParseSnbt(input);
+                return;
+            }
             if (expectedText == null) {
                 // Both versions refused it
-                if (KnownWidenings.Contains(escaped) || EmptyKey.IsMatch(escaped)) {
+                if (EmptyKey.IsMatch(escaped)) {
                     NbtTag.ParseSnbt(input);
                 } else {
                     Assert.Throws<NbtFormatException>(() => NbtTag.ParseSnbt(input));

@@ -5,12 +5,15 @@
     how much it consumed. Parsing accepts every syntax Minecraft has used since
     1.12 plus what common NBT tools write, including hex and binary numbers,
     every escape except \N{name}, bool() and uuid(), NaNf and Infinityd as the
-    numbers they name, and lists of mixed types, which become the wrapper
-    compounds Minecraft 1.21.5 stores on disk. Output uses the shape every
-    Minecraft version and tool reads, apart from non-finite numbers and empty
-    keys, which no Minecraft version reads back. SnbtOptions.WriteLayout
-    selects compact, spaced, or indented text, and SnbtOptions.DefaultWriteLayout
-    sets the process-wide default.
+    numbers they name, byte literals up to 255b, and lists of mixed types,
+    which become the wrapper compounds Minecraft 1.21.5 stores on disk. Output
+    uses the shape every Minecraft version and tool reads, apart from
+    non-finite numbers and empty keys, which no Minecraft version reads back.
+    SnbtOptions.WriteLayout selects compact, spaced, or indented text, and
+    SnbtOptions.DefaultWriteLayout sets the process-wide default.
+- NbtByte.SignedValue reads the value as the signed byte Minecraft stores and
+    takes one back: 255 is -1. ToSnbt prints bytes that way, and ParseSnbt
+    reads either spelling, so -1b and 255b are the same byte.
 - NbtFormatException.Index gives the character position of an SNBT parse
     error, or -1 for every other error.
 - The first tag added to an empty NbtList now sets its ListType whether that

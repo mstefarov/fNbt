@@ -22,7 +22,7 @@ namespace fNbt {
             switch (tag.TagType) {
                 case NbtTagType.Byte:
                     // Bytes travel signed, as in Java
-                    sb.Append(((sbyte)((NbtByte)tag).Value).ToString(CultureInfo.InvariantCulture)).Append('b');
+                    sb.Append(((NbtByte)tag).SignedValue.ToString(CultureInfo.InvariantCulture)).Append('b');
                     break;
                 case NbtTagType.Short:
                     sb.Append(((NbtShort)tag).Value.ToString(CultureInfo.InvariantCulture)).Append('s');
