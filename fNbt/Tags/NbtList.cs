@@ -19,8 +19,11 @@ namespace fNbt {
         const int MaxPresizedCapacity = 16;
 
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type.
-        /// An empty list may have the type <c>Unknown</c> or <c>End</c>; either way, the first tag added to
-        /// it sets the type. </summary>
+        /// The type of an empty list is a constraint on what may be added, not part of its value:
+        /// <c>Unknown</c> (a new list) and <c>End</c> (a loaded or parsed one) both let the first tag
+        /// added set the type, and a declared type is enforced. Files store the declared type, or
+        /// <c>End</c> for <c>Unknown</c>, readers accept any type for an empty list, SNBT carries none,
+        /// and <see cref="NbtComparer"/> treats every empty list as equal to every other. </summary>
         /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is not a recognized tag type. </exception>
         public NbtTagType ListType {
@@ -344,7 +347,6 @@ namespace fNbt {
 
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            EnsureListType();
             writeStream.WriteTagHeader(NbtTagType.List, Name);
             WritePayload(writeStream, childDepthBudget);
         }
@@ -352,20 +354,19 @@ namespace fNbt {
 
         internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            EnsureListType();
             WritePayload(writeStream, childDepthBudget);
         }
 
 
-        void EnsureListType() {
-            if (ListType == NbtTagType.Unknown) {
-                throw NbtFormatException.UnknownListType();
-            }
+        // The element type that goes on the wire. A list that never committed to one writes
+        // End, which is what Minecraft writes for every empty list.
+        internal NbtTagType WireListType {
+            get { return listType == NbtTagType.Unknown ? NbtTagType.End : listType; }
         }
 
 
         void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
-            writeStream.Write(ListType);
+            writeStream.Write(WireListType);
             writeStream.Write(tags.Count);
             foreach (NbtTag tag in tags) {
                 tag.WriteData(writeStream, childDepthBudget);

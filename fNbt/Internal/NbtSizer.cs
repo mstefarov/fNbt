@@ -95,11 +95,7 @@ namespace fNbt {
                 case NbtTagType.List: {
                     int childDepthBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     NbtList list = (NbtList)tag;
-                    NbtTagType listType = list.ListType;
-                    if (listType == NbtTagType.Unknown) {
-                        // The write pass would refuse this list; fail the same way before it
-                        throw NbtFormatException.UnknownListType();
-                    }
+                    NbtTagType listType = list.WireListType;
                     if (Validates<TMode>() && listType > flavor.MaxTagType) {
                         throw NbtFormatException.NotPermitted(flavor, listType);
                     }

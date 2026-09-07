@@ -4,7 +4,8 @@ using System.Collections.Generic;
 namespace fNbt {
     /// <summary> Compares tags for equality by type, name, and value. Compound tags are equal
     /// when they contain equal sets of tags; list tags when their elements are equal and in the
-    /// same order. Name comparisons are case-sensitive. </summary>
+    /// same order, and every empty list is equal to every other whatever its ListType. Name
+    /// comparisons are case-sensitive. </summary>
     public sealed class NbtComparer : IEqualityComparer<NbtTag> {
         /// <summary> Gets a singleton instance of the NbtComparer. </summary>
         public static NbtComparer Instance { get; } = new NbtComparer();
@@ -54,7 +55,8 @@ namespace fNbt {
 
                     case NbtTagType.List:
                         NbtList list = (NbtList)tag;
-                        hash = (hash * 23) ^ list.ListType.GetHashCode();
+                        // Empty lists are equal whatever their type, so it stays out of their hash
+                        if (list.Count > 0) hash = (hash * 23) ^ list.ListType.GetHashCode();
                         hash = (hash * 23) ^ list.Count.GetHashCode();
                         return hash;
 
@@ -182,10 +184,13 @@ namespace fNbt {
                     }
                 case NbtTagType.List: {
                         int childDepthBudget = ConsumeDepthBudget(depthBudget, nameof(x));
-                        // Lists are considered equal if their type, count, and contents are equal
+                        // Lists are equal when their count and contents are, and their type once
+                        // they have elements: the type of an empty list only constrains what may
+                        // be added, and neither Minecraft nor SNBT keeps it
                         NbtList xl = (NbtList)x;
                         NbtList yl = (NbtList)y;
-                        if (xl.ListType != yl.ListType || xl.Count != yl.Count) return false;
+                        if (xl.Count != yl.Count) return false;
+                        if (xl.Count > 0 && xl.ListType != yl.ListType) return false;
                         for (int i = 0; i < xl.Count; i++)
                             if (!Equals(xl.tags[i], yl.tags[i], childDepthBudget)) return false;
                         return true;

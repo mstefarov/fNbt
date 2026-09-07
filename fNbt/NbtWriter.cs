@@ -790,9 +790,6 @@ namespace fNbt {
                     break;
                 case NbtTagType.List:
                     EnsureCanGoDown();
-                    if (((NbtList)tag).ListType == NbtTagType.Unknown) {
-                        throw NbtFormatException.UnknownListType();
-                    }
                     break;
                 case NbtTagType.String:
                     stringValue = ((NbtString)tag).Value;

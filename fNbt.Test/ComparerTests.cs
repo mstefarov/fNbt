@@ -138,5 +138,22 @@ namespace fNbt.Test {
             Assert.IsTrue(comparer.Equals(x, y), "Two runs of MakeAllListsRoot should be deeply equal");
             Assert.AreEqual(comparer.GetHashCode(x), comparer.GetHashCode(y), "And their hash codes should match");
         }
+
+        [TestMethod]
+        public void EmptyListsAreEqualWhateverTheirListType() {
+            // The type of an empty list constrains what may be added; it is not part of its value
+            NbtList fresh = new NbtList("l");
+            NbtList loaded = new NbtList("l", NbtTagType.End);
+            NbtList declared = new NbtList("l", NbtTagType.Compound);
+            Assert.IsTrue(comparer.Equals(fresh, loaded));
+            Assert.IsTrue(comparer.Equals(loaded, declared));
+            Assert.AreEqual(comparer.GetHashCode(fresh), comparer.GetHashCode(declared));
+
+            // With elements in it, the type is part of the value again
+            NbtList ints = new NbtList("l") { new NbtInt(1) };
+            NbtList bytes = new NbtList("l") { new NbtByte(1) };
+            Assert.IsFalse(comparer.Equals(ints, bytes));
+            Assert.IsFalse(comparer.Equals(ints, declared));
+        }
     }
 }

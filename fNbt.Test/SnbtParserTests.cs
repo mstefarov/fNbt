@@ -321,25 +321,11 @@ namespace fNbt.Test {
                 back.Name = root.Name;
                 NbtAssert.AreEqual(root, back, layout.ToString());
             }
-            // Text carries no element type for an empty list, so declared types come back as End
+            // Text carries no element type for an empty list, and the comparer needs none
             NbtCompound lists = TestFiles.MakeAllListsRoot();
             NbtTag parsed = Parse(lists.ToSnbt());
             parsed.Name = lists.Name;
-            EmptyListsToEnd(lists);
             NbtAssert.AreEqual(lists, parsed);
-        }
-
-
-        static void EmptyListsToEnd(NbtTag tag) {
-            if (tag is NbtList list) {
-                if (list.Count == 0) {
-                    list.ListType = NbtTagType.End;
-                } else {
-                    foreach (NbtTag child in list) EmptyListsToEnd(child);
-                }
-            } else if (tag is NbtCompound compound) {
-                foreach (NbtTag child in compound) EmptyListsToEnd(child);
-            }
         }
     }
 }

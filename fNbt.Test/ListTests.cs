@@ -269,16 +269,15 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void SerializingWithoutListType() {
+        public void ListWithoutTypeSavesAsEnd() {
+            // A list that never committed to a type writes the element type Minecraft writes for
+            // every empty list, and comes back End-typed like any other loaded empty list
             var root = new NbtCompound("root") {
                 new NbtList("list")
             };
-            var file = new NbtFile(root);
-
-            using (var ms = new MemoryStream()) {
-                // list should throw NbtFormatException, because its ListType is Unknown
-                Assert.Throws<NbtFormatException>(() => file.SaveToStream(ms, NbtCompression.None));
-            }
+            NbtCompound reloaded = TestFiles.Reload(root);
+            Assert.AreEqual(NbtTagType.End, reloaded.Get<NbtList>("list").ListType);
+            NbtAssert.AreEqual(root, reloaded);
         }
 
 

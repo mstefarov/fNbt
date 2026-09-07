@@ -140,11 +140,8 @@ namespace fNbt {
                     int listChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     NbtList list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
-                    if (list.ListType == NbtTagType.Unknown) {
-                        throw NbtFormatException.UnknownListType();
-                    }
-                    if (list.ListType > MaxTagType) {
-                        throw NbtFormatException.NotPermitted(this, list.ListType);
+                    if (list.WireListType > MaxTagType) {
+                        throw NbtFormatException.NotPermitted(this, list.WireListType);
                     }
                     foreach (NbtTag child in list.tags) {
                         ValidateTree(child, listChildBudget);

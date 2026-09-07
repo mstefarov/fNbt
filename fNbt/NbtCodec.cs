@@ -313,7 +313,7 @@ namespace fNbt {
         /// or <paramref name="tag"/> is <c>null</c> and the flavor requires a compound root. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public void WriteTag(NbtTag? tag, Stream stream) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
@@ -338,7 +338,7 @@ namespace fNbt {
         /// Documents before it are already written when this throws. </exception>
         /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. Documents before the offending one
         /// are already written when this throws. </exception>
         public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, Stream stream) {
@@ -369,7 +369,7 @@ namespace fNbt {
         /// or <paramref name="tag"/> is <c>null</c> and the flavor requires a compound root. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
@@ -394,7 +394,7 @@ namespace fNbt {
         /// Documents before it are already written when this throws. </exception>
         /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. Documents before the offending one
         /// are already written when this throws. </exception>
         /// <remarks> Only the .NET 8 build has this overload. </remarks>
@@ -459,7 +459,7 @@ namespace fNbt {
         /// <exception cref="NotSupportedException"> The document does not fit in a single array. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
             // An absent document is a lone TAG_End byte

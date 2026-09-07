@@ -434,7 +434,6 @@ namespace fNbt {
         /// <exception cref="IOException"> If an I/O error occurred while creating the file. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -463,7 +462,6 @@ namespace fNbt {
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>;
         /// if <paramref name="index"/> is less than zero; or if <paramref name="index"/> is greater than the length of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -483,7 +481,6 @@ namespace fNbt {
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
         /// <exception cref="NotSupportedException"> If the serialized document does not fit in a single array. </exception>
         /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -528,7 +525,6 @@ namespace fNbt {
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
         /// <exception cref="NbtFormatException"> If RootTag is unnamed;
         /// or if one of the NbtCompound tags contained unnamed tags;
-        /// or if an NbtList tag had Unknown list type and no elements;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>

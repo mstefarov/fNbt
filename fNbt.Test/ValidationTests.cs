@@ -84,20 +84,15 @@ namespace fNbt.Test {
             NbtCodec strict = new NbtCodec(NbtFlavor.JavaLegacy);
             Assert.Throws<NbtFormatException>(() => strict.WriteTag(root));
 
-            // An unset element type gets the list's own message, not an empty type name
+            // A list that never committed to a type writes as End, which every flavor permits
             var unset = new NbtCompound("r") { new NbtList("l") };
-            NbtFormatException ex = Assert.Throws<NbtFormatException>(() => strict.WriteTag(unset));
-            StringAssert.Contains(ex.Message, "Unknown ListType");
+            NbtAssert.AreEqual(unset, TestFiles.Load(strict.WriteTag(unset), NbtFlavor.JavaLegacy).RootTag);
             new NbtCodec(NbtFlavor.Java).WriteTag(root);
             new NbtCodec(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnWrite = false }).WriteTag(root);
 
             using (MemoryStream output = new MemoryStream()) {
                 // Stream writes validate the tree without the buffer overload's sizing walk.
                 NbtAssert.WritesNothing<NbtFormatException>(output, () => strict.WriteTag(root, output));
-                ex = NbtAssert.WritesNothing<NbtFormatException>(output, () => strict.WriteTag(unset, output));
-                StringAssert.Contains(ex.Message, "Unknown ListType");
-
-                unset.Get<NbtList>("l").Add(new NbtInt(1));
                 strict.WriteTag(unset, output);
                 NbtAssert.AreEqual(unset, TestFiles.Load(output.ToArray(), NbtFlavor.JavaLegacy).RootTag);
             }

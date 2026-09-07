@@ -18,6 +18,10 @@
     error, or -1 for every other error.
 - The first tag added to an empty NbtList now sets its ListType whether that
     type was Unknown or End, so empty lists loaded from files accept new tags.
+    The type of an empty list is a constraint on what may be added, not part of
+    its value: NbtComparer now treats every empty list as equal to every other,
+    and a list that never received a type writes TAG_End, the type Minecraft
+    writes for every empty list, instead of throwing NbtFormatException.
 - NbtReader.ReadListAsArray now uses the result element size when applying
     MaxAllocation to enum, decimal, and bool arrays.
 - NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
