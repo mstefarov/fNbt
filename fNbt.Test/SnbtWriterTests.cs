@@ -54,6 +54,7 @@ namespace fNbt.Test {
             Assert.AreEqual("1.0E10f", Snbt(new NbtFloat(1e10f)));
             Assert.AreEqual("3.4028235E38f", Snbt(new NbtFloat(float.MaxValue)));
             Assert.AreEqual("-3.4028235E38f", Snbt(new NbtFloat(float.MinValue)));
+            Assert.AreEqual("1.0E-45f", Snbt(new NbtFloat(float.Epsilon)));
             // Floats that need nine digits, the probe loop's fallback on .NET Framework
             Assert.AreEqual("115527.086f", Snbt(new NbtFloat(115527.086f)));
             Assert.AreEqual("-103.217316f", Snbt(new NbtFloat(-103.217316f)));
@@ -97,6 +98,10 @@ namespace fNbt.Test {
             Assert.AreEqual("1.0E23d", Snbt(new NbtDouble(1e23)));
             Assert.AreEqual("1.7976931348623157E308d", Snbt(new NbtDouble(double.MaxValue)));
             Assert.AreEqual("-1.7976931348623157E308d", Snbt(new NbtDouble(double.MinValue)));
+            Assert.AreEqual("5.0E-324d", Snbt(new NbtDouble(double.Epsilon)));
+            Assert.AreEqual("2.2250738585072014E-308d", Snbt(new NbtDouble(2.2250738585072014E-308)));
+            // 17 digits: the 16-digit text would name the value below it
+            Assert.AreEqual("0.056526799757396023d", Snbt(new NbtDouble(BitConverter.Int64BitsToDouble(4588307191414157804))));
             Assert.AreEqual("NaNd", Snbt(new NbtDouble(double.NaN)));
             Assert.AreEqual("Infinityd", Snbt(new NbtDouble(double.PositiveInfinity)));
             Assert.AreEqual("-Infinityd", Snbt(new NbtDouble(double.NegativeInfinity)));

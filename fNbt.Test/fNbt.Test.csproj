@@ -45,6 +45,9 @@
     <None Update="TestFiles\snbt-cases.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="TestFiles\snbt-numbers.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="TestFiles\snbt\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

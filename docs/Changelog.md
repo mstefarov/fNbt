@@ -10,7 +10,8 @@
     uses the shape every Minecraft version and tool reads, apart from
     non-finite numbers and empty keys, which no Minecraft version reads back.
     SnbtOptions.WriteLayout selects compact, spaced, or indented text, and
-    SnbtOptions.DefaultWriteLayout sets the process-wide default.
+    SnbtOptions.DefaultWriteLayout sets the process-wide default. Numbers print
+    the same digits and parse to the same bits on every target framework.
 - NbtList.CreateMixed builds a list from tags of different types the way
     Minecraft 1.21.5 stores one, as compounds holding each tag under an empty
     key, and NbtList.UnwrapMixed reads such a list back. ParseSnbt applies the

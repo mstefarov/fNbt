@@ -189,16 +189,19 @@ namespace fNbt {
                              (hasDot ? "." + fraction.Replace("_", "") : "") +
                              (hasExponent ? "e" + exponent.Replace("_", "") : "");
             if (isFloat) {
-                if (!float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f) ||
-                    float.IsInfinity(f)) {
-                    return null;
-                }
+                if (!float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f)) return null;
+#if !NETCOREAPP
+                // .NET Framework's parser can land a unit off and drops the sign of zero
+                f = FloatingDecimal.CorrectSingle(cleaned, f);
+#endif
+                if (float.IsInfinity(f)) return null;
                 return new NbtFloat(f);
             }
-            if (!double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out double d) ||
-                double.IsInfinity(d)) {
-                return null;
-            }
+            if (!double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return null;
+#if !NETCOREAPP
+            d = FloatingDecimal.CorrectDouble(cleaned, d);
+#endif
+            if (double.IsInfinity(d)) return null;
             return new NbtDouble(d);
         }
 
@@ -395,6 +398,11 @@ namespace fNbt {
                 // .NET Framework reports an overflow as a failure
                 value = digits[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
             }
+#if !NETCOREAPP
+            else {
+                value = FloatingDecimal.CorrectDouble(digits, value);
+            }
+#endif
             return isFloat ? new NbtFloat((float)value) : (NbtTag)new NbtDouble(value);
         }
 

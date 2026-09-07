@@ -266,35 +266,15 @@ namespace fNbt {
             return value.ToString("R", CultureInfo.InvariantCulture);
         }
 #else
-        // .NET Framework's "R" is not shortest (15 digits, then 17), and its default is lossy. The
-        // shortest of G7 to G9 (G15 to G17) that parses back exactly is the closest available; the
-        // longest always does.
-        static readonly string[] FloatProbes = { "G7", "G8" };
-        static readonly string[] DoubleProbes = { "G15", "G16" };
-
-        // TryParse, not Parse: a rounded-up maximum overflows, which .NET Framework reports as
-        // an exception from Parse and as false from TryParse
+        // .NET Framework's formatting is not correctly rounded past 15 digits and its "R" is not
+        // shortest, so the digits come from exact arithmetic; the result is what .NET Core prints
         static string ShortestFloat(float value) {
-            foreach (string format in FloatProbes) {
-                string text = value.ToString(format, CultureInfo.InvariantCulture);
-                if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float back) &&
-                    back == value) {
-                    return WithSign(text, value);
-                }
-            }
-            return WithSign(value.ToString("G9", CultureInfo.InvariantCulture), value);
+            return WithSign(FloatingDecimal.ShortestSingle(value), value);
         }
 
 
         static string ShortestDouble(double value) {
-            foreach (string format in DoubleProbes) {
-                string text = value.ToString(format, CultureInfo.InvariantCulture);
-                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double back) &&
-                    back == value) {
-                    return WithSign(text, value);
-                }
-            }
-            return WithSign(value.ToString("G17", CultureInfo.InvariantCulture), value);
+            return WithSign(FloatingDecimal.ShortestDouble(value), value);
         }
 
 

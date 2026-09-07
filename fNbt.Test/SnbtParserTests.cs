@@ -14,6 +14,21 @@ namespace fNbt.Test {
         }
 
 
+        [TestMethod]
+        public void NumbersParseToTheSameBitsOnEveryFramework() {
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0d").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0d").DoubleValue));
+            Assert.AreEqual(int.MinValue, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("-0.0f")).Value), 0));
+            Assert.AreEqual(int.MinValue, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("-0e1f")).Value), 0));
+            // .NET Framework's own parser reads the 16-digit text a unit too high
+            Assert.AreEqual(4588307191414157803, BitConverter.DoubleToInt64Bits(Parse("0.05652679975739602d").DoubleValue));
+            Assert.AreEqual(4588307191414157804, BitConverter.DoubleToInt64Bits(Parse("0.056526799757396023d").DoubleValue));
+            Assert.AreEqual(1L, BitConverter.DoubleToInt64Bits(Parse("4.9E-324d").DoubleValue));
+            Assert.AreEqual(1, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("1.4E-45f")).Value), 0));
+        }
+
+
         static SnbtParseException Refuses(string text) {
             return Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt(text));
         }

@@ -16,6 +16,7 @@ namespace fNbt.Test {
         public static readonly string CanonicalBlockStates = Path.Combine(DirName, "canonical_block_states.nbt");
         public static readonly string EntityIdentifiers = Path.Combine(DirName, "entity_identifiers.nbt");
         public static readonly string SnbtCases = Path.Combine(DirName, "snbt-cases.txt");
+        public static readonly string SnbtNumbers = Path.Combine(DirName, "snbt-numbers.txt");
         public static readonly string SnbtDocumentsDir = Path.Combine(DirName, "snbt");
 
 
