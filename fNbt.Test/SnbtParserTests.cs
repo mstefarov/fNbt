@@ -78,6 +78,10 @@ namespace fNbt.Test {
             Assert.AreEqual("1e", Parse("1e").StringValue);
             Assert.AreEqual("1.5.2", Parse("1.5.2").StringValue);
             Assert.AreEqual("0x", Parse("0x").StringValue);
+            Assert.AreEqual("1._5", Parse("1._5").StringValue);
+            Assert.AreEqual("1e_5", Parse("1e_5").StringValue);
+            Assert.AreEqual("0b_1", Parse("0b_1").StringValue);
+            Assert.AreEqual("0_1", Parse("0_1").StringValue);
             Assert.AreEqual("1_", Parse("1_").StringValue);
             Assert.AreEqual("-0x1", Parse("-0x1").StringValue);
             // Overflowing floats are the infinities the classic parser stored
@@ -120,6 +124,7 @@ namespace fNbt.Test {
             Refuses("\"\\u260\"");
             Refuses("\"\\U00110000\"");
             Refuses("\"abc");
+            Refuses("\"abc\\");
             StringAssert.Contains(Refuses("\"\\N{SNOWMAN}\"").Message, "not supported");
         }
 
@@ -138,6 +143,9 @@ namespace fNbt.Test {
             Refuses("{a:1");
             Refuses("{a:1;b:2}");
             Refuses("{a=1}");
+            Refuses("{a");
+            Refuses("{a:1,");
+            Refuses("{:1}");
         }
 
 
@@ -170,6 +178,10 @@ namespace fNbt.Test {
             Refuses("[1 2]");
             Refuses("[1");
             Refuses("[1]]");
+            Refuses("[");
+            Refuses("[1,");
+            Refuses("[B");
+            Refuses("[B;");
         }
 
 
@@ -222,6 +234,15 @@ namespace fNbt.Test {
             Refuses("uuid(\"not-a-uuid\")");
             Refuses("uuid(\"123e4567e89b12d3a456426614174000\")");
             Refuses("{bool(1):1}");
+            Refuses("bool(");
+            Refuses("bool(1");
+            Refuses("bool(1 2)");
+            Refuses("bool(1,");
+            Refuses("uuid(\"123e45678-e89b-12d3-a456-426614174000\")");
+            Refuses("uuid(\"123e456g-e89b-12d3-a456-426614174000\")");
+            Refuses("uuid(\"-0-0-0-0\")");
+            CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
+                                      ((NbtIntArray)Parse("uuid(\"123e4567-e89b-12d3-a456-426614174000\",)")).Value);
         }
 
 
@@ -272,6 +293,7 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", 2, out consumed));
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", -1, out consumed));
             Assert.Throws<NbtFormatException>(() => NbtTag.ParseSnbt("x", 1, out consumed));
+            Assert.Throws<ArgumentNullException>(() => NbtTag.ParseSnbt(null, 0, out consumed));
         }
 
 

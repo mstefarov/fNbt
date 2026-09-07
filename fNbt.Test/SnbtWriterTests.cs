@@ -54,6 +54,10 @@ namespace fNbt.Test {
             Assert.AreEqual("1.0E10f", Snbt(new NbtFloat(1e10f)));
             Assert.AreEqual("3.4028235E38f", Snbt(new NbtFloat(float.MaxValue)));
             Assert.AreEqual("-3.4028235E38f", Snbt(new NbtFloat(float.MinValue)));
+            // Floats that need nine digits, the probe loop's fallback on .NET Framework
+            Assert.AreEqual("115527.086f", Snbt(new NbtFloat(115527.086f)));
+            Assert.AreEqual("-103.217316f", Snbt(new NbtFloat(-103.217316f)));
+            Assert.AreEqual("1.00584066E18f", Snbt(new NbtFloat(1.00584066E18f)));
             Assert.AreEqual("NaNf", Snbt(new NbtFloat(float.NaN)));
             Assert.AreEqual("Infinityf", Snbt(new NbtFloat(float.PositiveInfinity)));
             Assert.AreEqual("-Infinityf", Snbt(new NbtFloat(float.NegativeInfinity)));
