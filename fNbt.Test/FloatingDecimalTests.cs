@@ -56,7 +56,14 @@ namespace fNbt.Test {
             Assert.AreEqual(0L, DoubleBits(FloatingDecimal.CorrectDouble("0.0", -0.0)));
 
             // The smallest and largest doubles, and the halfway points around them
-            Assert.AreEqual("5E-324", FloatingDecimal.ShortestDouble(double.Epsilon));
+            Assert.AreEqual("4.9E-324", FloatingDecimal.ShortestDouble(double.Epsilon));
+            // Java's two-digit rule on the smallest subnormals, and the closer form below a power
+            // of two, where the rounding interval is lopsided and one digit fewer fits
+            Assert.AreEqual("9.9E-324", FloatingDecimal.ShortestDouble(BitConverter.Int64BitsToDouble(2)));
+            Assert.AreEqual("2E-323", FloatingDecimal.ShortestDouble(BitConverter.Int64BitsToDouble(4)));
+            Assert.AreEqual("9.9E-323", FloatingDecimal.ShortestDouble(BitConverter.Int64BitsToDouble(20)));
+            Assert.AreEqual("7.120236347223045E-307", FloatingDecimal.ShortestDouble(BitConverter.Int64BitsToDouble(27021597764222976)));
+            Assert.AreEqual("7.291122019556398E-304", FloatingDecimal.ShortestDouble(BitConverter.Int64BitsToDouble(72057594037927936)));
             Assert.AreEqual("1.7976931348623157E308", FloatingDecimal.ShortestDouble(double.MaxValue));
             Assert.AreEqual("2.2250738585072014E-308", FloatingDecimal.ShortestDouble(2.2250738585072014E-308));
             Assert.AreEqual(1L, DoubleBits(FloatingDecimal.CorrectDouble("4.94065645841247E-324", 0.0)));
@@ -66,7 +73,7 @@ namespace fNbt.Test {
             Assert.IsTrue(double.IsPositiveInfinity(FloatingDecimal.CorrectDouble("1.7976931348623159E308", double.MaxValue)));
 
             // Floats
-            Assert.AreEqual("1E-45", FloatingDecimal.ShortestSingle(float.Epsilon));
+            Assert.AreEqual("1.4E-45", FloatingDecimal.ShortestSingle(float.Epsilon));
             Assert.AreEqual("3.4028235E38", FloatingDecimal.ShortestSingle(float.MaxValue));
             Assert.AreEqual("1.15527086E5", FloatingDecimal.ShortestSingle(115527.086f));
             Assert.AreEqual(SingleBits(115527.086f), SingleBits(FloatingDecimal.CorrectSingle("115527.086", 115527.09f)));
@@ -114,7 +121,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void FixtureFromDotNet8PrintsAndParsesTheSameHere() {
+        public void FixtureFromJavaPrintsAndParsesTheSameHere() {
             int checkedLines = 0;
             foreach (string line in File.ReadLines(TestFiles.SnbtNumbers)) {
                 if (line.StartsWith("#", StringComparison.Ordinal)) continue;
@@ -130,7 +137,7 @@ namespace fNbt.Test {
                 }
                 checkedLines++;
             }
-            Assert.IsTrue(checkedLines > 2500, "fixture holds " + checkedLines + " lines");
+            Assert.IsTrue(checkedLines > 5000, "fixture holds " + checkedLines + " lines");
         }
 
 
@@ -139,9 +146,10 @@ namespace fNbt.Test {
         public void MatchesTheCorrectlyRoundedRuntime() {
             state = 0x9E3779B97F4A7C15UL;
             for (int i = 0; i < 20000; i++) {
+                // Subnormals follow Java's two-digit rule instead of the runtime's; the fixture has them
                 long bits = (long)Next() & long.MaxValue;
                 double value = BitConverter.Int64BitsToDouble(bits);
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value) || (bits & 0x7FF0000000000000L) == 0) continue;
                 string text = FloatingDecimal.ShortestDouble(value);
                 string reference = value.ToString("R", CultureInfo.InvariantCulture);
                 // The same value, and no more digits than the runtime's shortest form
@@ -150,7 +158,7 @@ namespace fNbt.Test {
 
                 int singleBits = (int)(Next() >> 32) & int.MaxValue;
                 float single = SingleFromBits(singleBits);
-                if (float.IsNaN(single) || float.IsInfinity(single)) continue;
+                if (float.IsNaN(single) || float.IsInfinity(single) || (singleBits & 0x7F800000) == 0) continue;
                 string singleText = FloatingDecimal.ShortestSingle(single);
                 string singleReference = single.ToString("R", CultureInfo.InvariantCulture);
                 Assert.AreEqual(singleBits, SingleBits(float.Parse(singleText, NumberStyles.Float, CultureInfo.InvariantCulture)), singleText);
