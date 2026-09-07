@@ -69,9 +69,21 @@ namespace fNbt {
             int start = pos;
             if (CanStartNumber(text[pos])) {
                 NbtTag? number = TryReadNumber(NbtTagType.Int);
-                // A number that runs straight into more token characters (1abc, 1.5.2, 1bx) is a
-                // old-era string, not a number plus trailing data
-                if (number != null && !(pos < text.Length && IsUnquotedChar(text[pos]))) return number;
+                if (number != null) {
+                    if (!RunsIntoToken()) return number;
+                    // The whitespace the grammar allows inside a number can carry it into the next
+                    // word: 1.5 foo took the f as a suffix. Read it again without that whitespace
+                    // so the word stays separate. A number that runs straight into more token
+                    // characters (1abc, 1.5.2, 1bx) is an old-era string, not a number plus
+                    // trailing data.
+                    if (HasWhitespace(start, pos)) {
+                        pos = start;
+                        spacedNumbers = false;
+                        number = TryReadNumber(NbtTagType.Int);
+                        spacedNumbers = true;
+                        if (number != null && !RunsIntoToken()) return number;
+                    }
+                }
                 pos = start;
             }
 
@@ -97,6 +109,19 @@ namespace fNbt {
         }
 
 
+        bool RunsIntoToken() {
+            return pos < text.Length && IsUnquotedChar(text[pos]);
+        }
+
+
+        bool HasWhitespace(int start, int end) {
+            for (int i = start; i < end; i++) {
+                if (IsWhitespace(text[i])) return true;
+            }
+            return false;
+        }
+
+
         static bool CanStartNumber(char c) {
             return (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
         }
@@ -118,12 +143,21 @@ namespace fNbt {
         // element type inside an array. Whitespace is skipped before every part, as the game's
         // terminals do. Returns null, with pos unspecified, when the text is not a modern number;
         // the caller rewinds and falls back to the old reading.
+        // Whitespace the modern grammar allows between the parts of a number; off while a number
+        // that ran into the next word is read again
+        bool spacedNumbers = true;
+
+        void SkipNumberWhitespace() {
+            if (spacedNumbers) SkipWhitespace();
+        }
+
+
         NbtTag? TryReadNumber(NbtTagType defaultType) {
             bool negative = false;
             if (text[pos] == '+' || text[pos] == '-') {
                 negative = text[pos] == '-';
                 pos++;
-                SkipWhitespace();
+                SkipNumberWhitespace();
             }
             if (pos >= text.Length) return null;
             int afterSign = pos;
@@ -139,7 +173,7 @@ namespace fNbt {
             int wholeDigits = ScanDigitRun(10);
             if (wholeDigits < 0) return null;
             int end = pos;
-            SkipWhitespace();
+            SkipNumberWhitespace();
 
             bool hasDot = false;
             int fractionDigits = 0;
@@ -147,26 +181,33 @@ namespace fNbt {
                 hasDot = true;
                 pos++;
                 end = pos;
-                SkipWhitespace();
+                SkipNumberWhitespace();
                 fractionDigits = ScanDigitRun(10);
                 if (fractionDigits < 0) return null;
                 if (fractionDigits > 0) end = pos;
-                SkipWhitespace();
+                SkipNumberWhitespace();
             }
             if (wholeDigits == 0 && fractionDigits == 0) return null;
 
             bool hasExponent = false;
             if (pos < text.Length && (text[pos] == 'e' || text[pos] == 'E')) {
+                bool spaced = pos > end;
                 pos++;
-                SkipWhitespace();
+                SkipNumberWhitespace();
                 if (pos < text.Length && (text[pos] == '+' || text[pos] == '-')) {
                     pos++;
-                    SkipWhitespace();
+                    SkipNumberWhitespace();
                 }
-                if (ScanDigitRun(10) <= 0) return null;
-                hasExponent = true;
-                end = pos;
-                SkipWhitespace();
+                if (ScanDigitRun(10) <= 0) {
+                    // An e that starts the next word (1.5 exp) leaves the number as it was; one
+                    // glued to the number (1.5e) refuses the whole token
+                    if (!spaced) return null;
+                    pos = end;
+                } else {
+                    hasExponent = true;
+                    end = pos;
+                    SkipNumberWhitespace();
+                }
             }
 
             bool isFloat = false;
@@ -274,10 +315,10 @@ namespace fNbt {
                 pos++;
                 digitsEnd = pos;
                 end = pos;
-                SkipWhitespace();
+                SkipNumberWhitespace();
                 if (pos < text.Length && (text[pos] == 'x' || text[pos] == 'X')) {
                     pos++;
-                    SkipWhitespace();
+                    SkipNumberWhitespace();
                     digitsStart = pos;
                     if (ScanDigitRun(16) <= 0) return false;
                     digitsEnd = pos;
@@ -286,7 +327,7 @@ namespace fNbt {
                 } else if (pos < text.Length && (text[pos] == 'b' || text[pos] == 'B')) {
                     int beforeB = pos;
                     pos++;
-                    SkipWhitespace();
+                    SkipNumberWhitespace();
                     int binaryStart = pos;
                     if (ScanDigitRun(2) > 0) {
                         digitsStart = binaryStart;
@@ -308,7 +349,7 @@ namespace fNbt {
                 digitsEnd = pos;
                 end = pos;
             }
-            SkipWhitespace();
+            SkipNumberWhitespace();
 
             // Suffix: [u|s] then b|s|i|l, or a lone type letter; a lone s is a short
             bool? unsigned = null;
@@ -317,7 +358,7 @@ namespace fNbt {
                 bool signedness = c == 'u' || c == 'U' || c == 's' || c == 'S';
                 // The game skips whitespace before every terminal, the type letter included
                 int letterAt = pos + 1;
-                while (signedness && letterAt < text.Length && IsWhitespace(text[letterAt])) letterAt++;
+                while (signedness && spacedNumbers && letterAt < text.Length && IsWhitespace(text[letterAt])) letterAt++;
                 if (signedness && letterAt < text.Length && TryTypeLetter(text[letterAt], out NbtTagType prefixed)) {
                     unsigned = c == 'u' || c == 'U';
                     type = prefixed;
@@ -855,6 +896,11 @@ namespace fNbt {
                     return value;
                 }
                 pos = start;
+            }
+            // An element can only be a number, so a container fails here instead of after being
+            // parsed: nested arrays would otherwise recurse without spending depth
+            if (pos < text.Length && (text[pos] == '[' || text[pos] == '{')) {
+                throw Error("Invalid array element type", start);
             }
             return ArrayElement(ReadValue(depthBudget), min, max, start);
         }

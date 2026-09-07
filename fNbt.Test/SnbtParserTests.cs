@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace fNbt.Test {
@@ -420,6 +421,60 @@ namespace fNbt.Test {
             NbtTag parsed = Parse(lists.ToSnbt());
             parsed.Name = lists.Name;
             NbtAssert.AreEqual(lists, parsed);
+        }
+
+
+        [TestMethod]
+        public void SpacedNumberPartsStayOutOfTheNextWord() {
+            // The whitespace the grammar allows inside a number must not carry it into a word that
+            // happens to start with a suffix letter, an e or a dot
+            NbtTag tag = NbtTag.ParseSnbt("1.5 foo", 0, out int consumed);
+            Assert.AreEqual(NbtTagType.Double, tag.TagType);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+
+            tag = NbtTag.ParseSnbt("1.5 exp", 0, out consumed);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+
+            tag = NbtTag.ParseSnbt("5 bx", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(5, tag.IntValue);
+            Assert.AreEqual(1, consumed);
+
+            tag = NbtTag.ParseSnbt("15 .foo", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(2, consumed);
+
+            // A word that is only a suffix still belongs to the number
+            tag = NbtTag.ParseSnbt("1.5 f oo", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Float, tag.TagType);
+            Assert.AreEqual(5, consumed);
+            tag = NbtTag.ParseSnbt("240u b x", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Byte, tag.TagType);
+            Assert.AreEqual(6, consumed);
+
+            // A whole-text parse refuses the word instead of misreading the number
+            StringAssert.Contains(Refuses("1.5 foo").Message, "trailing");
+            StringAssert.Contains(Refuses("5 bx").Message, "trailing");
+            // Glued characters still make the old-era string
+            Assert.AreEqual("1.5fx", Parse("1.5fx").StringValue);
+        }
+
+
+        [TestMethod]
+        [Timeout(10000)]
+        public void ContainersInsideTypedArraysFailBeforeAnyRecursion() {
+            // Arrays take no nesting level, so a nested array must be refused before it is parsed
+            // or deep nesting overflows the stack ahead of the element type check
+            StringBuilder deep = new StringBuilder();
+            for (int i = 0; i < 5000; i++) deep.Append("[B;");
+            deep.Append('0').Append(']', 5000);
+            SnbtParseException ex = Refuses(deep.ToString());
+            StringAssert.Contains(ex.Message, "Invalid array element type");
+            Assert.AreEqual(3, ex.Index);
+            Assert.AreEqual(3, Refuses("[I;{}]").Index);
+            Assert.AreEqual(4, Refuses("[L; [1]]").Index);
         }
     }
 }
