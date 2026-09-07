@@ -475,9 +475,8 @@ namespace fNbt {
         /// <param name="text"> The SNBT text. </param>
         /// <returns> The parsed tag, unnamed. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
-        /// <exception cref="NbtFormatException"> The text is not SNBT, has anything but whitespace
-        /// after the value, or nests deeper than 512 levels. <see cref="NbtFormatException.Index"/>
-        /// gives the position. </exception>
+        /// <exception cref="SnbtParseException"> The text is not SNBT, has anything but whitespace
+        /// after the value, or nests deeper than 512 levels. The exception gives the position. </exception>
         public static NbtTag ParseSnbt(string text) {
             if (text == null) throw new ArgumentNullException(nameof(text));
             return SnbtParser.ParseWhole(text);
@@ -496,8 +495,8 @@ namespace fNbt {
         /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is negative or past
         /// the end of the text. </exception>
-        /// <exception cref="NbtFormatException"> No value starts at the index, or the value nests
-        /// deeper than 512 levels. <see cref="NbtFormatException.Index"/> gives the position within
+        /// <exception cref="SnbtParseException"> No value starts at the index, or the value nests
+        /// deeper than 512 levels. <see cref="SnbtParseException.Index"/> is the position within
         /// <paramref name="text"/>. </exception>
         public static NbtTag ParseSnbt(string text, int index, out int charsConsumed) {
             if (text == null) throw new ArgumentNullException(nameof(text));

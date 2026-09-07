@@ -2,27 +2,15 @@ using System;
 
 namespace fNbt {
     /// <summary> Exception thrown when a format violation is detected while
-    /// parsing or serializing an NBT file. </summary>
+    /// parsing or serializing an NBT file. <see cref="SnbtParseException"/> is the form
+    /// thrown for SNBT text, and carries the position. </summary>
     [Serializable]
-    public sealed class NbtFormatException : Exception {
-        /// <summary> Zero-based index into the SNBT text where parsing failed, or -1 when this
-        /// exception did not come from parsing SNBT. </summary>
-        public int Index { get; }
-
+    public class NbtFormatException : Exception {
         internal NbtFormatException(string message)
-            : base(message) {
-            Index = -1;
-        }
+            : base(message) { }
 
         internal NbtFormatException(string message, Exception innerException)
-            : base(message, innerException) {
-            Index = -1;
-        }
-
-        internal NbtFormatException(string message, int index)
-            : base(message) {
-            Index = index;
-        }
+            : base(message, innerException) { }
 
 
         // Conditions that several layers detect, worded once

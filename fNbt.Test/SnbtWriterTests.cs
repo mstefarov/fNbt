@@ -301,8 +301,8 @@ namespace fNbt.Test {
             }
             Assert.AreEqual(1024, Snbt(root).Length);
             current.Add(new NbtList());
-            NbtFormatException ex = Assert.Throws<NbtFormatException>(() => Snbt(root));
-            Assert.AreEqual(-1, ex.Index);
+            // Only parsing has a position; the writer's depth failure is the plain exception
+            Assert.ThrowsExactly<NbtFormatException>(() => Snbt(root));
         }
     }
 }

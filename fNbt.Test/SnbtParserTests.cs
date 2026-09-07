@@ -14,8 +14,8 @@ namespace fNbt.Test {
         }
 
 
-        static NbtFormatException Refuses(string text) {
-            return Assert.Throws<NbtFormatException>(() => NbtTag.ParseSnbt(text));
+        static SnbtParseException Refuses(string text) {
+            return Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt(text));
         }
 
 
@@ -270,9 +270,13 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ErrorsCarryTheIndexAndTheLineAndColumn() {
-            NbtFormatException ex = Refuses("{a:1,\n b:[1,,2]}");
+            SnbtParseException ex = Refuses("{a:1,\n b:[1,,2]}");
             Assert.AreEqual(12, ex.Index);
+            Assert.AreEqual(2, ex.Line);
+            Assert.AreEqual(7, ex.Column);
             StringAssert.Contains(ex.Message, "at index 12 (line 2, column 7)");
+            Assert.AreEqual(1, Refuses("").Line);
+            Assert.AreEqual(1, Refuses("").Column);
             Assert.AreEqual(0, Refuses("").Index);
             Assert.AreEqual(3, Refuses("{} x").Index);
             Assert.AreEqual(1, Refuses("\"\\q\"").Index);
@@ -294,7 +298,7 @@ namespace fNbt.Test {
             Assert.AreEqual(6, consumed);
             Assert.AreEqual("a", NbtTag.ParseSnbt("a b", 0, out consumed).StringValue);
             Assert.AreEqual(1, consumed);
-            NbtFormatException ex = Assert.Throws<NbtFormatException>(() => NbtTag.ParseSnbt("x {", 2, out consumed));
+            SnbtParseException ex = Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt("x {", 2, out consumed));
             Assert.AreEqual(3, ex.Index);
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", 2, out consumed));
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", -1, out consumed));
@@ -307,7 +311,7 @@ namespace fNbt.Test {
         public void NestingBeyondTheDepthLimitIsRefused() {
             string ok = new string('[', 512) + new string(']', 512);
             Assert.AreEqual(ok, Parse(ok).ToSnbt());
-            NbtFormatException ex = Refuses(new string('[', 513) + new string(']', 513));
+            SnbtParseException ex = Refuses(new string('[', 513) + new string(']', 513));
             Assert.AreEqual(512, ex.Index);
             StringAssert.Contains(ex.Message, "512 levels) at index 512");
             Refuses(string.Concat(Enumerable.Repeat("{a:", 513)) + "1" + new string('}', 513));

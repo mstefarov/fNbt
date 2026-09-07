@@ -20,8 +20,9 @@
 - NbtByte.SignedValue reads the value as the signed byte Minecraft stores and
     takes one back: 255 is -1. ToSnbt prints bytes that way, and ParseSnbt
     reads either spelling, so -1b and 255b are the same byte.
-- NbtFormatException.Index gives the character position of an SNBT parse
-    error, or -1 for every other error.
+- SnbtParseException, thrown by ParseSnbt and derived from NbtFormatException,
+    gives the index, line, and column of an SNBT parse error.
+    NbtFormatException is no longer sealed.
 - The first tag added to an empty NbtList now sets its ListType whether that
     type was Unknown or End, so empty lists loaded from files accept new tags.
     The type of an empty list is a constraint on what may be added, not part of

@@ -770,12 +770,12 @@ namespace fNbt {
         }
 
 
-        NbtFormatException Error(string message) {
+        SnbtParseException Error(string message) {
             return Error(message, pos);
         }
 
 
-        NbtFormatException Error(string message, int index) {
+        SnbtParseException Error(string message, int index) {
             int line = 1;
             int column = 1;
             for (int i = 0; i < index && i < text.Length; i++) {
@@ -786,8 +786,8 @@ namespace fNbt {
                     column++;
                 }
             }
-            return new NbtFormatException(
-                message + " at index " + index + " (line " + line + ", column " + column + ").", index);
+            return new SnbtParseException(
+                message + " at index " + index + " (line " + line + ", column " + column + ").", index, line, column);
         }
 
         #endregion
