@@ -25,8 +25,13 @@ namespace fNbt {
         // closest two-digit one
         const int MinDigits = 2;
 
-        // Past this many significant digits the BCL's reading is kept; nothing real is that long
+        // Digits kept before a sticky one stands in for the rest. No halfway point between two
+        // doubles has more than 767 significant digits, so nothing further down can change the
+        // rounding, and the arithmetic stays bounded whatever the text's length.
         const int MaxDigits = 800;
+
+        // Exponents stop counting here; the callers' cutoffs decide long before
+        const long ExponentCap = 1000000000;
 
         #region Formatting
 
@@ -136,25 +141,31 @@ namespace fNbt {
         // point, exponent and sign), starting from the BCL's reading, which is within a few units
         public static double CorrectDouble(string text, double parsed) {
             return BitConverter.Int64BitsToDouble(CorrectBits(text, BitConverter.DoubleToInt64Bits(parsed),
-                DoubleMantissaBits, DoubleMinExponent, -400));
+                DoubleMantissaBits, DoubleMinExponent, -400, 310));
         }
 
 
         public static float CorrectSingle(string text, float parsed) {
             return SingleFromBits(unchecked((int)CorrectBits(text, SingleBits(parsed),
-                SingleMantissaBits, SingleMinExponent, -60)));
+                SingleMantissaBits, SingleMinExponent, -60, 40)));
         }
 
 
         // Positive IEEE encodings are ordered integers, for both single and double precision.
-        static long CorrectBits(string text, long bits, int mantissaBits, int minExponent, int underflowCutoff) {
-            if (!Scan(text, out bool negative, out BigInteger digits, out int scale, out int digitCount)) return bits;
+        // A reading the runtime refused as overflow comes in as infinity and is decided from the
+        // largest finite value, against the halfway point above it.
+        static long CorrectBits(string text, long bits, int mantissaBits, int minExponent, int underflowCutoff, int overflowCutoff) {
+            Scan(text, out bool negative, out BigInteger digits, out long scale, out int digitCount);
             long magnitudeMask = mantissaBits == DoubleMantissaBits ? long.MaxValue : int.MaxValue;
             long sign = negative ? ~magnitudeMask : 0;
-            if (digits.IsZero || digitCount + scale < underflowCutoff) return sign;
-            bits &= magnitudeMask;
             ulong hiddenBit = 1UL << (mantissaBits - 1);
             long infinity = magnitudeMask - (long)(hiddenBit - 1);
+            // Far outside the format the magnitude alone decides, which also keeps the powers of
+            // ten below within reach
+            if (digits.IsZero || digitCount + scale < underflowCutoff) return sign;
+            if (digitCount + scale > overflowCutoff) return infinity | sign;
+            bits &= magnitudeMask;
+            if (bits >= infinity) bits = infinity - 1;
             for (int step = 0; step < 16 && bits < infinity; step++) {
                 int exponentField = (int)(bits >> (mantissaBits - 1));
                 ulong mantissa = (ulong)bits & (hiddenBit - 1);
@@ -163,7 +174,8 @@ namespace fNbt {
                     mantissa |= hiddenBit;
                     exponent = exponentField + minExponent - 1;
                 }
-                int side = Compare(digits, scale, mantissa, exponent, mantissaBits, minExponent);
+                // Within reach of the cutoffs above, the scale fits an int
+                int side = Compare(digits, (int)scale, mantissa, exponent, mantissaBits, minExponent);
                 if (side == 0) break;
                 bits += side;
             }
@@ -172,12 +184,9 @@ namespace fNbt {
 
 
         // Splits validated decimal text into its digits (as one integer) and their power of ten.
-        // False for anything this class should leave to the BCL.
-        static bool Scan(string text, out bool negative, out BigInteger digits, out int scale, out int digitCount) {
+        // Trailing zeros are dropped, and past MaxDigits a sticky one replaces the rest.
+        static void Scan(string text, out bool negative, out BigInteger digits, out long scale, out int digitCount) {
             negative = false;
-            digits = BigInteger.Zero;
-            scale = 0;
-            digitCount = 0;
             int pos = 0;
             if (pos < text.Length && (text[pos] == '-' || text[pos] == '+')) {
                 negative = text[pos] == '-';
@@ -189,19 +198,26 @@ namespace fNbt {
             pos = exponentAt < 0 ? text.Length : exponentAt;
             int pointAt = text.IndexOf('.', start, pos - start);
             int fraction = pointAt < 0 ? 0 : pos - pointAt - 1;
-            string mantissaText = text.Substring(start, pos - start).Replace(".", "");
-            mantissaText = mantissaText.TrimStart('0');
-            if (mantissaText.Length > MaxDigits) return false;
+            string mantissaText = text.Substring(start, pos - start).Replace(".", "").TrimStart('0');
+            int allDigits = mantissaText.Length;
+            mantissaText = mantissaText.TrimEnd('0');
+            if (mantissaText.Length > MaxDigits) mantissaText = mantissaText.Substring(0, MaxDigits) + "1";
             digitCount = mantissaText.Length;
-            digits = mantissaText.Length == 0 ? BigInteger.Zero : BigInteger.Parse(mantissaText, CultureInfo.InvariantCulture);
-            int exponent = 0;
-            if (pos < text.Length && (text[pos] == 'e' || text[pos] == 'E')) {
-                if (!int.TryParse(text.Substring(pos + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out exponent)) {
-                    return false;
+            digits = digitCount == 0 ? BigInteger.Zero : BigInteger.Parse(mantissaText, CultureInfo.InvariantCulture);
+            long exponent = 0;
+            if (pos < text.Length) {
+                int at = pos + 1;
+                bool exponentNegative = false;
+                if (at < text.Length && (text[at] == '-' || text[at] == '+')) {
+                    exponentNegative = text[at] == '-';
+                    at++;
                 }
+                for (; at < text.Length && exponent < ExponentCap; at++) {
+                    exponent = exponent * 10 + (text[at] - '0');
+                }
+                if (exponentNegative) exponent = -exponent;
             }
-            scale = exponent - fraction;
-            return true;
+            scale = exponent - fraction + (allDigits - digitCount);
         }
 
         #endregion

@@ -81,10 +81,42 @@ namespace fNbt.Test {
             Assert.AreEqual("1E-1", FloatingDecimal.ShortestDouble(0.1));
             Assert.AreEqual("3.0000000000000004E-1", FloatingDecimal.ShortestDouble(0.1 + 0.2));
 
-            // Texts left to the BCL's reading: a huge exponent, an absurd number of digits
-            Assert.AreEqual(1.0, FloatingDecimal.CorrectDouble("1e99999999999", 1.0));
-            Assert.AreEqual(1.0, FloatingDecimal.CorrectDouble(new string('9', 801), 1.0));
+            // Texts far outside the format are decided by their magnitude alone
+            Assert.IsTrue(double.IsPositiveInfinity(FloatingDecimal.CorrectDouble("1e99999999999", 1.0)));
+            Assert.IsTrue(double.IsPositiveInfinity(FloatingDecimal.CorrectDouble(new string('9', 801), 1.0)));
             Assert.AreEqual(0L, DoubleBits(FloatingDecimal.CorrectDouble("1e-500", 1.0)));
+        }
+
+
+        [TestMethod]
+        [Timeout(10000)]
+        public void ExtremeTextsRoundLikeIeeeWithoutTheRuntime() {
+            long maxDouble = DoubleBits(double.MaxValue);
+            int maxSingle = SingleBits(float.MaxValue);
+            // Just above the largest value but below the halfway point to infinity, which IEEE
+            // rounds down. .NET Framework reports these float texts as overflow, so the
+            // correction has to decide from infinity.
+            Assert.AreEqual(maxSingle, SingleBits(FloatingDecimal.CorrectSingle("3.4028235677973365e38", float.PositiveInfinity)));
+            Assert.AreEqual(maxSingle, SingleBits(FloatingDecimal.CorrectSingle("3.4028235677973366e38", float.PositiveInfinity)));
+            Assert.IsTrue(float.IsPositiveInfinity(FloatingDecimal.CorrectSingle("3.4028235677973367e38", float.PositiveInfinity)));
+            Assert.IsTrue(float.IsNegativeInfinity(FloatingDecimal.CorrectSingle("-3.4028235677973367e38", float.PositiveInfinity)));
+            Assert.AreEqual(maxDouble, DoubleBits(FloatingDecimal.CorrectDouble("1.7976931348623158E308", double.PositiveInfinity)));
+            Assert.IsTrue(double.IsPositiveInfinity(FloatingDecimal.CorrectDouble("1.7976931348623159E308", double.PositiveInfinity)));
+
+            // Exponents beyond int, including one whose scale overflowed int arithmetic and asked
+            // for a power of ten two billion digits long
+            Assert.AreEqual(0L, DoubleBits(FloatingDecimal.CorrectDouble("0.01e-2147483648", 0.0)));
+            Assert.AreEqual(long.MinValue, DoubleBits(FloatingDecimal.CorrectDouble("-1e-99999999999", 0.0)));
+            Assert.IsTrue(double.IsPositiveInfinity(FloatingDecimal.CorrectDouble("1e2147483647", double.PositiveInfinity)));
+            Assert.AreEqual(int.MinValue, SingleBits(FloatingDecimal.CorrectSingle("-0e-2147483648", 0f)));
+
+            // Padding with zeros or writing a thousand digits does not switch the correction off
+            long bits = -8238024276155674125;
+            string padded = "-8.394338450683387" + new string('0', 801) + "E-243";
+            Assert.AreEqual(bits, DoubleBits(FloatingDecimal.CorrectDouble(padded, BitConverter.Int64BitsToDouble(bits + 1))));
+            string thirds = "1." + new string('3', 900);
+            long third = DoubleBits(4.0 / 3);
+            Assert.AreEqual(third, DoubleBits(FloatingDecimal.CorrectDouble(thirds, BitConverter.Int64BitsToDouble(third + 1))));
         }
 
 

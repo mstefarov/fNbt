@@ -15,6 +15,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
+        [Timeout(10000)]
         public void NumbersParseToTheSameBitsOnEveryFramework() {
             Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0d").DoubleValue));
             Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0").DoubleValue));
@@ -26,6 +27,18 @@ namespace fNbt.Test {
             Assert.AreEqual(4588307191414157804, BitConverter.DoubleToInt64Bits(Parse("0.056526799757396023d").DoubleValue));
             Assert.AreEqual(1L, BitConverter.DoubleToInt64Bits(Parse("4.9E-324d").DoubleValue));
             Assert.AreEqual(1, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("1.4E-45f")).Value), 0));
+            // Just above the largest value but below the halfway point to infinity
+            int maxSingle = BitConverter.ToInt32(BitConverter.GetBytes(float.MaxValue), 0);
+            Assert.AreEqual(maxSingle, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("3.4028235677973365e38f")).Value), 0));
+            Assert.AreEqual(maxSingle, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("3.4028235677973366e38f")).Value), 0));
+            Assert.IsTrue(float.IsPositiveInfinity(((NbtFloat)Parse("3.4028235677973367e38f")).Value));
+            Assert.AreEqual(BitConverter.DoubleToInt64Bits(double.MaxValue), BitConverter.DoubleToInt64Bits(Parse("1.7976931348623158E308d").DoubleValue));
+            Assert.IsTrue(double.IsPositiveInfinity(Parse("1.7976931348623159E308d").DoubleValue));
+            // Absurd exponents and digit counts
+            Assert.AreEqual(0L, BitConverter.DoubleToInt64Bits(Parse("0.01e-2147483648d").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-1e-99999999999d").DoubleValue));
+            Assert.AreEqual(-8238024276155674125, BitConverter.DoubleToInt64Bits(
+                Parse("-8.394338450683387" + new string('0', 801) + "E-243d").DoubleValue));
         }
 
 

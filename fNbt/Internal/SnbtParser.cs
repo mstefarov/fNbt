@@ -189,17 +189,23 @@ namespace fNbt {
                              (hasDot ? "." + fraction : "") +
                              (hasExponent ? "e" + exponent : "");
             if (isFloat) {
-                if (!float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f)) return null;
-#if !NETCOREAPP
-                // .NET Framework's parser can land a unit off and drops the sign of zero
-                f = FloatingDecimal.CorrectSingle(cleaned, f);
+                bool parsed = float.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out float f);
+#if NETCOREAPP
+                if (!parsed) return null;
+#else
+                // .NET Framework's parser can land a unit off, drops the sign of zero, and reports
+                // overflow for texts just above the largest value that IEEE rounds down to it;
+                // the correction settles all three, from infinity when the runtime refused
+                f = FloatingDecimal.CorrectSingle(cleaned, parsed ? f : float.PositiveInfinity);
 #endif
                 if (float.IsInfinity(f)) return null;
                 return new NbtFloat(f);
             }
-            if (!double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return null;
-#if !NETCOREAPP
-            d = FloatingDecimal.CorrectDouble(cleaned, d);
+            bool parsedDouble = double.TryParse(cleaned, NumberStyles.Float, CultureInfo.InvariantCulture, out double d);
+#if NETCOREAPP
+            if (!parsedDouble) return null;
+#else
+            d = FloatingDecimal.CorrectDouble(cleaned, parsedDouble ? d : double.PositiveInfinity);
 #endif
             if (double.IsInfinity(d)) return null;
             return new NbtDouble(d);
