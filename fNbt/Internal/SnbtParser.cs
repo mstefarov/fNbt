@@ -800,7 +800,7 @@ namespace fNbt {
                 // whole budget below this list no longer fits under it
                 for (int i = 0; i < elements.Count; i++) {
                     if (list[i] != elements[i] && ContainerDepth(elements[i]) >= childDepthBudget) {
-                        throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), starts[mark + i]);
+                        throw Error(NbtFormatException.DepthLimitMessage.TrimEnd('.'), starts[mark + i]);
                     }
                 }
             }
@@ -934,7 +934,7 @@ namespace fNbt {
 
 
         int ConsumeDepthBudget(int depthBudget, int errorAt) {
-            if (depthBudget <= 0) throw Error(NbtTag.DepthLimitMessage.TrimEnd('.'), errorAt);
+            if (depthBudget <= 0) throw Error(NbtFormatException.DepthLimitMessage.TrimEnd('.'), errorAt);
             return depthBudget - 1;
         }
 

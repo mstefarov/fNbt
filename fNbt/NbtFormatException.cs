@@ -41,5 +41,13 @@ namespace fNbt {
         internal static NbtFormatException StringEncoding(Exception ex) {
             return new NbtFormatException("String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
         }
+
+
+        internal const string DepthLimitMessage =
+            "NBT tags are nested deeper than the supported limit (512 levels).";
+
+        internal static NbtFormatException DepthLimit() {
+            return new NbtFormatException(DepthLimitMessage);
+        }
     }
 }

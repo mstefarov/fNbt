@@ -392,7 +392,7 @@ namespace fNbt {
         void GoDown() {
             if (Depth > NbtTag.MaxDepth) {
                 state = ParseState.Error;
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+                throw NbtFormatException.DepthLimit();
             }
             if (nodes == null) {
                 nodes = new Node[4];

@@ -97,10 +97,18 @@ namespace fNbt {
         }
 
 
+        // Inlined by request: the tag type and every varint byte come through here, and neither
+        // JIT inlines it on its own once the exception is built inline.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte() {
             int value = stream.ReadByte();
-            if (value < 0) throw new EndOfStreamException();
+            if (value < 0) throw EndOfStream();
             return (byte)value;
+        }
+
+
+        static EndOfStreamException EndOfStream() {
+            return new EndOfStreamException();
         }
 
 
@@ -242,14 +250,18 @@ namespace fNbt {
         // The prefix is an unsigned 16-bit byte count in Java (valid up to 65,535 bytes), and
         // an unsigned varint in BedrockNetwork. Comparing as uint also rejects varint lengths
         // past int.MaxValue with a format error instead of an overflow.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int ReadStringLength(int limit) {
             uint length = useVarInt ? ReadUnsignedVarInt32() : (ushort)ReadInt16();
-            if (length > (uint)limit) {
-                throw new NbtFormatException(
-                    "Declared string length (" + length + " bytes) exceeds the configured limit (" +
-                    limit + " bytes).");
-            }
+            if (length > (uint)limit) throw StringLengthError(length, limit);
             return (int)length;
+        }
+
+
+        static NbtFormatException StringLengthError(uint length, int limit) {
+            return new NbtFormatException(
+                "Declared string length (" + length + " bytes) exceeds the configured limit (" +
+                limit + " bytes).");
         }
 
 
@@ -440,11 +452,12 @@ namespace fNbt {
         }
 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void FillBuffer(int numBytes) {
             int offset = 0;
             do {
                 int num = stream.Read(buffer, offset, numBytes - offset);
-                if (num == 0) throw new EndOfStreamException();
+                if (num == 0) throw EndOfStream();
                 offset += num;
             } while (offset < numBytes);
         }

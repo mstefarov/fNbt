@@ -315,7 +315,7 @@ namespace fNbt {
                 string tagName = readStream.ReadTagName();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
-                    if (!TryInsert(newTag)) ReplaceLoaded(newTag, readStream.RejectDuplicateNames);
+                    if (!TryInsert(newTag)) ReplaceLoaded(newTag, readStream);
                 }
             }
         }
@@ -325,6 +325,16 @@ namespace fNbt {
         internal void AddLoaded(NbtTag tag, bool rejectDuplicate) {
             tag.Parent = this;
             if (!TryInsert(tag)) ReplaceLoaded(tag, rejectDuplicate);
+        }
+
+
+        // The read loop's miss path hands over the reader rather than a flag read from it. The
+        // loop's code is the same either way; the shorter miss path moved the code that the
+        // Framework JIT lays out after this method, and a selector load read 6% slower with the
+        // flag. Layout luck, so measure this row again before touching the loop.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void ReplaceLoaded(NbtTag tag, NbtBinaryReader readStream) {
+            ReplaceLoaded(tag, readStream.RejectDuplicateNames);
         }
 
 

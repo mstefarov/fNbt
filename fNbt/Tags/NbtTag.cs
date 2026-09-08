@@ -12,9 +12,6 @@ namespace fNbt {
         // Matches Minecraft's own limit. Real NBT is nowhere near this deep.
         internal const int MaxDepth = 512;
 
-        internal const string DepthLimitMessage =
-            "NBT tags are nested deeper than the supported limit (512 levels).";
-
         /// <summary> Parent compound tag, either NbtList or NbtCompound, if any.
         /// May be <c>null</c> for detached tags. </summary>
         public NbtTag? Parent { get; internal set; }
@@ -118,8 +115,9 @@ namespace fNbt {
 
         // Called exactly once when a recursive walk enters a compound or list. Returning the
         // child budget makes the off-by-one rule common to reading, writing, cloning, and validation.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int ConsumeDepthBudget(int depthBudget) {
-            if (depthBudget <= 0) throw new NbtFormatException(DepthLimitMessage);
+            if (depthBudget <= 0) throw NbtFormatException.DepthLimit();
             return depthBudget - 1;
         }
 

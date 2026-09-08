@@ -848,7 +848,7 @@ namespace fNbt {
 
         void EnsureCanGoDown() {
             if (OpenContainerCount >= NbtTag.MaxDepth) {
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+                throw NbtFormatException.DepthLimit();
             }
         }
 
