@@ -6,6 +6,9 @@
 - Add NbtList.CreateMixed and UnwrapMixed for lists of mixed types, stored as
     Minecraft 1.21.5 stores them.
 - Add NbtByte.SignedValue, the value as the signed byte Minecraft stores.
+- A compound with a repeated tag name now loads with the last value in the
+    first tag's place, as every Minecraft version loads it, instead of failing.
+    ValidateOnRead still rejects it.
 - The first tag added to an empty NbtList now sets its type, so empty lists
     loaded from files accept tags. NbtComparer treats every empty list as
     equal, and an untyped empty list writes TAG_End instead of throwing.

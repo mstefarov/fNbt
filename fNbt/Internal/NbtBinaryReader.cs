@@ -62,6 +62,12 @@ namespace fNbt {
             }
         }
 
+        // ValidateOnRead: a repeated name in a compound is refused instead of replacing the
+        // earlier tag. The format's one rule that no flavor relaxes, so it does not wait on
+        // HasRestrictions like the ceilings below.
+        public bool RejectDuplicateNames { get; }
+
+
         public NbtBinaryReader(Stream input, NbtFlavor flavor,
                                long maxAllocation = long.MaxValue, bool validate = false) {
             if (input == null) throw new ArgumentNullException(nameof(input));
@@ -72,6 +78,7 @@ namespace fNbt {
             useVarInt = flavor.UsesVarInts;
             this.maxAllocation = maxAllocation;
             maxStringBytes = (int)Math.Min(int.MaxValue, maxAllocation);
+            RejectDuplicateNames = validate;
             if (validate && flavor.HasRestrictions) {
                 maxTagType = flavor.MaxTagType;
                 flavorMaxStringBytes = flavor.MaxStringBytes;

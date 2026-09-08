@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace fNbt {
@@ -314,11 +315,33 @@ namespace fNbt {
                 string tagName = readStream.ReadTagName();
                 newTag.name = tagName;
                 if (newTag.ReadTag(readStream, childDepthBudget)) {
-                    if (!TryInsert(newTag)) {
-                        throw new NbtFormatException("Duplicate tag name in compound: " + tagName);
-                    }
+                    if (!TryInsert(newTag)) ReplaceLoaded(newTag, readStream.RejectDuplicateNames);
                 }
             }
+        }
+
+
+        // Attaches a tag a reader decoded
+        internal void AddLoaded(NbtTag tag, bool rejectDuplicate) {
+            tag.Parent = this;
+            if (!TryInsert(tag)) ReplaceLoaded(tag, rejectDuplicate);
+        }
+
+
+        // A repeated name replaces the earlier tag in its slot, the last value at the first
+        // position, which is what Minecraft's own loader keeps and what ParseSnbt does;
+        // ValidateOnRead refuses it instead. Off the read loop's path: the loop inlines TryInsert
+        // and only a miss comes here.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void ReplaceLoaded(NbtTag tag, bool rejectDuplicate) {
+            if (rejectDuplicate) {
+                tag.Parent = null;
+                throw new NbtFormatException("Duplicate tag name in compound: " + tag.name);
+            }
+            int position = FindPosition(tag.name!);
+            items[position].Parent = null;
+            items[position] = tag;
+            version++;
         }
 
 

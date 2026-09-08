@@ -711,11 +711,11 @@ namespace fNbt {
                 parentAsList.Add(thisTag);
             } else if (parent is NbtCompound parentAsCompound) {
                 try {
-                    parentAsCompound.Add(thisTag);
-                } catch (ArgumentException) {
-                    // A duplicate name is malformed input, not a caller error.
+                    parentAsCompound.AddLoaded(thisTag, reader.RejectDuplicateNames);
+                } catch (NbtFormatException) {
+                    // A refused duplicate name is malformed input, not a caller error
                     state = ParseState.Error;
-                    throw new NbtFormatException("Duplicate tag name in compound: " + thisTag.Name);
+                    throw;
                 }
             } else {
                 // cannot happen unless NbtReader is bugged

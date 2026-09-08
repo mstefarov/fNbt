@@ -115,7 +115,7 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void DuplicateNamesInOneCompoundStillRejected() {
+        public void DuplicateNamesInOneCompoundStillDetected() {
             // Cached names must not bypass decoded-name duplicate detection
             byte[] doc;
             using (var ms = new MemoryStream()) {
@@ -125,7 +125,7 @@ namespace fNbt.Test {
                     writer.WriteByte("dup", 0);
                     writer.EndCompound();
                 }
-                // NbtWriter permits duplicate names; the tree reader must reject them.
+                // NbtWriter permits duplicate names; the tree reader must notice them.
                 writer.BeginCompound("duplicates");
                 writer.WriteByte("dup", 1);
                 writer.WriteByte("dup", 2);
@@ -140,7 +140,8 @@ namespace fNbt.Test {
             string firstName = reader.TagName;
             Assert.IsTrue(reader.ReadToFollowing());
             Assert.AreSame(firstName, reader.TagName);
-            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc));
+            Assert.AreEqual(2, TestFiles.Load(doc).RootTag.Get<NbtCompound>("duplicates")["dup"].ByteValue);
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, new NbtOptions { ValidateOnRead = true }));
         }
     }
 }

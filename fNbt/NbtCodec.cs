@@ -65,7 +65,7 @@ namespace fNbt {
             flavor = resolved.Flavor;
             maxAllocation = resolved.MaxAllocation;
             validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;
-            validateOnRead = resolved.ValidateOnRead && flavor.HasRestrictions;
+            validateOnRead = resolved.ValidateOnRead;
             requireCompoundRootOnRead = resolved.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
         }
 

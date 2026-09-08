@@ -57,8 +57,8 @@ namespace fNbt {
 
         /// <summary> Initial <see cref="ValidateOnRead"/> value for new options and for entry
         /// points constructed without options. Initially <c>false</c>. Enabling it process-wide
-        /// makes documents that merely bend a flavor's rules throw where they previously loaded,
-        /// even in code that did not opt in. </summary>
+        /// makes documents that merely bend a flavor's rules or repeat a name throw where they
+        /// previously loaded, even in code that did not opt in. </summary>
         public static bool DefaultValidateOnRead {
             get { return CurrentPolicy.ValidateOnRead; }
             set { ReplacePolicy(value, null, null); }
@@ -138,9 +138,11 @@ namespace fNbt {
         public NbtFlavor Flavor { get; set; }
 
         /// <summary> Whether reads enforce the flavor's conformance rules (permitted tag types,
-        /// string ceilings, and for <see cref="NbtCodec"/> the root tag type) in addition to
-        /// parsing. Initialized from <see cref="DefaultValidateOnRead"/>. When off, reads accept
-        /// anything parseable, so files that merely bend the rules still load. </summary>
+        /// string ceilings, and for <see cref="NbtCodec"/> the root tag type) and the format's
+        /// rule against a repeated name in a compound, in addition to parsing. Initialized from
+        /// <see cref="DefaultValidateOnRead"/>. When off, reads accept anything parseable, so
+        /// files that merely bend the rules still load, and a repeated name keeps the last value
+        /// in the first tag's place, the way Minecraft loads it. </summary>
         public bool ValidateOnRead { get; set; }
 
         /// <summary> Whether writes enforce the flavor's conformance rules, refusing to produce a
