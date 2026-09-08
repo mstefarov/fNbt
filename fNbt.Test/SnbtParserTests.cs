@@ -277,8 +277,13 @@ namespace fNbt.Test {
             CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
                                       ((NbtIntArray)Parse("uuid('123e4567-E89B-12d3-a456-426614174000')")).Value);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0\")")).Value);
-            // Java's UUID.fromString: any group width within 36 characters, a leading plus, masked to width
+            // Java's UUID.fromString: any number of digits per group within 36 characters, leading
+            // zeros included, a leading plus, masked to width
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0000000000001\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-00000000000000001\")")).Value);
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0 },
+                                      ((NbtIntArray)Parse("uuid(\"" + new string('0', 27) + "1-0-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 65535, -1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-07fffffffffffffff\")")).Value);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"+0-0-0-0-+1\")")).Value);
             CollectionAssert.AreEqual(new[] { 591751049, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"123456789-0-0-0-0\")")).Value);
             CollectionAssert.AreEqual(new[] { 0, 591724544, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-12345-0-0-0\")")).Value);
@@ -300,6 +305,8 @@ namespace fNbt.Test {
             Refuses("uuid(\"123e456g-e89b-12d3-a456-426614174000\")");
             Refuses("uuid(\"-0-0-0-0\")");
             Refuses("uuid(\"0-0-0-0-ffffffffffffffff\")");
+            Refuses("uuid(\"0-0-0-0-08000000000000000\")");
+            Refuses("uuid(\"" + new string('0', 28) + "1-0-0-0-0\")");
             Refuses("uuid(\"0-0-0-0-\")");
             Refuses("uuid(\"0-0-0-0-0-0\")");
             Refuses("uuid(\"123e4567-e89b-12d3-a456-4266141740000\")");
@@ -454,11 +461,57 @@ namespace fNbt.Test {
             Assert.AreEqual(NbtTagType.Byte, tag.TagType);
             Assert.AreEqual(6, consumed);
 
+            // A reading the whitespace spoiled, as a leading zero, an overflow or a range
+            // failure, is taken again without it too
+            tag = NbtTag.ParseSnbt("0 1", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(0, tag.IntValue);
+            Assert.AreEqual(1, consumed);
+            tag = NbtTag.ParseSnbt("1.5 e999", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Double, tag.TagType);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+            tag = NbtTag.ParseSnbt("300 b", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(300, tag.IntValue);
+            Assert.AreEqual(3, consumed);
+            tag = NbtTag.ParseSnbt("1s bx", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Short, tag.TagType);
+            Assert.AreEqual(2, consumed);
+            // Glued to the number, the overflow is the old parser's infinity
+            tag = NbtTag.ParseSnbt("1.5e999 x", 0, out consumed);
+            Assert.IsTrue(double.IsPositiveInfinity(tag.DoubleValue));
+            Assert.AreEqual(7, consumed);
+
             // A whole-text parse refuses the word instead of misreading the number
             StringAssert.Contains(Refuses("1.5 foo").Message, "trailing");
             StringAssert.Contains(Refuses("5 bx").Message, "trailing");
             // Glued characters still make the old-era string
             Assert.AreEqual("1.5fx", Parse("1.5fx").StringValue);
+        }
+
+
+        [TestMethod]
+        public void IndexOverloadReadsAPrefixTheWayItsOwnTextReads() {
+            // Whatever follows a value must not change it: the tag the index overload returns is
+            // the one a whole-text parse of the consumed characters gives
+            string[] texts = {
+                "0 1", "0 x", "0 xg", "0 07", "0 1 2", "0 bx", "0 x1z", "0x 1", "0b 1", "0 b 1", "0 b1 b",
+                "1 e999", "1e999 x", "1.5 e999", "1.5 e999d", "1.5e999 x", "1.5 e", "1.5 e x", "1e x",
+                "1.5 e+ 2", "1 .5", "1 . 5", "1 .", "1 .5x", ".5 .5", "1. e5", "- 1", "- 1x", "-",
+                "1 _0", "1_ 0", "1 s", "1 u s", "1 us x", "1s b", "1s bx", "1 l1", "1L L", "1 f", "1.5 F x",
+                "300 b", "-129 b", "255 b", "4294967296 i", "9999999999 1", "007 1", "1abc d", "1.5fx 1",
+                "true x", "truex", "NaNf x", "-Infinityd,", "Infinity d", "\"a\" b", "'a'b", "\"a\\\"b\"c",
+                "{a:1} x", "{a:1}}", "{ a : 1 , } b", "[1,2]]", "[1, 2 ] ,", "[B;1b] x", "[I; 0, 1 ]x",
+                "bool(1) x", "bool (1)x", "bool x", "uuid (\"0-0-0-0-0\") z", "\uFEFF1 2", "a-b c",
+            };
+            foreach (string text in texts) {
+                NbtTag prefix = NbtTag.ParseSnbt(text, 0, out int consumed);
+                Assert.IsTrue(consumed > 0 && consumed <= text.Length, text);
+                NbtTag whole = Parse(text.Substring(0, consumed));
+                Assert.AreEqual(whole.TagType, prefix.TagType, text);
+                Assert.AreEqual(whole.ToSnbt(), prefix.ToSnbt(), text);
+            }
         }
 
 

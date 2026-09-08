@@ -68,21 +68,20 @@ namespace fNbt {
         NbtTag ReadUnquoted(int depthBudget) {
             int start = pos;
             if (CanStartNumber(text[pos])) {
+                numberSpaced = false;
                 NbtTag? number = TryReadNumber(NbtTagType.Int);
-                if (number != null) {
-                    if (!RunsIntoToken()) return number;
-                    // The whitespace the grammar allows inside a number can carry it into the next
-                    // word: 1.5 foo took the f as a suffix. Read it again without that whitespace
-                    // so the word stays separate. A number that runs straight into more token
-                    // characters (1abc, 1.5.2, 1bx) is an old-era string, not a number plus
-                    // trailing data.
-                    if (HasWhitespace(start, pos)) {
-                        pos = start;
-                        spacedNumbers = false;
-                        number = TryReadNumber(NbtTagType.Int);
-                        spacedNumbers = true;
-                        if (number != null && !RunsIntoToken()) return number;
-                    }
+                if (number != null && !RunsIntoToken()) return number;
+                // The whitespace the grammar allows inside a number can carry it into the next
+                // word: 1.5 foo took the f as a suffix, 0 1 read as a leading zero, 1.5 e999
+                // overflowed. Read it again without that whitespace so the word stays separate.
+                // A number that runs straight into more token characters (1abc, 1.5.2, 1bx) is
+                // an old-era string, not a number plus trailing data.
+                if (numberSpaced) {
+                    pos = start;
+                    spacedNumbers = false;
+                    number = TryReadNumber(NbtTagType.Int);
+                    spacedNumbers = true;
+                    if (number != null && !RunsIntoToken()) return number;
                 }
                 pos = start;
             }
@@ -114,14 +113,6 @@ namespace fNbt {
         }
 
 
-        bool HasWhitespace(int start, int end) {
-            for (int i = start; i < end; i++) {
-                if (IsWhitespace(text[i])) return true;
-            }
-            return false;
-        }
-
-
         static bool CanStartNumber(char c) {
             return (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
         }
@@ -137,21 +128,26 @@ namespace fNbt {
 
         #region Numbers
 
+        // Whitespace the modern grammar allows between the parts of a number; off while a number
+        // that ran into the next word is read again, which only helps when the first reading
+        // skipped some
+        bool spacedNumbers = true;
+        bool numberSpaced;
+
+        void SkipNumberWhitespace() {
+            if (!spacedNumbers) return;
+            int before = pos;
+            SkipWhitespace();
+            if (pos != before) numberSpaced = true;
+        }
+
+
         // The modern number grammar: sign, then a float form (a dot, an exponent or an f/d suffix)
         // or an integer form (decimal, 0x hex, 0b binary, underscores, an optional signedness letter
         // before the type letter). An unsuffixed integer takes defaultType: int on its own, the
         // element type inside an array. Whitespace is skipped before every part, as the game's
         // terminals do. Returns null, with pos unspecified, when the text is not a modern number;
         // the caller rewinds and falls back to the old reading.
-        // Whitespace the modern grammar allows between the parts of a number; off while a number
-        // that ran into the next word is read again
-        bool spacedNumbers = true;
-
-        void SkipNumberWhitespace() {
-            if (spacedNumbers) SkipWhitespace();
-        }
-
-
         NbtTag? TryReadNumber(NbtTagType defaultType) {
             bool negative = false;
             if (text[pos] == '+' || text[pos] == '-') {
@@ -359,6 +355,7 @@ namespace fNbt {
                 // The game skips whitespace before every terminal, the type letter included
                 int letterAt = pos + 1;
                 while (signedness && spacedNumbers && letterAt < text.Length && IsWhitespace(text[letterAt])) letterAt++;
+                if (letterAt > pos + 1) numberSpaced = true;
                 if (signedness && letterAt < text.Length && TryTypeLetter(text[letterAt], out NbtTagType prefixed)) {
                     unsigned = c == 'u' || c == 'U';
                     type = prefixed;
@@ -656,8 +653,9 @@ namespace fNbt {
 
 
         // Java's UUID.fromString, which the game's uuid() calls: at most 36 characters, exactly
-        // five groups between dashes, each an optional plus sign and 1 to 16 hex digits that fit
-        // a signed long, masked to the group's width (32, 16, 16, 16 and 48 bits)
+        // five groups between dashes, each an optional plus sign and any number of hex digits
+        // (leading zeros included) whose value fits a signed long, masked to the group's width
+        // (32, 16, 16, 16 and 48 bits)
         static bool TryParseUuid(string value, out int[] words) {
             words = new int[4];
             if (value.Length > 36) return false;
@@ -667,13 +665,12 @@ namespace fNbt {
             for (int i = 0; i < 5; i++) {
                 string group = groups[i];
                 int start = group.Length > 0 && group[0] == '+' ? 1 : 0;
-                if (group.Length - start < 1 || group.Length - start > 16) return false;
+                if (group.Length == start) return false;
                 for (int j = start; j < group.Length; j++) {
                     char c = group[j];
-                    if (!IsDigit(c, 16)) return false;
+                    if (!IsDigit(c, 16) || parts[i] > (long.MaxValue >> 4)) return false;
                     parts[i] = parts[i] * 16 + (ulong)(c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10);
                 }
-                if (parts[i] > long.MaxValue) return false;
             }
             ulong high = ((parts[0] & 0xffffffffUL) << 32) | ((parts[1] & 0xffffUL) << 16) | (parts[2] & 0xffffUL);
             ulong low = ((parts[3] & 0xffffUL) << 48) | (parts[4] & 0xffffffffffffUL);
