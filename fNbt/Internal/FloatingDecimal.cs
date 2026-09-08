@@ -26,13 +26,16 @@ namespace fNbt {
         // closest two-digit one
         const int MinDigits = 2;
 
-        // Digits kept before a sticky one stands in for the rest. No halfway point between two
-        // doubles has more than 767 significant digits, so nothing further down can change the
-        // rounding, and the arithmetic stays bounded whatever the text's length.
+        // Digits kept before a sticky one stands in for the rest. Rounding a text correctly means
+        // comparing it with the halfway point between two doubles, and the longest halfway point
+        // has 767 significant digits, so nothing past that can change the answer. 800 leaves
+        // margin and bounds the arithmetic whatever the text's length.
         const int MaxDigits = 800;
 
-        // Exponents stop counting here; the callers' cutoffs decide long before
-        const long ExponentCap = 1000000000;
+        // Exponent digits stop counting here. An exponent this large is decided by the magnitude
+        // cutoffs in CorrectBits before any power of ten is built, so the value only has to sit
+        // beyond those cutoffs and well inside a long.
+        const long ExponentCap = 10000;
 
         #region Formatting
 
@@ -139,7 +142,11 @@ namespace fNbt {
         #region Parsing
 
         // The correctly rounded double for a decimal text ("-12.5e-3", digits and an optional
-        // point, exponent and sign), starting from the BCL's reading, which is within a few units
+        // point, exponent and sign), starting from the BCL's reading, which is within a few units.
+        // The cutoffs are where the magnitude alone decides: a leading digit past 10^310 is
+        // infinity and one below 10^-400 is zero. They sit outside the format's range (1.8E308
+        // down to 4.9E-324, and 3.4E38 down to 1.4E-45 for singles) so texts near the edges
+        // still get the exact comparison.
         public static double CorrectDouble(string text, double parsed) {
             return BitConverter.Int64BitsToDouble(CorrectBits(text, BitConverter.DoubleToInt64Bits(parsed),
                 DoubleMantissaBits, DoubleMinExponent, -400, 310));
@@ -161,8 +168,8 @@ namespace fNbt {
             long sign = negative ? ~magnitudeMask : 0;
             ulong hiddenBit = 1UL << (mantissaBits - 1);
             long infinity = magnitudeMask - (long)(hiddenBit - 1);
-            // Far outside the format the magnitude alone decides, which also keeps the powers of
-            // ten below within reach
+            // Outside the cutoffs the magnitude alone decides, which also bounds the powers of ten
+            // the comparison below can ask for
             if (digits.IsZero || digitCount + scale < underflowCutoff) return sign;
             if (digitCount + scale > overflowCutoff) return infinity | sign;
             bits &= magnitudeMask;
@@ -261,6 +268,7 @@ namespace fNbt {
             }
         }
 
+        // Up to the largest power the cutoffs let through: about MaxDigits plus the range
         static readonly CachedPower?[] powersOfTen = new CachedPower?[1300];
 
         static BigInteger Pow10(int power) {
