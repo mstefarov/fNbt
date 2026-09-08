@@ -5,12 +5,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace fNbt {
-    // Reads SNBT text into a tag tree. The grammar is Minecraft Java 1.21.5's, widened wherever an
-    // older game version or a common tool produces something 1.21.5 rejects, as long as text the
-    // modern game accepts keeps its meaning: an unquoted token that is not a modern number falls back
-    // to the old (1.12 to 1.21.4) reading, which made it a string or an infinity; suffixed
-    // NaN and Infinity read as numbers; empty quoted keys are allowed; mixed lists become the
-    // wrapper compounds the game stores on disk.
+    // Reads SNBT text into a tag tree. The grammar is Minecraft Java 1.21.5's, widened to understand
+    // older game versions and common tools. For example:
+    // - an unquoted token that is not a modern number falls back to the old (1.12 to 1.21.4) reading,
+    //   which made it a string or an infinity
+    // - suffixed NaN and Infinity read as numbers
+    // - empty quoted keys are allowed
+    // - mixed lists become the wrapper compounds the game stores on disk.
     internal sealed class SnbtParser {
         readonly string text;
         int pos;
@@ -71,11 +72,14 @@ namespace fNbt {
                 numberSpaced = false;
                 NbtTag? number = TryReadNumber(NbtTagType.Int);
                 if (number != null && !RunsIntoToken()) return number;
-                // The whitespace the grammar allows inside a number can carry it into the next
-                // word: 1.5 foo took the f as a suffix, 0 1 read as a leading zero, 1.5 e999
-                // overflowed. Read it again without that whitespace so the word stays separate.
+                // The whitespace the grammar allows inside a number can carry it into the next word,
+                // which might cause problems like:
+                // - "1.5 foo" took the f as a suffix
+                // - "0 1" read as a leading zero
+                // - "1.5 e999" overflowed
+                // Read it again without that whitespace so the word stays separate.
                 // A number that runs straight into more token characters (1abc, 1.5.2, 1bx) is
-                // an old-era string, not a number plus trailing data.
+                // an old-era unquoted string, not a number plus trailing data.
                 if (numberSpaced) {
                     pos = start;
                     spacedNumbers = false;
@@ -128,7 +132,7 @@ namespace fNbt {
 
         #region Numbers
 
-        // Whitespace the modern grammar allows between the parts of a number; off while a number
+        // Modern grammar allows whitespace between the parts of a number; off while a number
         // that ran into the next word is read again, which only helps when the first reading
         // skipped some
         bool spacedNumbers = true;
@@ -145,8 +149,8 @@ namespace fNbt {
         // The modern number grammar: sign, then a float form (a dot, an exponent or an f/d suffix)
         // or an integer form (decimal, 0x hex, 0b binary, underscores, an optional signedness letter
         // before the type letter). An unsuffixed integer takes defaultType: int on its own, the
-        // element type inside an array. Whitespace is skipped before every part, as the game's
-        // terminals do. Returns null, with pos unspecified, when the text is not a modern number;
+        // element type inside an array. Whitespace is skipped before every part.
+        // Returns null, with pos unspecified, when the text is not a modern number;
         // the caller rewinds and falls back to the old reading.
         NbtTag? TryReadNumber(NbtTagType defaultType) {
             bool negative = false;
@@ -297,8 +301,10 @@ namespace fNbt {
         }
 
 
-        // The modern integer grammar, folded straight from the text into the value the literal's
-        // type carries on the wire, sign extended: 255b, 255ub and -1b are all -1
+        // The modern integer grammar, accumulated digit by digit while scanning rather than parsed
+        // from a substring. The value is the bits the literal's type stores on the wire, sign
+        // extended to a long: the wire byte is signed, so 255b, 255ub and -1b all come out as -1,
+        // and TryReadInteger casts that back to the unsigned NbtByte.Value.
         bool TryReadIntegerValue(bool negative, NbtTagType defaultType, out long value, out NbtTagType type) {
             value = 0;
             type = defaultType;
