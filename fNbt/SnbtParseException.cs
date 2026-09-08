@@ -1,8 +1,9 @@
 using System;
 
 namespace fNbt {
-    /// <summary> Exception thrown by <see cref="NbtTag.ParseSnbt(string)"/> when the text is not
-    /// SNBT. Carries where parsing stopped; catching <see cref="NbtFormatException"/> catches it too. </summary>
+    /// <summary> Exception thrown by <see cref="NbtTag.ParseSnbt(string)"/> when the text
+    /// is not valid SNBT. Carries where parsing stopped.
+    /// Catching <see cref="NbtFormatException"/> catches it too. </summary>
     [Serializable]
     public sealed class SnbtParseException : NbtFormatException {
         /// <summary> Zero-based index into the text where parsing failed. </summary>

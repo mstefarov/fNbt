@@ -301,8 +301,8 @@ namespace fNbt {
         }
 
 
-        // The modern integer grammar, accumulated digit by digit while scanning rather than parsed
-        // from a substring. The value is the bits the literal's type stores on the wire, sign
+        // The modern integer grammar, accumulated digit by digit while scanning.
+        // The value is the bits the literal's type stores on the wire, sign
         // extended to a long: the wire byte is signed, so 255b, 255ub and -1b all come out as -1,
         // and TryReadInteger casts that back to the unsigned NbtByte.Value.
         bool TryReadIntegerValue(bool negative, NbtTagType defaultType, out long value, out NbtTagType type) {
@@ -438,7 +438,7 @@ namespace fNbt {
 
         // Moves past a run of digits in the given radix with underscores between them. Returns
         // the digit count, 0 when none is present, or -1 when an underscore starts or ends the
-        // run, which no reading accepts.
+        // run (not allowed).
         int ScanDigitRun(int radix) {
             int start = pos;
             int digits = 0;
@@ -609,8 +609,8 @@ namespace fNbt {
 
         #region Operations
 
-        // pos is just past the opening parenthesis. A call nests like a container, so it spends
-        // depth like one.
+        // pos is just past the opening parenthesis.
+        // A call nests like a container, so it spends depth like one.
         NbtTag ReadOperation(string name, int errorAt, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             List<NbtTag> args = new List<NbtTag>();

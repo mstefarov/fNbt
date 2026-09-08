@@ -10,8 +10,8 @@ namespace fNbt {
 
         /// <summary> One line with a space after every comma and colon:
         /// <c>{a: 1, b: [1, 2], c: [B; 1B, 2B]}</c>. What <c>/data get</c> prints in chat and the
-        /// default display of NBT Studio, nbtlib, Amulet and mecha; the readable single-line form for
-        /// logs and user interfaces. </summary>
+        /// default display of NBT Studio, nbtlib, Amulet, and mecha; the readable single-line form
+        /// for logs and user interfaces. </summary>
         Spaced,
 
         /// <summary> Multiple lines, four-space indentation, one member per line as
