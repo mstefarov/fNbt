@@ -1,12 +1,12 @@
-#if !FNBT_BASELINE
+#if !FNBT_BASELINE_2_0
 using BenchmarkDotNet.Attributes;
 
 namespace fNbt.Benchmarks;
 
 // SNBT text over the two realistic inputs: the ClassicWorld metadata subtree (~9,300 small tags,
 // mostly names and small numbers) and the Bedrock block palette (16,913 compound roots, quoted
-// strings and ints). ToSnbt and ParseSnbt postdate 2.0.0, so this cannot run against a baseline.
-[BenchmarkCategory(Program.BaselineIncompatible)]
+// strings and ints). ToSnbt and ParseSnbt postdate 2.0.0, so this needs a 2.1 baseline.
+[BenchmarkCategory(Program.Baseline20Incompatible)]
 public class SnbtBenchmarks {
     static readonly SnbtOptions Indented = new SnbtOptions { WriteLayout = SnbtLayout.Indented };
 

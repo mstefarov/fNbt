@@ -17,6 +17,7 @@ namespace fNbt.Benchmarks;
 
 class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
+    public const string Baseline20Incompatible = "Baseline20Incompatible";
 
 #if NETFRAMEWORK
     // BenchmarkDotNet's in-place Framework toolchain omits TargetFrameworkAttribute, enabling
@@ -54,8 +55,11 @@ class Program {
 
         // Benchmarks using 2.0 APIs can't compile against a 1.x baseline package. Source #if
         // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
-        if (customArgs.BaselineVersion != null && IsPre2(customArgs.BaselineVersion)) {
+        if (customArgs.BaselineVersion != null && IsBelow(customArgs.BaselineVersion, 2, 0)) {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
+        }
+        if (customArgs.BaselineVersion != null && IsBelow(customArgs.BaselineVersion, 2, 1)) {
+            initialConfig.AddFilter(new ExcludeCategoryFilter(Baseline20Incompatible));
         }
 
         if (customArgs.ServerGc && customArgs.BaselineVersion == null) {
@@ -132,9 +136,12 @@ class Program {
             || arg.Equals("--version", StringComparison.OrdinalIgnoreCase));
     }
 
-    // Mirrors the FNBT_BASELINE condition in the csproj
-    static bool IsPre2(string version) {
-        return int.TryParse(version.Split('.')[0], out int major) && major < 2;
+    // Mirrors the FNBT_BASELINE conditions in the csproj, which ignore a prerelease label too
+    static bool IsBelow(string version, int major, int minor) {
+        string[] parts = version.Split('-', '+')[0].Split('.');
+        return int.TryParse(parts[0], out int actualMajor)
+            && int.TryParse(parts.Length > 1 ? parts[1] : "0", out int actualMinor)
+            && (actualMajor < major || actualMajor == major && actualMinor < minor);
     }
 }
 
