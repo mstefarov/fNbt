@@ -425,18 +425,18 @@ namespace fNbt {
         /// <see cref="SnbtOptions.DefaultWriteLayout"/>. The tag's <see cref="Name"/> is not written:
         /// SNBT has no root name, and tags inside a compound are written with their keys already. </summary>
         /// <remarks> The text is readable by every Minecraft Java version since 1.12 and by the
-        /// common NBT tools: strings are always quoted, with the delimiter Minecraft would choose and
-        /// only that delimiter and backslashes escaped; keys are bare when they consist of letters,
-        /// digits and <c>._+-</c>, start with a letter, <c>.</c> or <c>_</c>, and are not <c>true</c>
-        /// or <c>false</c>; numbers carry Java's suffixes and spelling (<c>1b</c>, <c>1s</c>, <c>1L</c>,
-        /// <c>1.0f</c>, <c>1.0E7d</c>), with bytes signed the way Minecraft stores them (a
-        /// <see cref="NbtByte.Value"/> of 255 prints as <c>-1b</c>, its <see cref="NbtByte.SignedValue"/>);
-        /// compounds keep insertion order. Inside a list of compounds, a
-        /// one-entry compound whose key is empty prints as its value, the form Minecraft 1.21.5 and
-        /// later store on disk for lists of mixed types (<see cref="NbtList.UnwrapMixed"/> reads the
-        /// same way). Two things no Minecraft version reads back:
-        /// <c>NaN</c> and infinities, printed as <c>NaNf</c> or <c>Infinityd</c> the way Minecraft
-        /// prints them, and an empty key. <see cref="ParseSnbt(string)"/> reads both. </remarks>
+        /// common NBT tools: strings are always in double quotes, the only delimiter Minecraft 1.12
+        /// and 1.13 read, with just the quote and backslashes escaped; keys are bare when they
+        /// consist of letters, digits and <c>._+-</c>, start with a letter, <c>.</c> or <c>_</c>,
+        /// and are not <c>true</c> or <c>false</c>; numbers carry Java's suffixes and spelling
+        /// (<c>1b</c>, <c>1s</c>, <c>1L</c>, <c>1.0f</c>, <c>1.0E7d</c>), with bytes signed the way
+        /// Minecraft stores them (a <see cref="NbtByte.Value"/> of 255 prints as <c>-1b</c>, its
+        /// <see cref="NbtByte.SignedValue"/>); compounds keep insertion order. Inside a list of
+        /// compounds, a one-entry compound whose key is empty prints as its value, the form
+        /// Minecraft 1.21.5 and later store on disk for lists of mixed types
+        /// (<see cref="NbtList.UnwrapMixed"/> reads the same way). Two things no Minecraft version
+        /// reads back: <c>NaN</c> and infinities, printed as <c>NaNf</c> or <c>Infinityd</c> the way
+        /// Minecraft prints them, and an empty key. <see cref="ParseSnbt(string)"/> reads both. </remarks>
         /// <returns> The SNBT text. </returns>
         /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
         public string ToSnbt() {

@@ -3,7 +3,8 @@ using System.Globalization;
 using System.Threading;
 
 namespace fNbt.Test {
-    // NbtTag.ToSnbt: the fixed output shape (Minecraft's own compact form apart from key order),
+    // NbtTag.ToSnbt: the fixed output shape (Minecraft's own compact form apart from key order
+    // and the quote choice),
     // number spelling on both targets, the three layouts, wrapper unwrapping, and the depth cap.
     // Expected texts come from running Minecraft 1.21.4 and 26.2's own printers (tools/snbt-harness).
     [TestClass]
@@ -127,15 +128,17 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void StringsAreAlwaysQuotedWithMinecraftsQuoteChoice() {
+        public void StringsAreAlwaysDoubleQuoted() {
             Assert.AreEqual("\"\"", Snbt(new NbtString("")));
             Assert.AreEqual("\"a\"", Snbt(new NbtString("a")));
             Assert.AreEqual("\"a b\"", Snbt(new NbtString("a b")));
-            Assert.AreEqual("'a\"b'", Snbt(new NbtString("a\"b")));
+            // Even where Minecraft's own printer would switch to single quotes, which 1.12 and
+            // 1.13 cannot read
+            Assert.AreEqual("\"a\\\"b\"", Snbt(new NbtString("a\"b")));
             Assert.AreEqual("\"a'b\"", Snbt(new NbtString("a'b")));
-            Assert.AreEqual("'a\"b\\'c'", Snbt(new NbtString("a\"b'c")));
+            Assert.AreEqual("\"a\\\"b'c\"", Snbt(new NbtString("a\"b'c")));
             Assert.AreEqual("\"a'b\\\"c\"", Snbt(new NbtString("a'b\"c")));
-            Assert.AreEqual("'\"'", Snbt(new NbtString("\"")));
+            Assert.AreEqual("\"\\\"\"", Snbt(new NbtString("\"")));
             Assert.AreEqual("\"'\"", Snbt(new NbtString("'")));
             Assert.AreEqual("\"\\\\\"", Snbt(new NbtString("\\")));
             Assert.AreEqual("\"a\\\\b\"", Snbt(new NbtString("a\\b")));
@@ -162,7 +165,7 @@ namespace fNbt.Test {
                                 new NbtInt("1", 1), new NbtInt("1a", 1), new NbtInt("-a", 1), new NbtInt("+a", 1),
                                 new NbtInt("0", 1), new NbtInt("true", 1), new NbtInt("FALSE", 1), new NbtInt("", 1)
                             }));
-            Assert.AreEqual("{\"a b\":1,'a\"b':1,\"a'b\":1,\"\u00e9\":1,\"a:b\":1,\"a\\\\b\":1,\"a\nb\":1}",
+            Assert.AreEqual("{\"a b\":1,\"a\\\"b\":1,\"a'b\":1,\"\u00e9\":1,\"a:b\":1,\"a\\\\b\":1,\"a\nb\":1}",
                             Snbt(new NbtCompound {
                                 new NbtInt("a b", 1), new NbtInt("a\"b", 1), new NbtInt("a'b", 1),
                                 new NbtInt("\u00e9", 1), new NbtInt("a:b", 1), new NbtInt("a\\b", 1),

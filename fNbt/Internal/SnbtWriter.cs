@@ -5,9 +5,9 @@ using System.Text;
 namespace fNbt {
     // Prints a tag tree as SNBT text in one of the SnbtLayout shapes. The shape is the common
     // denominator of what Minecraft Java has read since 1.12 and what the NBT tools read: values
-    // always quoted with the game's own quote choice and only the delimiter and backslash escaped,
-    // keys bare only when no parser could take them for anything else, Java's number spelling and
-    // suffixes, insertion order.
+    // always in double quotes with only the quote and backslash escaped, keys bare only when no
+    // parser could take them for anything else, Java's number spelling and suffixes, insertion
+    // order.
     internal static class SnbtWriter {
         const string IndentUnit = "    ";
 
@@ -202,25 +202,17 @@ namespace fNbt {
 
         #region Strings and keys
 
-        // Minecraft's StringTag.quoteAndEscape: the first quote character in the value picks the
-        // other one as delimiter, and only the delimiter and backslashes are escaped. Control
-        // characters go out raw, which every version reads; the 1.21.5+ escapes would not be.
+        // Double quotes always, where Minecraft's own printer switches to single quotes around a
+        // value holding a double quote: 1.12 and 1.13 read no other delimiter. Only the quote and
+        // backslashes are escaped. Control characters go out raw, which every version reads; the
+        // 1.21.5+ escapes would not be.
         internal static void AppendQuoted(StringBuilder sb, string value) {
-            char quote = '"';
+            sb.Append('"');
             foreach (char c in value) {
-                if (c == '"') {
-                    quote = '\'';
-                    break;
-                } else if (c == '\'') {
-                    break;
-                }
-            }
-            sb.Append(quote);
-            foreach (char c in value) {
-                if (c == quote || c == '\\') sb.Append('\\');
+                if (c == '"' || c == '\\') sb.Append('\\');
                 sb.Append(c);
             }
-            sb.Append(quote);
+            sb.Append('"');
         }
 
 
