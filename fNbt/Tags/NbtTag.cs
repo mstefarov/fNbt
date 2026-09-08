@@ -490,7 +490,9 @@ namespace fNbt {
         /// <param name="text"> Text containing the SNBT value. </param>
         /// <param name="index"> Position at which the value starts; leading whitespace is skipped. </param>
         /// <param name="charsConsumed"> Number of characters from <paramref name="index"/> to the end
-        /// of the value. </param>
+        /// of the value, so that <paramref name="index"/> plus this count is the position right
+        /// after the value. Whitespace before the value is counted; whitespace after it is not
+        /// consumed. </param>
         /// <returns> The parsed tag, unnamed. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="text"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is negative or past

@@ -361,6 +361,11 @@ namespace fNbt.Test {
             Assert.AreEqual(6, consumed);
             Assert.AreEqual("a", NbtTag.ParseSnbt("a b", 0, out consumed).StringValue);
             Assert.AreEqual(1, consumed);
+            // Whitespace before the value counts, whitespace after it is left alone
+            Assert.AreEqual(1, NbtTag.ParseSnbt(" \t1 \n", 0, out consumed).IntValue);
+            Assert.AreEqual(3, consumed);
+            NbtTag.ParseSnbt("{} ", 0, out consumed);
+            Assert.AreEqual(2, consumed);
             SnbtParseException ex = Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt("x {", 2, out consumed));
             Assert.AreEqual(3, ex.Index);
             Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", 2, out consumed));
