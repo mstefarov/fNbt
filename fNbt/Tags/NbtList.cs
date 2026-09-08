@@ -14,8 +14,9 @@ namespace fNbt {
 
         internal readonly List<NbtTag> tags;
 
-        // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
-        // of a corrupt length. Longer lists grow as they go, unless the input can vouch for the count.
+        // Real lists are small, and a 5-byte list header should not be able to force a large
+        // allocation out of a corrupt length. Longer lists grow as they go, unless the input can
+        // vouch for the count.
         const int MaxPresizedCapacity = 16;
 
         /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type.
@@ -371,11 +372,8 @@ namespace fNbt {
         }
 
 
-        // Minecraft's rules for the list of mixed types the wire cannot hold. On save, a list
-        // whose elements are compounds or of mixed types wraps every element that is not a plain
-        // compound in a compound under an empty key, wrapper-shaped compounds included; on load,
-        // one such wrapper comes off each element of a compound list. The SNBT parser and writer
-        // apply the same two rules.
+        // A mixed list goes on the wire as a list of compounds, which is Minecraft's own save rule
+        // and the one CreateMixed, UnwrapMixed and the SNBT layer follow.
         static NbtTagType RawElementType(IEnumerable<NbtTag> elements) {
             NbtTagType type = NbtTagType.End;
             foreach (NbtTag element in elements) {

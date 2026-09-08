@@ -9,10 +9,9 @@ namespace fNbt {
     // prints: the fewest digits that read back as the value, but never fewer than two, the closest
     // such decimal, a tie going to the even digit. .NET Core's own shortest form agrees for every
     // normal value and differs only for the smallest subnormals, where one digit would do. .NET
-    // Framework is not correctly rounded in either direction (measured 2026-09-06 on 300,000
-    // random doubles: Parse lands one unit off for 0.4% of shortest texts, ToString past 15 digits
-    // is often wrong, and zero loses its sign both ways). The netstandard2.0 build routes SNBT
-    // numbers through this class both ways; net8.0 uses the runtime. This class is compiled
+    // Framework is not correctly rounded in either direction: Parse can land a unit off, ToString
+    // past 15 digits is often wrong, and zero loses its sign both ways. The netstandard2.0 build
+    // routes SNBT numbers through this class both ways; net8.0 uses the runtime. It is compiled
     // everywhere so the tests can check it against a correct runtime and against Java's output.
     internal static class FloatingDecimal {
         const int DoubleMantissaBits = 53;
@@ -28,7 +27,7 @@ namespace fNbt {
 
         // Digits kept before a sticky one stands in for the rest. Rounding a text correctly means
         // comparing it with the halfway point between two doubles, and the longest halfway point
-        // has 767 significant digits, so nothing past that can change the answer. 800 leaves
+        // has 767 significant digits, so nothing past that can change the answer. The cap leaves
         // margin and bounds the arithmetic whatever the text's length.
         const int MaxDigits = 800;
 
@@ -66,12 +65,12 @@ namespace fNbt {
 
 
         // Where the search for the shortest form starts. For a normal value, the runtime's
-        // 15-digit (6-digit) form is the shortest form padded with zeros whenever that form is no
-        // longer than 15 (6) digits: half a decimal step at those precisions is wider than half a
-        // binary one, so the shortest form is the nearest grid point. Its digit count is then the
-        // answer, and otherwise a lower bound. A subnormal's wide rounding interval breaks the
-        // argument, so it starts at the minimum. Seven digits would not do for floats: 2^-24 is
-        // wider than half a step of the finest 7-digit grid.
+        // 15-digit form for doubles and 6-digit form for floats is the shortest form padded with
+        // zeros whenever the shortest form fits in that many digits: half a decimal step at those
+        // precisions is wider than half a binary one, so the shortest form is the nearest grid
+        // point. Its digit count is then the answer, and otherwise a lower bound. A subnormal's
+        // wide rounding interval breaks the argument, so it starts at the minimum. Seven digits
+        // would not do for floats: 2^-24 is wider than half a step of the finest 7-digit grid.
         static int SignificantDigits(string text) {
             int at = text.IndexOf('E');
             string mantissa = (at < 0 ? text : text.Substring(0, at)).Replace(".", "").Replace("-", "").Trim('0');
@@ -141,21 +140,20 @@ namespace fNbt {
 
         #region Parsing
 
-        // The correctly rounded double for a decimal text ("-12.5e-3", digits and an optional
-        // point, exponent and sign), starting from the BCL's reading, which is within a few units.
-        // The cutoffs are where the magnitude alone decides: a leading digit past 10^310 is
-        // infinity and one below 10^-400 is zero. They sit outside the format's range (1.8E308
-        // down to 4.9E-324, and 3.4E38 down to 1.4E-45 for singles) so texts near the edges
-        // still get the exact comparison.
+        // The correctly rounded double for a decimal text, starting from the BCL's reading, which
+        // is within a few units. The cutoffs are where the magnitude alone decides: below 10^-324
+        // nothing reaches half the smallest subnormal (2.5e-324), and from 10^309 up everything
+        // passes the largest value plus half an ulp (1.8e308). Floats: 10^-46 and 10^39 against
+        // 7e-46 and 3.4e38.
         public static double CorrectDouble(string text, double parsed) {
             return BitConverter.Int64BitsToDouble(CorrectBits(text, BitConverter.DoubleToInt64Bits(parsed),
-                DoubleMantissaBits, DoubleMinExponent, -400, 310));
+                DoubleMantissaBits, DoubleMinExponent, -323, 309));
         }
 
 
         public static float CorrectSingle(string text, float parsed) {
             return SingleFromBits(unchecked((int)CorrectBits(text, SingleBits(parsed),
-                SingleMantissaBits, SingleMinExponent, -60, 40)));
+                SingleMantissaBits, SingleMinExponent, -45, 39)));
         }
 
 

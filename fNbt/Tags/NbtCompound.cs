@@ -328,10 +328,8 @@ namespace fNbt {
         }
 
 
-        // The read loop's miss path hands over the reader rather than a flag read from it. The
-        // loop's code is the same either way; the shorter miss path moved the code that the
-        // Framework JIT lays out after this method, and a selector load read 6% slower with the
-        // flag. Layout luck, so measure this row again before touching the loop.
+        // Micro-optimization: A flag read here instead of the reader made the loop's miss path a byte longer,
+        // which moved .NET Framework JIT's layout of later methods and slowed down the hot path.
         [MethodImpl(MethodImplOptions.NoInlining)]
         void ReplaceLoaded(NbtTag tag, NbtBinaryReader readStream) {
             ReplaceLoaded(tag, readStream.RejectDuplicateNames);
@@ -339,9 +337,8 @@ namespace fNbt {
 
 
         // A repeated name replaces the earlier tag in its slot, the last value at the first
-        // position, which is what Minecraft's own loader keeps and what ParseSnbt does;
-        // ValidateOnRead refuses it instead. Off the read loop's path: the loop inlines TryInsert
-        // and only a miss comes here.
+        // position, as Minecraft's own loader and ParseSnbt keep it; ValidateOnRead refuses it
+        // instead. Off the read loop's path: the loop inlines TryInsert and only a miss comes here.
         [MethodImpl(MethodImplOptions.NoInlining)]
         void ReplaceLoaded(NbtTag tag, bool rejectDuplicate) {
             if (rejectDuplicate) {

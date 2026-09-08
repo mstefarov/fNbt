@@ -3,11 +3,10 @@ using BenchmarkDotNet.Attributes;
 namespace fNbt.Benchmarks;
 
 // Standalone array comparisons, which the metadata comparer row leaves uncovered. Equal inputs
-// are the worst case: no early exit. 128 KB per array keeps the data in L2 with room to spare:
-// the comparer owns only the type dispatch around the BCL's vectorized SequenceEqual. At 8 MiB
-// these rows measured memory placement instead (145 to 370 us for the byte compare within one
-// day); at 256 KB the byte row still ran 8% apart between processes when its 64 pages crowded
-// one L2 page color; at 64 KB the 1 us op picked up a fixed 3 to 4% alignment offset per job.
+// are the worst case: no early exit. The array size keeps the data in L2 with room to spare,
+// since the comparer owns only the type dispatch around the BCL's vectorized SequenceEqual.
+// Larger arrays measured memory placement instead, and smaller ones picked up a per-process
+// alignment offset.
 public class ComparerBenchmarks {
     const int BlobBytes = 128 * 1024;
 

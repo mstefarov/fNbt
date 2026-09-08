@@ -6,8 +6,8 @@ namespace fNbt.Benchmarks;
 // The BedrockNetwork varint encoding over real data: the full Bedrock block-state palette
 // from pmmp/BedrockData (CC0-1.0), 2.3 MB of 16,913 small compound roots back to back.
 // This is the shape a Bedrock server serializes into StartGame, so it is the realistic
-// workload for varint throughput. NbtCodec and NbtFlavor postdate 1.1.1, so this cannot
-// build or run against a released baseline.
+// workload for varint throughput. NbtCodec and NbtFlavor postdate 1.1.1, so this stays out
+// of any 1.x comparison.
 [BenchmarkCategory(Program.BaselineIncompatible)]
 public class BedrockNetworkBenchmarks {
     byte[] paletteBytes = null!;

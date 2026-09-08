@@ -5,8 +5,8 @@ namespace fNbt.Test {
     // Whole real-world SNBT documents (TestFiles/snbt, see SOURCES.md there): each parses to the
     // same tree as Minecraft 26.2's own printout of it (the .game.snbt twin), survives a round trip
     // through every layout, and a document without a twin is one every game version refuses.
-    // The large binary fixtures round-trip through text as well; the game accepted fNbt's text
-    // for all of them in the research run, but that verdict is too large to ship.
+    // The large binary fixtures round-trip through text as well; the game's verdicts on them are
+    // too large to ship.
     [TestClass]
     public class SnbtDocumentsTests {
         // Text carries no root name, so the parsed tree takes the original's before comparing

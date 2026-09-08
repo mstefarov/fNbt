@@ -5,9 +5,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace fNbt {
-    // Reads SNBT text into a tag tree. The grammar is Minecraft Java 1.21.5's, widened to understand
-    // older game versions and common tools. For example:
-    // - an unquoted token that is not a modern number falls back to the old (1.12 to 1.21.4) reading,
+    // Reads SNBT text into a tag tree. The grammar is Minecraft Java 1.21.5's, widened to what
+    // older game versions and common tools wrote:
+    // - an unquoted token that is not a modern number falls back to the old parser's reading,
     //   which made it a string or an infinity
     // - suffixed NaN and Infinity read as numbers
     // - empty quoted keys are allowed
@@ -72,14 +72,11 @@ namespace fNbt {
                 numberSpaced = false;
                 NbtTag? number = TryReadNumber(NbtTagType.Int);
                 if (number != null && !RunsIntoToken()) return number;
-                // The whitespace the grammar allows inside a number can carry it into the next word,
-                // which might cause problems like:
-                // - "1.5 foo" took the f as a suffix
-                // - "0 1" read as a leading zero
-                // - "1.5 e999" overflowed
-                // Read it again without that whitespace so the word stays separate.
-                // A number that runs straight into more token characters (1abc, 1.5.2, 1bx) is
-                // an old-era unquoted string, not a number plus trailing data.
+                // The whitespace the grammar allows inside a number can carry it into the next
+                // word: "1.5 foo" took the f as a suffix, "0 1" read as a leading zero, "1.5 e999"
+                // overflowed. Read it again without that whitespace so the word stays separate. A
+                // number that runs straight into more token characters (1abc, 1.5.2) is a string
+                // under the old parser, not a number plus trailing data.
                 if (numberSpaced) {
                     pos = start;
                     spacedNumbers = false;
@@ -132,9 +129,9 @@ namespace fNbt {
 
         #region Numbers
 
-        // Modern grammar allows whitespace between the parts of a number; off while a number
-        // that ran into the next word is read again, which only helps when the first reading
-        // skipped some
+        // The modern grammar allows whitespace between the parts of a number. It is off while a
+        // number that ran into the next word is read again, which only helps when the first
+        // reading skipped some.
         bool spacedNumbers = true;
         bool numberSpaced;
 
@@ -437,8 +434,7 @@ namespace fNbt {
 
 
         // Moves past a run of digits in the given radix with underscores between them. Returns
-        // the digit count, 0 when none is present, or -1 when an underscore starts or ends the
-        // run (not allowed).
+        // the digit count, 0 when none is present, or -1 when run starts or ends with an underscore.
         int ScanDigitRun(int radix) {
             int start = pos;
             int digits = 0;

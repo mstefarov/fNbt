@@ -4,9 +4,9 @@ using System.Threading;
 
 namespace fNbt.Test {
     // NbtTag.ToSnbt: the fixed output shape (Minecraft's own compact form apart from key order
-    // and the quote choice),
-    // number spelling on both targets, the three layouts, wrapper unwrapping, and the depth cap.
-    // Expected texts come from running Minecraft 1.21.4 and 26.2's own printers (tools/snbt-harness).
+    // and the quote choice), number spelling on both targets, the three layouts, wrapper
+    // unwrapping, and the depth cap. Expected texts come from Minecraft 1.21.4 and 26.2's own
+    // printers (tools/snbt-harness).
     [TestClass]
     public class SnbtWriterTests {
         static string Snbt(NbtTag tag, SnbtLayout layout = SnbtLayout.Compact) {

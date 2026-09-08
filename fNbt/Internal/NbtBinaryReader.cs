@@ -98,7 +98,7 @@ namespace fNbt {
 
 
         // Inlined by request: the tag type and every varint byte come through here, and neither
-        // JIT inlines it on its own once the exception is built inline.
+        // JIT inlined it on its own.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte() {
             int value = stream.ReadByte();
@@ -247,9 +247,9 @@ namespace fNbt {
         }
 
 
-        // The prefix is an unsigned 16-bit byte count in Java (valid up to 65,535 bytes), and
-        // an unsigned varint in BedrockNetwork. Comparing as uint also rejects varint lengths
-        // past int.MaxValue with a format error instead of an overflow.
+        // The prefix is an unsigned 16-bit byte count in Java and an unsigned varint in
+        // BedrockNetwork. Comparing as uint also rejects varint lengths past int.MaxValue with a
+        // format error instead of an overflow.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int ReadStringLength(int limit) {
             uint length = useVarInt ? ReadUnsignedVarInt32() : (ushort)ReadInt16();

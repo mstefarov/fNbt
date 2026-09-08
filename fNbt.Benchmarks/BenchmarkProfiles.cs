@@ -9,10 +9,9 @@ namespace fNbt.Benchmarks;
 // These profiles assume the wrapper's affinity: one physical core with both of its logical
 // CPUs, the second one for the runtime's own threads. On a single CPU the tiering worker
 // competes with the measured thread and the runtime multiplies its tiering delay by ten, so
-// tier-1 code arrived about two seconds in, after the pilot had sized the iteration on tier-0
-// speed. Launch-to-launch spread (JIT and heap layout, Dynamic PGO outcomes) dominates the
-// ratio noise on every row, so the two gating profiles spend their time on four launches
-// rather than on long actual stages: the relative-error stop lands between 10 and 20 iterations.
+// tier-1 code arrived after the pilot had sized the iteration on tier-0 speed. Launch-to-launch
+// spread dominates the ratio noise on every row, so the two gating profiles spend their time
+// on launches rather than on long actual stages.
 
 [AttributeUsage(AttributeTargets.Method)]
 sealed class VeryStableBenchmarkAttribute : BenchmarkCategoryAttribute, IConfigSource {

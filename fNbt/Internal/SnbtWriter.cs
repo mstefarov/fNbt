@@ -252,8 +252,7 @@ namespace fNbt {
         // least one fractional digit when the decimal exponent is in [-3, 7), and as d.dddE<exp>
         // otherwise, with no plus sign or padding on the exponent. The runtime's shortest form
         // gives Java's digits on .NET Core after its one-digit forms get a second digit when
-        // closer; FloatingDecimal gives them elsewhere. Checked against JDK 25 on random values,
-        // powers of two, and neighbors of one-digit decimals.
+        // closer; FloatingDecimal gives them elsewhere.
 
         internal static void AppendFloat(StringBuilder sb, float value) {
             if (float.IsNaN(value)) {
