@@ -15,18 +15,18 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an empty unnamed NbtCompound tag. </summary>
+        /// <summary> Creates an empty unnamed <see cref="NbtCompound"/> tag. </summary>
         public NbtCompound() { }
 
 
-        /// <summary> Creates an empty NbtCompound tag with the given name. </summary>
+        /// <summary> Creates an empty <see cref="NbtCompound"/> tag with the given name. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtCompound(string? tagName) {
             name = tagName;
         }
 
 
-        /// <summary> Creates an unnamed NbtCompound tag, containing the given tags. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtCompound"/> tag, containing the given tags. </summary>
         /// <param name="tags"> Collection of tags to assign to this tag's Value. May not be null </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>, or one of the tags is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If some of the given tags were not named, or two tags with the same name were given. </exception>
@@ -34,7 +34,7 @@ namespace fNbt {
             : this(null, tags) { }
 
 
-        /// <summary> Creates an NbtCompound tag with the given name, containing the given tags. </summary>
+        /// <summary> Creates an <see cref="NbtCompound"/> tag with the given name, containing the given tags. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to assign to this tag's Value. May not be null </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>, or one of the tags is <c>null</c>. </exception>
@@ -54,8 +54,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a deep copy of given NbtCompound. </summary>
-        /// <param name="other"> An existing NbtCompound to copy. May not be <c>null</c>. </param>
+        /// <summary> Creates a deep copy of given <see cref="NbtCompound"/>. </summary>
+        /// <param name="other"> An existing <see cref="NbtCompound"/> to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
         public NbtCompound(NbtCompound other)
@@ -129,7 +129,7 @@ namespace fNbt {
 
         /// <summary> Gets the tag with the specified name. May return <c>null</c>. </summary>
         /// <param name="tagName"> The name of the tag to get. </param>
-        /// <typeparam name="T"> Type to cast the result to. Must derive from NbtTag. </typeparam>
+        /// <typeparam name="T"> Type to cast the result to. Must derive from <see cref="NbtTag"/>. </typeparam>
         /// <returns> The tag with the specified key. Null if tag with the given name was not found. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
@@ -153,8 +153,8 @@ namespace fNbt {
         /// <param name="tagName"> The name of the tag to get. </param>
         /// <param name="result"> When this method returns, contains the tag associated with the specified name, if the tag is found;
         /// otherwise, null. This parameter is passed uninitialized. </param>
-        /// <typeparam name="T"> Type to cast the result to. Must derive from NbtTag. </typeparam>
-        /// <returns> true if the NbtCompound contains a tag with the specified name; otherwise, false. </returns>
+        /// <typeparam name="T"> Type to cast the result to. Must derive from <see cref="NbtTag"/>. </typeparam>
+        /// <returns> true if the <see cref="NbtCompound"/> contains a tag with the specified name; otherwise, false. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public bool TryGet<T>(string tagName, out T? result) where T : NbtTag {
@@ -173,7 +173,7 @@ namespace fNbt {
         /// <param name="tagName"> The name of the tag to get. </param>
         /// <param name="result"> When this method returns, contains the tag associated with the specified name, if the tag is found;
         /// otherwise, null. This parameter is passed uninitialized. </param>
-        /// <returns> true if the NbtCompound contains a tag with the specified name; otherwise, false. </returns>
+        /// <returns> true if the <see cref="NbtCompound"/> contains a tag with the specified name; otherwise, false. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool TryGet(string tagName, out NbtTag? result) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
@@ -182,8 +182,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Adds all tags from the specified collection to this NbtCompound. </summary>
-        /// <param name="newTags"> The collection whose elements should be added to this NbtCompound. </param>
+        /// <summary> Adds all tags from the specified collection to this <see cref="NbtCompound"/>. </summary>
+        /// <param name="newTags"> The collection whose elements should be added to this <see cref="NbtCompound"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTags"/> is <c>null</c>, or one of the tags in newTags is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If one of the given tags was unnamed,
         /// or a tag with the same name already exists or appears twice in the batch,
@@ -234,7 +234,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Determines whether this NbtCompound contains a tag with a specific name. </summary>
+        /// <summary> Determines whether this <see cref="NbtCompound"/> contains a tag with a specific name. </summary>
         /// <param name="tagName"> Tag name to search for. May not be <c>null</c>. </param>
         /// <returns> true if a tag with given name was found; otherwise, false. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
@@ -244,12 +244,12 @@ namespace fNbt {
         }
 
 
-        /// <summary> Removes the tag with the specified name from this NbtCompound. </summary>
+        /// <summary> Removes the tag with the specified name from this <see cref="NbtCompound"/>. </summary>
         /// <remarks> Removing shifts every later child to preserve insertion order. When removing
         /// many tags from a large compound, rebuilding it without them is faster. </remarks>
         /// <param name="tagName"> The name of the tag to remove. </param>
         /// <returns> true if the tag is successfully found and removed; otherwise, false.
-        /// This method returns false if name is not found in the NbtCompound. </returns>
+        /// This method returns false if name is not found in the <see cref="NbtCompound"/>. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="tagName"/> is <c>null</c>. </exception>
         public bool Remove(string tagName) {
             if (tagName == null) throw new ArgumentNullException(nameof(tagName));
@@ -282,7 +282,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Gets a collection containing all tag names in this NbtCompound, in insertion order. </summary>
+        /// <summary> Gets a collection containing all tag names in this <see cref="NbtCompound"/>, in insertion order. </summary>
         public IEnumerable<string> Names {
             get {
                 foreach (NbtTag tag in this) {
@@ -291,7 +291,7 @@ namespace fNbt {
             }
         }
 
-        /// <summary> Gets a collection containing all tags in this NbtCompound, in insertion order. </summary>
+        /// <summary> Gets a collection containing all tags in this <see cref="NbtCompound"/>, in insertion order. </summary>
         public IEnumerable<NbtTag> Tags {
             get { return this; }
         }
@@ -377,9 +377,9 @@ namespace fNbt {
 
         #region Implementation of IEnumerable<NbtTag>
 
-        /// <summary> Returns an enumerator that iterates through all tags in this NbtCompound,
+        /// <summary> Returns an enumerator that iterates through all tags in this <see cref="NbtCompound"/>,
         /// in insertion order. </summary>
-        /// <returns> An IEnumerator&lt;NbtTag&gt; that can be used to iterate through the collection. </returns>
+        /// <returns> An IEnumerator&lt;<see cref="NbtTag"/>&gt; that can be used to iterate through the collection. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
             return Enumerate();
         }
@@ -405,11 +405,11 @@ namespace fNbt {
 
         #region Implementation of ICollection<NbtTag>
 
-        /// <summary> Adds a tag to this NbtCompound. </summary>
-        /// <param name="newTag"> The object to add to this NbtCompound. </param>
+        /// <summary> Adds a tag to this <see cref="NbtCompound"/>. </summary>
+        /// <param name="newTag"> The object to add to this <see cref="NbtCompound"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If the given tag is unnamed;
-        /// or if a tag with the given name already exists in this NbtCompound;
+        /// or if a tag with the given name already exists in this <see cref="NbtCompound"/>;
         /// or it already has a Parent; or it is this compound or one of its ancestors. </exception>
         public void Add(NbtTag newTag) {
             ValidateCanAttach(newTag, nameof(newTag));
@@ -420,7 +420,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Removes all tags from this NbtCompound. </summary>
+        /// <summary> Removes all tags from this <see cref="NbtCompound"/>. </summary>
         public void Clear() {
             NbtTag[] local = items;
             for (int i = 0; i < count; i++) {
@@ -434,10 +434,10 @@ namespace fNbt {
         }
 
 
-        /// <summary> Determines whether this NbtCompound contains a specific NbtTag.
+        /// <summary> Determines whether this <see cref="NbtCompound"/> contains a specific <see cref="NbtTag"/>.
         /// Looks for exact object matches, not name matches. </summary>
         /// <returns> true if tag is found; otherwise, false. </returns>
-        /// <param name="tag"> The object to locate in this NbtCompound. May not be <c>null</c>. </param>
+        /// <param name="tag"> The object to locate in this <see cref="NbtCompound"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         public bool Contains(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
@@ -445,15 +445,15 @@ namespace fNbt {
         }
 
 
-        /// <summary> Copies the tags of the NbtCompound to an array, starting at a particular array index. </summary>
-        /// <param name="array"> The one-dimensional array that is the destination of the tag copied from NbtCompound.
+        /// <summary> Copies the tags of the <see cref="NbtCompound"/> to an array, starting at a particular array index. </summary>
+        /// <param name="array"> The one-dimensional array that is the destination of the tag copied from <see cref="NbtCompound"/>.
         /// The array must have zero-based indexing. </param>
         /// <param name="arrayIndex"> The zero-based index in array at which copying begins. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="array"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> arrayIndex is less than 0. </exception>
         /// <exception cref="ArgumentException"> Given array is multidimensional; arrayIndex is equal to or greater than the length of array;
-        /// the number of tags in this NbtCompound is greater than the available space from arrayIndex to the end of the destination array;
-        /// or type NbtTag cannot be cast automatically to the type of the destination array. </exception>
+        /// the number of tags in this <see cref="NbtCompound"/> is greater than the available space from arrayIndex to the end of the destination array;
+        /// or type <see cref="NbtTag"/> cannot be cast automatically to the type of the destination array. </exception>
         public void CopyTo(NbtTag[] array, int arrayIndex) {
             if (array == null) throw new ArgumentNullException(nameof(array));
             if (arrayIndex < 0) throw new ArgumentOutOfRangeException(nameof(arrayIndex));
@@ -464,13 +464,13 @@ namespace fNbt {
         }
 
 
-        /// <summary> Removes the first occurrence of a specific NbtTag from the NbtCompound.
+        /// <summary> Removes the first occurrence of a specific <see cref="NbtTag"/> from the <see cref="NbtCompound"/>.
         /// Looks for exact object matches, not name matches. </summary>
         /// <remarks> Removing shifts every later child to preserve insertion order. When removing
         /// many tags from a large compound, rebuilding it without them is faster. </remarks>
-        /// <returns> true if tag was successfully removed from the NbtCompound; otherwise, false.
+        /// <returns> true if tag was successfully removed from the <see cref="NbtCompound"/>; otherwise, false.
         /// This method also returns false if tag is not found. </returns>
-        /// <param name="tag"> The tag to remove from the NbtCompound. </param>
+        /// <param name="tag"> The tag to remove from the <see cref="NbtCompound"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If the given tag is unnamed </exception>
         public bool Remove(NbtTag tag) {
@@ -483,8 +483,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Gets the number of tags contained in the NbtCompound. </summary>
-        /// <returns> The number of tags contained in the NbtCompound. </returns>
+        /// <summary> Gets the number of tags contained in the <see cref="NbtCompound"/>. </summary>
+        /// <returns> The number of tags contained in the <see cref="NbtCompound"/>. </returns>
         public int Count {
             get { return count; }
         }

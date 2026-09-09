@@ -1,7 +1,7 @@
 namespace fNbt {
-    /// <summary> Text layout produced by <see cref="NbtTag.ToSnbt()"/>. Every layout is read by
-    /// every Minecraft Java version since 1.12 and by every NBT tool; they differ only in
-    /// whitespace. </summary>
+    /// <summary> Text layout produced by <see cref="NbtTag.ToSnbt()"/>. The layouts differ only in
+    /// whitespace, which every SNBT reader skips, so each reads wherever the compact form reads;
+    /// <see cref="NbtTag.ToSnbt()"/> says what that form asks of its reader. </summary>
     public enum SnbtLayout {
         /// <summary> One line, no whitespace: <c>{a:1,b:[1,2],c:[B;1B,2B]}</c>. What Minecraft
         /// itself prints (<c>Tag.toString()</c>) and what commands, logs and command storage use.

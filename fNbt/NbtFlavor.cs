@@ -61,7 +61,7 @@ namespace fNbt {
         /// <summary> Short display name of this flavor, e.g. "Java" or "BedrockNetwork". </summary>
         public string Name { get; }
 
-        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and ClassiCube,
+        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and <see cref="ClassiCube"/>,
         /// false for the Bedrock flavors. </summary>
         public bool BigEndian { get; }
 
@@ -71,7 +71,7 @@ namespace fNbt {
 
         /// <summary> Whether strings are written as Java's modified UTF-8 (CESU-8 pairs for
         /// astral characters, the overlong <c>C0 80</c> form for NUL, lone surrogates preserved).
-        /// True for the Java flavors and ClassiCube; the Bedrock flavors write standard UTF-8.
+        /// True for the Java flavors and <see cref="ClassiCube"/>; the Bedrock flavors write standard UTF-8.
         /// Reads accept both encodings on every flavor. </summary>
         public bool UsesModifiedUtf8 { get; }
 

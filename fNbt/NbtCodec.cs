@@ -74,7 +74,7 @@ namespace fNbt {
         /// <summary> Reads one NBT document from the given stream. The stream is left positioned
         /// exactly past the end of the document. </summary>
         /// <param name="stream"> Stream to read from. Does not need to be seekable. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="EndOfStreamException"> If the stream ends before the document does. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
@@ -88,7 +88,7 @@ namespace fNbt {
         /// <summary> Reads one NBT document from the given stream, requiring a specific root tag type. </summary>
         /// <param name="stream"> Stream to read from. Does not need to be seekable. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="expectedRootType"/> is not a concrete tag type. </exception>
         /// <exception cref="EndOfStreamException"> If the stream ends before the document does. </exception>
@@ -107,7 +107,7 @@ namespace fNbt {
         /// <param name="length"> Maximum number of bytes the document may occupy. Trailing bytes past the
         /// document's actual end are ignored. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> or <paramref name="length"/>
         /// do not describe a valid range within <paramref name="buffer"/>. </exception>
@@ -127,7 +127,7 @@ namespace fNbt {
         /// document's actual end are ignored. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> or <paramref name="length"/>
         /// do not describe a valid range within <paramref name="buffer"/>; or <paramref name="expectedRootType"/>
@@ -208,7 +208,7 @@ namespace fNbt {
         /// the call, so pooled or stack memory is fine: the returned tags hold copies of their data. </summary>
         /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
         /// deep, exceeds a configured limit, fails enabled validation, or consists of a lone
@@ -224,7 +224,7 @@ namespace fNbt {
         /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="expectedRootType"/> is not a concrete tag type. </exception>
         /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels

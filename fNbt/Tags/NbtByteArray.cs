@@ -25,21 +25,21 @@ namespace fNbt {
         byte[] bytes;
 
 
-        /// <summary> Creates an unnamed NbtByteArray tag, containing an empty array of bytes. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtByteArray"/> tag, containing an empty array of bytes. </summary>
         public NbtByteArray()
             : this((string?)null) { }
 
 
-        /// <summary> Creates an unnamed NbtByteArray tag, containing the given array of bytes. </summary>
-        /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <summary> Creates an unnamed <see cref="NbtByteArray"/> tag, containing the given array of bytes. </summary>
+        /// <param name="value"> Byte array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given byte array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a byte[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a byte[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtByteArray(byte[] value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtByteArray tag with the given name, containing an empty array of bytes. </summary>
+        /// <summary> Creates an <see cref="NbtByteArray"/> tag with the given name, containing an empty array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtByteArray(string? tagName) {
             name = tagName;
@@ -47,12 +47,12 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtByteArray tag with the given name, containing the given array of bytes. </summary>
+        /// <summary> Creates an <see cref="NbtByteArray"/> tag with the given name, containing the given array of bytes. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
-        /// <param name="value"> Byte array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <param name="value"> Byte array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given byte array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a byte[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a byte[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtByteArray(string? tagName, byte[] value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             name = tagName;
@@ -60,7 +60,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a deep copy of given NbtByteArray. </summary>
+        /// <summary> Creates a deep copy of given <see cref="NbtByteArray"/>. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <remarks> Byte array of given tag will be cloned. </remarks>

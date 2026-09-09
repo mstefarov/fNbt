@@ -12,16 +12,16 @@ namespace fNbt {
         const int FileStreamBufferSize = 64 * 1024;
 
         /// <summary> Gets the file name used for most recent loading/saving of this file.
-        /// May be <c>null</c>, if this <c>NbtFile</c> instance has not been loaded from, or saved to, a file. </summary>
+        /// May be <c>null</c>, if this <see cref="NbtFile"/> instance has not been loaded from, or saved to, a file. </summary>
         public string? FileName { get; private set; }
 
         /// <summary> Gets the compression method used for most recent loading/saving of this file.
-        /// Defaults to AutoDetect. </summary>
+        /// Defaults to <see cref="NbtCompression.AutoDetect"/>. </summary>
         public NbtCompression FileCompression { get; private set; }
 
         /// <summary> Root tag of this file. Must be a named CompoundTag. Defaults to an empty-named tag. </summary>
-        /// <remarks> The assigned tag may already belong to another compound or list: <c>NbtFile</c> is not
-        /// a container and does not set or clear <c>Parent</c>. Saving then writes only this subtree,
+        /// <remarks> The assigned tag may already belong to another compound or list: <see cref="NbtFile"/> is not
+        /// a container and does not set or clear <see cref="NbtTag.Parent"/>. Saving then writes only this subtree,
         /// as a standalone document. </remarks>
         /// <exception cref="ArgumentException"> If given tag is unnamed. </exception>
         /// <exception cref="ArgumentNullException"> If value is <c>null</c>. </exception>
@@ -43,7 +43,7 @@ namespace fNbt {
         }
 
         /// <summary> The flavor this file reads and writes with, fixed at construction.
-        /// To re-save a document under a different flavor, create a new NbtFile over the same
+        /// To re-save a document under a different flavor, create a new <see cref="NbtFile"/> over the same
         /// <see cref="RootTag"/>: both files then share one tree. </summary>
         public NbtFlavor Flavor {
             get { return flavor; }
@@ -62,7 +62,7 @@ namespace fNbt {
         readonly bool validateOnWrite;
         readonly long maxAllocation;
 
-        /// <summary> Gets or sets the default value of <c>BufferSize</c> property. Default is 8192. 
+        /// <summary> Gets or sets the default value of <see cref="BufferSize"/> property. Default is 8192.
         /// Set to 0 to disable buffering by default. </summary>
         /// <exception cref="ArgumentOutOfRangeException"> value is negative. </exception>
         public static int DefaultBufferSize {
@@ -78,7 +78,7 @@ namespace fNbt {
         static int defaultBufferSize = 8 * 1024;
 
         /// <summary> Gets or sets the size of internal buffer used for reading files and streams.
-        /// Initialized to value of <c>DefaultBufferSize</c> property. </summary>
+        /// Initialized to value of <see cref="DefaultBufferSize"/> property. </summary>
         /// <exception cref="ArgumentOutOfRangeException"> value is negative. </exception>
         public int BufferSize {
             get { return bufferSize; }
@@ -95,15 +95,15 @@ namespace fNbt {
 
         #region Constructors
 
-        /// <summary> Creates an empty NbtFile with the current defaults
-        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults).
-        /// RootTag will be set to an empty <c>NbtCompound</c> with a blank name (""). </summary>
+        /// <summary> Creates an empty <see cref="NbtFile"/> with the current defaults
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <see cref="NbtOptions"/> defaults).
+        /// <see cref="RootTag"/> will be set to an empty <see cref="NbtCompound"/> with a blank name (""). </summary>
         public NbtFile()
             : this(NbtOptions.ResolveDefaults()) { }
 
 
-        /// <summary> Creates an empty NbtFile for the given flavor, with the current default
-        /// policy settings. RootTag will be set to an empty <c>NbtCompound</c> with a blank
+        /// <summary> Creates an empty <see cref="NbtFile"/> for the given flavor, with the current default
+        /// policy settings. <see cref="RootTag"/> will be set to an empty <see cref="NbtCompound"/> with a blank
         /// name (""). </summary>
         /// <param name="flavor"> Encoding to read and write with. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
@@ -177,7 +177,7 @@ namespace fNbt {
 
         /// <summary> Loads NBT data from a file using the most common settings.
         /// Automatically detects compression, and reads with the current defaults
-        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults). </summary>
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <see cref="NbtOptions"/> defaults). </summary>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> is <c>null</c>. </exception>
         /// <exception cref="FileNotFoundException"> If given file was not found. </exception>
@@ -195,7 +195,7 @@ namespace fNbt {
 
         #region Loading
 
-        /// <summary> Loads NBT data from a file. Existing <c>RootTag</c> will be replaced. Compression will be auto-detected. </summary>
+        /// <summary> Loads NBT data from a file. Existing <see cref="RootTag"/> will be replaced. Compression will be auto-detected. </summary>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <returns> Number of bytes read from the file. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> is <c>null</c>. </exception>
@@ -209,7 +209,9 @@ namespace fNbt {
         }
 
 
-        /// <summary> Loads NBT data from a file. Existing <c>RootTag</c> will be replaced. </summary>
+        /// <summary> Loads NBT data from a file. Existing <see cref="RootTag"/> will be replaced. </summary>
+        /// <remarks> See <see cref="LoadFromStream(Stream, NbtCompression, TagSelector)"/> for how
+        /// compressed loads verify checksums and where the load stops. </remarks>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.
@@ -239,7 +241,9 @@ namespace fNbt {
         }
 
 
-        /// <summary> Loads NBT data from a byte array. Existing <c>RootTag</c> will be replaced. <c>FileName</c> will be set to null. </summary>
+        /// <summary> Loads NBT data from a byte array. Existing <see cref="RootTag"/> will be replaced. <see cref="FileName"/> will be set to null. </summary>
+        /// <remarks> See <see cref="LoadFromStream(Stream, NbtCompression, TagSelector)"/> for how
+        /// compressed loads verify checksums and where the load stops. </remarks>
         /// <param name="buffer"> Byte array from which data will be loaded. </param>
         /// <param name="index"> The index into <paramref name="buffer"/> at which the stream begins. Must not be negative. </param>
         /// <param name="length"> Maximum number of bytes to read from the given buffer. Must not be negative.
@@ -267,7 +271,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Loads NBT data from a byte array. Existing <c>RootTag</c> will be replaced. <c>FileName</c> will be set to null. </summary>
+        /// <summary> Loads NBT data from a byte array. Existing <see cref="RootTag"/> will be replaced. <see cref="FileName"/> will be set to null. </summary>
         /// <param name="buffer"> Byte array from which data will be loaded. </param>
         /// <param name="index"> The index into <paramref name="buffer"/> at which the stream begins. Must not be negative. </param>
         /// <param name="length"> Maximum number of bytes to read from the given buffer. Must not be negative.
@@ -286,23 +290,25 @@ namespace fNbt {
         }
 
 
-        /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
+        /// <summary> Loads NBT data from a stream. Existing <see cref="RootTag"/> will be replaced </summary>
         /// <remarks> Compressed loads check checksums. On .NET 6 and later, a document cut off
-        /// inside its trailer may still load without error.
-        /// Seekable streams are left at their end, so the returned byte count is
+        /// inside its trailer may still load without error. A non-seekable GZip load, and every
+        /// ZLib load on .NET Standard 2.0, verifies the trailer by searching the bytes fed to the
+        /// decompressor last for the expected values, so a chance match there can hide a damaged
+        /// or missing trailer. Seekable streams are left at their end, so the returned byte count is
         /// deterministic; non-seekable streams stay wherever decompression stopped, which can be
         /// past the document, since decompressors read ahead. Concatenated GZip members decompress
         /// as one document only on .NET Core and later and only from a seekable stream; otherwise
         /// the load reads the first member. Uncompressed loads stop exactly at the end of the
         /// document, leaving any trailing bytes in place. </remarks>
-        /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
+        /// <param name="stream"> Stream from which data will be loaded. If compression is set to <see cref="NbtCompression.AutoDetect"/>, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <param name="selector"> Optional callback to select which tags to load into memory. Root may not be skipped.
         /// No reference is stored to this callback after loading (don't worry about implicitly captured closures). May be <c>null</c>. </param>
         /// <returns> Number of bytes read from the stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
-        /// <exception cref="NotSupportedException"> If <paramref name="compression"/> is set to AutoDetect, but the stream is not seekable. </exception>
+        /// <exception cref="NotSupportedException"> If <paramref name="compression"/> is set to <see cref="NbtCompression.AutoDetect"/>, but the stream is not seekable. </exception>
         /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
         /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
@@ -381,13 +387,13 @@ namespace fNbt {
         }
 
 
-        /// <summary> Loads NBT data from a stream. Existing <c>RootTag</c> will be replaced </summary>
-        /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
+        /// <summary> Loads NBT data from a stream. Existing <see cref="RootTag"/> will be replaced </summary>
+        /// <param name="stream"> Stream from which data will be loaded. If compression is set to <see cref="NbtCompression.AutoDetect"/>, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading/saving this file. </param>
         /// <returns> Number of bytes read from the stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
-        /// <exception cref="NotSupportedException"> If <paramref name="compression"/> is set to AutoDetect, but the stream is not seekable. </exception>
+        /// <exception cref="NotSupportedException"> If <paramref name="compression"/> is set to <see cref="NbtCompression.AutoDetect"/>, but the stream is not seekable. </exception>
         /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
         /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
@@ -424,14 +430,14 @@ namespace fNbt {
         /// partially written. If you are overwriting an existing file, write to a temp file first
         /// then use <c>File.Replace</c> to swap it with the original. </remarks>
         /// <param name="fileName"> File to write data to. May not be <c>null</c>. </param>
-        /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
+        /// <param name="compression"> Compression mode to use for saving. May not be <see cref="NbtCompression.AutoDetect"/>. </param>
         /// <returns> Number of bytes written to the file. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="fileName"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If AutoDetect was given as the <paramref name="compression"/> mode. </exception>
+        /// <exception cref="ArgumentException"> If <see cref="NbtCompression.AutoDetect"/> was given as the <paramref name="compression"/> mode. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
         /// <exception cref="IOException"> If an I/O error occurred while creating the file. </exception>
         /// <exception cref="UnauthorizedAccessException"> Specified file is read-only, or a permission issue occurred. </exception>
-        /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
+        /// <exception cref="NbtFormatException"> If one of the <see cref="NbtCompound"/> tags contained unnamed tags;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -453,13 +459,13 @@ namespace fNbt {
         /// <summary> Saves this NBT file to a buffer. </summary>
         /// <param name="buffer"> Buffer to write data to. May not be <c>null</c>. </param>
         /// <param name="index"> The index into <paramref name="buffer"/> at which the stream should begin. </param>
-        /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
+        /// <param name="compression"> Compression mode to use for saving. May not be <see cref="NbtCompression.AutoDetect"/>. </param>
         /// <returns> Number of bytes written to the buffer. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If AutoDetect was given as the <paramref name="compression"/> mode. </exception>
+        /// <exception cref="ArgumentException"> If <see cref="NbtCompression.AutoDetect"/> was given as the <paramref name="compression"/> mode. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>;
         /// if <paramref name="index"/> is less than zero; or if <paramref name="index"/> is greater than the length of <paramref name="buffer"/>. </exception>
-        /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
+        /// <exception cref="NbtFormatException"> If one of the <see cref="NbtCompound"/> tags contained unnamed tags;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -473,12 +479,12 @@ namespace fNbt {
 
 
         /// <summary> Saves this NBT file to a new byte array. </summary>
-        /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
+        /// <param name="compression"> Compression mode to use for saving. May not be <see cref="NbtCompression.AutoDetect"/>. </param>
         /// <returns> Byte array containing the serialized NBT data. </returns>
-        /// <exception cref="ArgumentException"> If AutoDetect was given as the <paramref name="compression"/> mode. </exception>
+        /// <exception cref="ArgumentException"> If <see cref="NbtCompression.AutoDetect"/> was given as the <paramref name="compression"/> mode. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
         /// <exception cref="NotSupportedException"> If the serialized document does not fit in a single array. </exception>
-        /// <exception cref="NbtFormatException"> If one of the NbtCompound tags contained unnamed tags;
+        /// <exception cref="NbtFormatException"> If one of the <see cref="NbtCompound"/> tags contained unnamed tags;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -516,13 +522,13 @@ namespace fNbt {
 
         /// <summary> Saves this NBT file to a stream. </summary>
         /// <param name="stream"> Stream to write data to. May not be <c>null</c>. </param>
-        /// <param name="compression"> Compression mode to use for saving. May not be AutoDetect. </param>
+        /// <param name="compression"> Compression mode to use for saving. May not be <see cref="NbtCompression.AutoDetect"/>. </param>
         /// <returns> Number of bytes written to the stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If AutoDetect was given as the <paramref name="compression"/> mode; or if <paramref name="stream"/> does not support writing. </exception>
+        /// <exception cref="ArgumentException"> If <see cref="NbtCompression.AutoDetect"/> was given as the <paramref name="compression"/> mode; or if <paramref name="stream"/> does not support writing. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
-        /// <exception cref="NbtFormatException"> If RootTag is unnamed;
-        /// or if one of the NbtCompound tags contained unnamed tags;
+        /// <exception cref="NbtFormatException"> If <see cref="RootTag"/> is unnamed;
+        /// or if one of the <see cref="NbtCompound"/> tags contained unnamed tags;
         /// or if a string is longer than the flavor's limit (65,535 bytes for the Java flavors);
         /// or if enabled validation rejects a tag type or string length for the flavor;
         /// or if tags are nested more than 512 levels deep. </exception>
@@ -634,7 +640,7 @@ namespace fNbt {
 
 
         /// <summary> Reads the root name from the given NBT file.
-        /// Root names longer than 65,535 bytes fail with NbtFormatException. </summary>
+        /// Root names longer than 65,535 bytes fail with <see cref="NbtFormatException"/>. </summary>
         /// <param name="fileName"> Name of the file from which data will be loaded. </param>
         /// <param name="compression"> Format in which the given file is compressed. </param>
         /// <param name="flavor"> Encoding to read with. </param>
@@ -663,15 +669,15 @@ namespace fNbt {
 
 
         /// <summary> Reads the root name from the given stream of NBT data.
-        /// Root names longer than 65,535 bytes fail with NbtFormatException. </summary>
-        /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
+        /// Root names longer than 65,535 bytes fail with <see cref="NbtFormatException"/>. </summary>
+        /// <param name="stream"> Stream from which data will be loaded. If compression is set to <see cref="NbtCompression.AutoDetect"/>, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading this stream. </param>
         /// <param name="flavor"> Encoding to read with. </param>
         /// <returns> Name of the root tag in the given stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> The flavor has no root name; use <see cref="NbtCodec"/> for those. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
-        /// <exception cref="NotSupportedException"> If compression is set to AutoDetect, but the stream is not seekable. </exception>
+        /// <exception cref="NotSupportedException"> If compression is set to <see cref="NbtCompression.AutoDetect"/>, but the stream is not seekable. </exception>
         /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
         /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
@@ -703,14 +709,14 @@ namespace fNbt {
 
 
         /// <summary> Reads the root name from the given stream of NBT data. </summary>
-        /// <param name="stream"> Stream from which data will be loaded. If compression is set to AutoDetect, this stream must support seeking. </param>
+        /// <param name="stream"> Stream from which data will be loaded. If compression is set to <see cref="NbtCompression.AutoDetect"/>, this stream must support seeking. </param>
         /// <param name="compression"> Compression method to use for loading this stream. </param>
         /// <param name="bigEndian"> Whether the stream uses big-endian (default) or little-endian encoding. </param>
         /// <param name="bufferSize"> No longer used. </param>
         /// <returns> Name of the root tag in the given stream. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> If an unrecognized/unsupported value was given for <paramref name="compression"/>. </exception>
-        /// <exception cref="NotSupportedException"> If compression is set to AutoDetect, but the stream is not seekable. </exception>
+        /// <exception cref="NotSupportedException"> If compression is set to <see cref="NbtCompression.AutoDetect"/>, but the stream is not seekable. </exception>
         /// <exception cref="EndOfStreamException"> If file ended earlier than expected. </exception>
         /// <exception cref="InvalidDataException"> If file compression could not be detected, or decompressing failed. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>

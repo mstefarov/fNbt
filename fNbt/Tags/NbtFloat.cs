@@ -13,23 +13,23 @@ namespace fNbt {
         public float Value { get; set; }
 
 
-        /// <summary> Creates an unnamed NbtFloat tag with the default value of 0f. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtFloat"/> tag with the default value of 0f. </summary>
         public NbtFloat() { }
 
 
-        /// <summary> Creates an unnamed NbtFloat tag with the given value. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtFloat"/> tag with the given value. </summary>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtFloat(float value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtFloat tag with the given name and the default value of 0f. </summary>
+        /// <summary> Creates an <see cref="NbtFloat"/> tag with the given name and the default value of 0f. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtFloat(string? tagName)
             : this(tagName, 0) { }
 
 
-        /// <summary> Creates an NbtFloat tag with the given name and value. </summary>
+        /// <summary> Creates an <see cref="NbtFloat"/> tag with the given name and value. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtFloat(string? tagName, float value) {
@@ -38,7 +38,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a copy of given NbtFloat tag. </summary>
+        /// <summary> Creates a copy of given <see cref="NbtFloat"/> tag. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtFloat(NbtFloat other) {

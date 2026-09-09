@@ -128,7 +128,7 @@ namespace fNbt {
             return compression;
         }
 
-        
+
 #if !NET6_0_OR_GREATER
         // netstandard2.0 reads ZLib through a DeflateStream, so the two header bytes are checked
         // manually. Full loads validate the Adler-32 trailer separately; peeks cannot.

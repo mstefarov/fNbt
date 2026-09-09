@@ -4,10 +4,10 @@ using System.Collections.Generic;
 namespace fNbt {
     /// <summary> Compares tags for equality by type, name, and value. Compound tags are equal
     /// when they contain equal sets of tags; list tags when their elements are equal and in the
-    /// same order, and every empty list is equal to every other whatever its ListType. Name
+    /// same order, and every empty list is equal to every other whatever its <see cref="NbtList.ListType"/>. Name
     /// comparisons are case-sensitive. </summary>
     public sealed class NbtComparer : IEqualityComparer<NbtTag> {
-        /// <summary> Gets a singleton instance of the NbtComparer. </summary>
+        /// <summary> Gets a singleton instance of the <see cref="NbtComparer"/>. </summary>
         public static NbtComparer Instance { get; } = new NbtComparer();
 
 

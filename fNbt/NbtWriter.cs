@@ -5,8 +5,8 @@ using System.Runtime.CompilerServices;
 
 namespace fNbt {
     /// <summary> An efficient writer for writing NBT data directly to streams.
-    /// Each instance of NbtWriter writes one complete file.
-    /// NbtWriter enforces the structural rules of the NBT format, except that it does not check for
+    /// Each instance of <see cref="NbtWriter"/> writes one complete file.
+    /// <see cref="NbtWriter"/> enforces the structural rules of the NBT format, except that it does not check for
     /// duplicate tag names within a compound. The flavor's own restrictions, such as its permitted
     /// tag types and string ceilings, are enforced only while <see cref="NbtOptions.ValidateOnWrite"/>
     /// is on. </summary>
@@ -45,8 +45,8 @@ namespace fNbt {
         Stack<Node>? ancestors;
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class with the current defaults
-        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults). </summary>
+        /// <summary> Initializes a new instance of the <see cref="NbtWriter"/> class with the current defaults
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <see cref="NbtOptions"/> defaults). </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> or <paramref name="rootTagName"/> is <c>null</c>. </exception>
@@ -55,7 +55,7 @@ namespace fNbt {
             : this(stream, rootTagName, NbtOptions.ResolveDefaults()) { }
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class. </summary>
+        /// <summary> Initializes a new instance of the <see cref="NbtWriter"/> class. </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
         /// <param name="bigEndian"> Whether NBT data should be in Big-Endian encoding. </param>
@@ -66,7 +66,7 @@ namespace fNbt {
             : this(stream, rootTagName, bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock) { }
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class for the given flavor,
+        /// <summary> Initializes a new instance of the <see cref="NbtWriter"/> class for the given flavor,
         /// with the current default policy settings. </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
@@ -79,17 +79,16 @@ namespace fNbt {
             : this(stream, rootTagName, NbtOptions.ResolveForFile(flavor, nameof(flavor))) { }
 
 
-        /// <summary> Initializes a new instance of the NbtWriter class with the given options.
+        /// <summary> Initializes a new instance of the <see cref="NbtWriter"/> class with the given options.
         /// When write validation is on, the flavor's tag-type range and string ceiling are
         /// enforced as tags are written. </summary>
         /// <param name="stream"> Stream to write to. </param>
         /// <param name="rootTagName"> Name to give to the root tag (written immediately). </param>
         /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="rootTagName"/>,
-        /// <paramref name="options"/>, or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// <paramref name="options"/>, or the options' <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not writable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtWriter(Stream stream, string rootTagName, NbtOptions options)
             : this(stream, rootTagName, NbtOptions.ResolveForFile(options, nameof(options))) { }
 
@@ -122,7 +121,7 @@ namespace fNbt {
         }
 
         /// <summary> Gets whether an earlier write failed after emitting bytes, an I/O error for
-        /// example. The document cannot be finished: every later write, End, and
+        /// example. The document cannot be finished: every later write, <see cref="EndCompound"/>, <see cref="EndList"/> and
         /// <see cref="Finish"/> call throws <see cref="NbtFormatException"/>, and the partial
         /// output should be discarded. A write refused before it emitted anything leaves the
         /// writer usable and does not set this. </summary>
@@ -132,7 +131,7 @@ namespace fNbt {
             get { return IsFailed; }
         }
 
-        /// <summary> Gets the underlying stream of the NbtWriter, flushing buffered output first. </summary>
+        /// <summary> Gets the underlying stream of the <see cref="NbtWriter"/>, flushing buffered output first. </summary>
         /// <exception cref="IOException"> Flushing the stream failed. </exception>
         public Stream BaseStream {
             get {
@@ -522,7 +521,7 @@ namespace fNbt {
 
         /// <summary> Writes an unnamed byte array tag, copying data from a stream. </summary>
         /// <remarks> A temporary buffer will be allocated, of size up to 8192 bytes.
-        /// To manually specify a buffer, use one of the other WriteByteArray() overloads. </remarks>
+        /// To manually specify a buffer, use <see cref="WriteByteArray(Stream, int, byte[])"/>. </remarks>
         /// <param name="dataSource"> A Stream from which data will be copied. </param>
         /// <param name="count"> The number of bytes to write. Must not be negative. </param>
         /// <exception cref="NbtFormatException"> No more tags can be written -OR-
@@ -557,7 +556,7 @@ namespace fNbt {
 
         /// <summary> Writes a named byte array tag, copying data from a stream. </summary>
         /// <remarks> A temporary buffer will be allocated, of size up to 8192 bytes.
-        /// To manually specify a buffer, use one of the other WriteByteArray() overloads. </remarks>
+        /// To manually specify a buffer, use <see cref="WriteByteArray(string, Stream, int, byte[])"/>. </remarks>
         /// <param name="tagName"> Name to give to this byte array tag. May not be null. </param>
         /// <param name="dataSource"> A Stream from which data will be copied. </param>
         /// <param name="count"> The number of bytes to write. Must not be negative. </param>
@@ -762,9 +761,9 @@ namespace fNbt {
         #endregion
 
 
-        /// <summary> Writes a NbtTag object, and all of its child tags, to stream.
-        /// Use this method sparingly with NbtWriter -- constructing NbtTag objects defeats the purpose of this class.
-        /// If you already have lots of NbtTag objects, you might as well use NbtFile to write them all at once. </summary>
+        /// <summary> Writes a <see cref="NbtTag"/> object, and all of its child tags, to stream.
+        /// Use this method sparingly with <see cref="NbtWriter"/> -- constructing <see cref="NbtTag"/> objects defeats the purpose of this class.
+        /// If you already have lots of <see cref="NbtTag"/> objects, you might as well use <see cref="NbtFile"/> to write them all at once. </summary>
         /// <param name="tag"> Tag to write. Must not be null. </param>
         /// <remarks> With write validation on for a flavor with restrictions, the whole tree is
         /// checked before anything is written. Otherwise a tree that is too deep or holds an

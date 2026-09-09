@@ -25,21 +25,21 @@ namespace fNbt {
         long[] longs;
 
 
-        /// <summary> Creates an unnamed NbtLongArray tag, containing an empty array of longs. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtLongArray"/> tag, containing an empty array of longs. </summary>
         public NbtLongArray()
             : this((string?)null) { }
 
 
-        /// <summary> Creates an unnamed NbtLongArray tag, containing the given array of longs. </summary>
-        /// <param name="value"> Long array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <summary> Creates an unnamed <see cref="NbtLongArray"/> tag, containing the given array of longs. </summary>
+        /// <param name="value"> Long array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given long array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a long[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a long[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtLongArray(long[] value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtLongArray tag with the given name, containing an empty array of longs. </summary>
+        /// <summary> Creates an <see cref="NbtLongArray"/> tag with the given name, containing an empty array of longs. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtLongArray(string? tagName) {
             name = tagName;
@@ -47,12 +47,12 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtLongArray tag with the given name, containing the given array of longs. </summary>
+        /// <summary> Creates an <see cref="NbtLongArray"/> tag with the given name, containing the given array of longs. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
-        /// <param name="value"> Long array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <param name="value"> Long array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given long array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a long[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a long[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtLongArray(string? tagName, long[] value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             name = tagName;
@@ -60,7 +60,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a deep copy of given NbtLongArray. </summary>
+        /// <summary> Creates a deep copy of given <see cref="NbtLongArray"/>. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <remarks> Long array of given tag will be cloned. </remarks>

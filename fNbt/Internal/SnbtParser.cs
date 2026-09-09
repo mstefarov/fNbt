@@ -223,7 +223,8 @@ namespace fNbt {
             int literalEnd = hasSuffix ? end - 1 : end;
 
             // The runtime reads the literal as written, unless the whitespace and underscores the
-            // grammar allows sit inside it, which asks for a copy without them
+            // grammar allows sit inside it, which asks for a copy without them. Literals past about
+            // 800 digits are outside the design and may read wrong.
             string? cleaned = null;
             for (int i = wholeStart; i < literalEnd; i++) {
                 if (text[i] == '_' || IsWhitespace(text[i])) {

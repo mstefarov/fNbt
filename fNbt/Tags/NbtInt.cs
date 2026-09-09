@@ -13,23 +13,23 @@ namespace fNbt {
         public int Value { get; set; }
 
 
-        /// <summary> Creates an unnamed NbtInt tag with the default value of 0. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtInt"/> tag with the default value of 0. </summary>
         public NbtInt() { }
 
 
-        /// <summary> Creates an unnamed NbtInt tag with the given value. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtInt"/> tag with the given value. </summary>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtInt(int value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtInt tag with the given name and the default value of 0. </summary>
+        /// <summary> Creates an <see cref="NbtInt"/> tag with the given name and the default value of 0. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtInt(string? tagName)
             : this(tagName, 0) { }
 
 
-        /// <summary> Creates an NbtInt tag with the given name and value. </summary>
+        /// <summary> Creates an <see cref="NbtInt"/> tag with the given name and value. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtInt(string? tagName, int value) {
@@ -38,7 +38,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a copy of given NbtInt tag. </summary>
+        /// <summary> Creates a copy of given <see cref="NbtInt"/> tag. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtInt(NbtInt other) {

@@ -172,6 +172,7 @@ namespace fNbt {
             if (digitCount + scale > overflowCutoff) return infinity | sign;
             bits &= magnitudeMask;
             if (bits >= infinity) bits = infinity - 1;
+            // Sixteen steps cover the runtime's error up to about 800 digits, the designed limit
             for (int step = 0; step < 16 && bits < infinity; step++) {
                 int exponentField = (int)(bits >> (mantissaBits - 1));
                 ulong mantissa = (ulong)bits & (hiddenBit - 1);
