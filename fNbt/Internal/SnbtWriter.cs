@@ -89,9 +89,14 @@ namespace fNbt {
             sb.Append('[');
             for (int i = 0; i < list.Count; i++) {
                 NbtTag element = NbtList.TryUnwrap(list[i]);
+                // A wrapper the text leaves out is still a level of the tree, as Clone and the
+                // parser count it
+                int elementDepthBudget = element == list[i]
+                    ? childDepthBudget
+                    : NbtTag.ConsumeDepthBudget(childDepthBudget);
                 if (i > 0) sb.Append(',');
                 BeginMember(sb, layout, expand, i, level + 1);
-                WriteTag(sb, element, layout, level + 1, childDepthBudget);
+                WriteTag(sb, element, layout, level + 1, elementDepthBudget);
             }
             EndContainer(sb, expand, level);
             sb.Append(']');

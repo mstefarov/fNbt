@@ -307,5 +307,27 @@ namespace fNbt.Test {
             // Only parsing has a position; the writer's depth failure is the plain exception
             Assert.ThrowsExactly<NbtFormatException>(() => Snbt(root));
         }
+
+
+        [TestMethod]
+        public void WrappersTheTextLeavesOutStillCountAgainstTheDepthLimit() {
+            // 255 mixed levels around [] make 511 containers; 256 make 513, which Clone and the
+            // parser refuse, so the writer must refuse them too
+            NbtTag tree = MixedNesting(255);
+            tree.Clone();
+            string text = Snbt(tree);
+            Assert.AreEqual(text, Snbt(NbtTag.ParseSnbt(text)));
+            NbtTag deeper = MixedNesting(256);
+            Assert.ThrowsExactly<NbtFormatException>(() => deeper.Clone());
+            Assert.ThrowsExactly<NbtFormatException>(() => Snbt(deeper));
+        }
+
+
+        // [0,[0,...[]...]] built with CreateMixed: every level but the innermost is a list of mixed types
+        static NbtTag MixedNesting(int levels) {
+            NbtTag tree = new NbtList();
+            for (int i = 0; i < levels; i++) tree = NbtList.CreateMixed(new NbtInt(0), tree);
+            return tree;
+        }
     }
 }
