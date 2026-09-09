@@ -55,8 +55,7 @@ namespace fNbt {
         /// <summary> Creates a codec with the given options. </summary>
         /// <param name="options"> Settings to copy. Later changes to these options do not
         /// affect this codec. </param>
-        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
+        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtOptions options)
             : this(NbtOptions.ResolveForCodec(options, nameof(options))) { }
 

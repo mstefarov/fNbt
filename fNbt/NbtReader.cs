@@ -68,16 +68,15 @@ namespace fNbt {
             : this(stream, NbtOptions.ResolveForFile(flavor, nameof(flavor))) { }
 
 
-        /// <summary> Initializes a new instance of the NbtReader class with the given options.
+        /// <summary> Initializes a new instance of the <see cref="NbtReader"/> class with the given options.
         /// When read validation is on, the flavor's tag-type range and string ceiling are enforced;
-        /// <c>MaxAllocation</c> caps declared-length allocations either way. </summary>
+        /// <see cref="NbtOptions.MaxAllocation"/> caps declared-length allocations either way. </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="options"/>,
-        /// or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// or the options' <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtReader(Stream stream, NbtOptions options)
             : this(stream, NbtOptions.ResolveForFile(options, nameof(options))) { }
 

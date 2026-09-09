@@ -124,19 +124,18 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an empty NbtFile with the given options.
-        /// RootTag will be set to an empty <c>NbtCompound</c> with a blank name (""). </summary>
+        /// <summary> Creates an empty <see cref="NbtFile"/> with the given options.
+        /// <see cref="RootTag"/> will be set to an empty <see cref="NbtCompound"/> with a blank name (""). </summary>
         /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
-        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
+        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> The options' flavor has no root name;
         /// use <see cref="NbtCodec"/> for those. </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtFile(NbtOptions options)
             : this(NbtOptions.ResolveForFile(options, nameof(options))) { }
 
 
         /// <summary> Creates a new NBT file with the given root tag and flavor, with the current
-        /// default policy settings. The tag is used directly, not cloned. <c>NbtFile</c> is not a
+        /// default policy settings. The tag is used directly, not cloned. <see cref="NbtFile"/> is not a
         /// tag container, so a root tag may be shared between files: to re-save a loaded document
         /// under a different flavor, pass its <see cref="RootTag"/> here. </summary>
         /// <param name="rootTag"> Compound tag to set as the root tag. May not be <c>null</c>. </param>
@@ -156,10 +155,9 @@ namespace fNbt {
         /// <param name="rootTag"> Compound tag to set as the root tag. May not be <c>null</c>. </param>
         /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="rootTag"/>, <paramref name="options"/>,
-        /// or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// or the options' <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If given <paramref name="rootTag"/> is unnamed;
         /// or if the options' flavor has no root name. </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtFile(NbtCompound rootTag, NbtOptions options)
             : this(options) {
             if (rootTag == null) throw new ArgumentNullException(nameof(rootTag));

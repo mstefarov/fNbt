@@ -69,8 +69,6 @@ namespace fNbt.Test {
             Assert.Throws<ArgumentNullException>(() => new NbtCodec((NbtFlavor)null));
             Assert.Throws<ArgumentNullException>(() => new NbtCodec((NbtOptions)null));
             Assert.Throws<ArgumentNullException>(() => new NbtCodec(new NbtOptions { Flavor = null }));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = 0 }));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new NbtCodec(new NbtOptions { MaxAllocation = -5 }));
         }
 
 
