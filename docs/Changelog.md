@@ -22,6 +22,8 @@
     list serializes with TAG_End as its element type instead of throwing.
 - NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
     a value does not fit the requested enum's underlying type.
+- NbtOptions.MaxAllocation now rejects zero and negative values when set, like
+    DefaultMaxAllocation, instead of when an entry point first uses the options.
 - Performance: comparing parsed or cloned metadata trees is about 2x faster,
     large long arrays read about 1.4x faster on .NET 8, and fixed-width array
     reads and writes up to 2x faster on .NET Framework 4.8 in benchmarks

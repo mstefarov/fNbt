@@ -9,7 +9,7 @@ Minecraft Java, Minecraft Bedrock, and ClassiCube use.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 2.1.0 (7 September 2026).
+Current released version is 2.1.0 (9 September 2026).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -153,8 +153,8 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
     // Minecraft stores a list of mixed types as compounds with each value under an empty key.
     // CreateMixed builds that form and UnwrapMixed reads through it.
     NbtList line = NbtList.CreateMixed(new NbtString("Hello "), new NbtCompound { new NbtString("text", "world") });
-    string json = line.ToSnbt();                                      // ["Hello ",{text:"world"}]
-    NbtTag[] parts = ((NbtList)NbtTag.ParseSnbt(json)).UnwrapMixed(); // NbtString, NbtCompound
+    string snbt = line.ToSnbt();                                      // ["Hello ",{text:"world"}]
+    NbtTag[] parts = ((NbtList)NbtTag.ParseSnbt(snbt)).UnwrapMixed(); // NbtString, NbtCompound
 ```
 
 #### Check out unit tests in fNbt.Test for more examples.
