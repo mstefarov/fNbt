@@ -1,23 +1,31 @@
 ## 2.1.0 (fNbt)
-- Add SNBT (stringified NBT), the text form Minecraft Java uses in commands
-    and .snbt files: NbtTag.ToSnbt and NbtTag.ParseSnbt, SnbtOptions for the
-    layout, and SnbtParseException for errors. Parsing accepts every syntax
-    Minecraft has used since 1.12; output uses the shape every version reads.
+- Add support for SNBT (stringified NBT), the text form Minecraft Java uses
+    in commands and .snbt files. Use NbtTag.ParseSnbt to read, NbtTag.ToSnbt
+    to write, and SnbtOptions to configure. Parser accepts older and modern
+    Minecraft Java syntax, except \N{name} escapes. Writer uses syntax
+    compatible with older Minecraft versions where possible. Mixed-type lists
+    require Minecraft Java 1.21.5+ or a tool that supports them. NaN, infinity,
+    and empty keys also print, but Minecraft does not read them back as the
+    same values.
+- Add SnbtParseException (extends NbtFormatException).
 - Add NbtList.CreateMixed and UnwrapMixed for lists of mixed types, stored as
-    Minecraft 1.21.5 stores them.
-- Add NbtByte.SignedValue, the value as the signed byte Minecraft stores.
-- A compound with a repeated tag name now loads with the last value in the
-    first tag's place, as every Minecraft version loads it, instead of failing.
-    ValidateOnRead still rejects it.
-- The first tag added to an empty NbtList now sets its type, so empty lists
-    loaded from files accept tags. NbtComparer treats every empty list as
-    equal, and an untyped empty list writes TAG_End instead of throwing.
-- Improve performance: comparing parsed or cloned trees is about 2x faster,
-    large array reads and uncompressed loads about 1.4x faster on .NET 8, and
-    fixed-width array reads and writes up to 2x faster on .NET Standard.
+    Minecraft 1.21.5 stores them (list of compounds).
+- Add NbtByte.SignedValue to get/set value as a Java-style signed byte.
+- Compatibility: When loading an NBT compound with a repeated tag name, fNbt
+    now uses the last loaded value in the first tag's place, matching Minecraft
+    behavior. Earlier versions of fNbt rejected duplicates among loaded
+    members. NbtOptions.ValidateOnRead still rejects those duplicates.
+- Compatibility: You can now add a tag of any type to an empty NbtList with
+    'Unknown' or 'End' ListType. First tag added sets its type; explicitly
+    typed lists still enforce their type. NbtComparer treats empty lists with
+    the same name as equal regardless of element type. An untyped empty
+    list serializes with TAG_End as its element type instead of throwing.
 - NbtReader.ReadValueAs and ReadListAsArray now throw OverflowException when
     a value does not fit the requested enum's underlying type.
-- Document the cases where a compressed load can miss a damaged checksum.
+- Performance: comparing parsed or cloned metadata trees is about 2x faster,
+    large long arrays read about 1.4x faster on .NET 8, and fixed-width array
+    reads and writes up to 2x faster on .NET Framework 4.8 in benchmarks
+    against 2.0.0.
 
 ## 2.0.0 (fNbt)
 - Add NbtFlavor support for Java (the default), JavaAnvil,
@@ -39,9 +47,9 @@
     consuming trailing data and handles unnamed, non-compound, absent, and
     concatenated documents. It reads and writes streams and byte arrays, plus
     ReadOnlySpan<byte> and IBufferWriter<byte> on .NET 8.
-- NbtReader.ReadValueAs<T> now performs the same numeric and string
-    conversions as ReadListAsArray<T>, and both read integral values or member
-    names as an enum type.
+- NbtReader.ReadValueAs<T> now does the same numeric and string conversions
+    as ReadListAsArray<T>, and both read integral values or member names
+    as an enum type.
 - NbtCompound now guarantees insertion order. Enumeration, Names, Tags,
     ToString, and saved documents all list tags in the order they were added.
 - Improve performance: repeated-name parsing allocates about half as much,
