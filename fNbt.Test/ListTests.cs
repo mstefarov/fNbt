@@ -403,9 +403,9 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void ParsedListCapacityFollowsPlausibleDeclaredCount() {
-            // Each element is nine bytes on the wire, more than the reference it costs up front
-            var list = new NbtList("items", NbtTagType.Compound);
-            for (int i = 0; i < 100; i++) list.Add(new NbtCompound { new NbtInt("v", i) });
+            // Each element is eight bytes on the wire, the size of the reference it costs up front
+            var list = new NbtList("items", NbtTagType.Long);
+            for (int i = 0; i < 100; i++) list.Add(new NbtLong(i));
             byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
 
             // A complete seekable input vouches for the count, so storage is exact
@@ -419,6 +419,70 @@ namespace fNbt.Test {
             NbtList fromStream = streamed.RootTag.Get<NbtList>("items");
             Assert.AreEqual(100, fromStream.Count);
             Assert.AreEqual(128, fromStream.tags.Capacity);
+        }
+
+        [TestMethod]
+        public void ListOfContainersKeepsBoundedGrowthOnSeekableInput() {
+            // A list header does not consume the bytes it declares, so nested container lists
+            // could each claim the whole remaining input; only leaf lists are presized
+            var list = new NbtList("items", NbtTagType.List);
+            for (int i = 0; i < 100; i++) list.Add(new NbtList(NbtTagType.Int));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            var file = new NbtFile();
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
+            NbtList loaded = file.RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, loaded.Count);
+            Assert.AreEqual(128, loaded.tags.Capacity);
+        }
+
+#if NETCOREAPP
+        [TestMethod]
+        public void NestedCorruptListCountsDoNotMultiplyAllocation() {
+            // 511 nested list headers, each declaring a million elements, then padding
+            var ms = new MemoryStream();
+            ms.Write(new byte[] { 0x0A, 0, 0, 0x09, 0, 1, (byte)'l' }, 0, 7);
+            for (int i = 0; i < 511; i++) {
+                ms.Write(new byte[] { 0x09, 0x00, 0x0F, 0x42, 0x40 }, 0, 5);
+            }
+            ms.Write(new byte[2 * 1024 * 1024], 0, 2 * 1024 * 1024);
+            byte[] doc = ms.ToArray();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Assert.ThrowsException<NbtFormatException>(
+                () => new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null));
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.IsTrue(allocated < 4 * doc.Length, "Allocated " + allocated + " bytes for a " + doc.Length + " byte input");
+        }
+#endif
+
+        [TestMethod]
+        public void ListCountPastTheRemainingInputFailsBeforeReadingElements() {
+            var list = new NbtList("items", NbtTagType.Byte);
+            for (int i = 0; i < 100; i++) list.Add(new NbtByte(1));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+            // Declare 1,000 elements where 100 follow; the count sits right before the payload
+            int countAt = doc.Length - 100 - 1 - 4;
+            doc[countAt] = 0;
+            doc[countAt + 1] = 0;
+            doc[countAt + 2] = 0x03;
+            doc[countAt + 3] = 0xE8;
+
+            var stream = new MemoryStream(doc);
+            Assert.ThrowsException<EndOfStreamException>(
+                () => new NbtFile().LoadFromStream(stream, NbtCompression.None));
+            Assert.AreEqual(countAt + 4, stream.Position);
+        }
+
+
+        [TestMethod]
+        public void ShrunkSeekableStreamFailsWithEndOfStream() {
+            var list = new NbtList("items", NbtTagType.Byte);
+            for (int i = 0; i < 100; i++) list.Add(new NbtByte(1));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            Assert.ThrowsException<EndOfStreamException>(
+                () => new NbtFile().LoadFromStream(new ShrinkingStream(new MemoryStream(doc)), NbtCompression.None));
         }
 
 
