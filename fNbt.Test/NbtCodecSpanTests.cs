@@ -96,26 +96,26 @@ namespace fNbt.Test {
         public void BufferWriterOutputMatchesStreamOutput() {
             NbtCodec codec = NbtCodec.For(NbtFlavor.Bedrock);
             NbtCompound root = MakeRoot();
+            root["blob"] = new NbtByteArray("blob", Enumerable.Range(0, 1024).Select(i => (byte)i).ToArray());
+            root.Add(new NbtString("after", "tail"));
             byte[] expected = codec.WriteTag(root);
 
-            var output = new ArrayBufferWriter<byte>();
+            // Small writes exhaust staging before the larger payload goes out directly.
+            ArrayBufferWriter<byte> output = new ArrayBufferWriter<byte>(8);
             codec.WriteTag(root, output);
             CollectionAssert.AreEqual(expected, output.WrittenSpan.ToArray());
+            NbtTag read = codec.ReadTag(output.WrittenSpan, out int bytesConsumed);
+            Assert.AreEqual(output.WrittenCount, bytesConsumed);
+            NbtAssert.AreEqual(root, read);
 
             // Concatenated documents append back to back
             output.Clear();
             codec.WriteConcatenatedTags(new NbtTag[] { root, root }, output);
             Assert.AreEqual(expected.Length * 2, output.WrittenCount);
+            CollectionAssert.AreEqual(expected.Concat(expected).ToArray(), output.WrittenSpan.ToArray());
             using (var ms = new MemoryStream(output.WrittenSpan.ToArray())) {
                 Assert.AreEqual(2, codec.ReadConcatenatedTags(ms).Count());
             }
-
-            // A pipeline-style round trip: written to a buffer writer, read from its span
-            output.Clear();
-            codec.WriteTag(root, output);
-            NbtTag read = codec.ReadTag(output.WrittenSpan, out int bytesConsumed);
-            Assert.AreEqual(output.WrittenCount, bytesConsumed);
-            NbtAssert.AreEqual(root, read);
         }
 
 

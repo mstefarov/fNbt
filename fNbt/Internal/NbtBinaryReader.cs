@@ -30,7 +30,8 @@ namespace fNbt {
         int nameLookups;
         int nameHits;
         bool nameCacheDisabled;
-        const int NameCacheActivation = 64;
+        internal const int NameCacheActivation = 64;
+        const int NameCacheJudgeAfter = 256;
         const int NameCacheInitialSlots = 128;
         const int NameCacheMaxSlots = 2048;
         const int NameCacheMaxProbe = 8;
@@ -61,6 +62,12 @@ namespace fNbt {
             }
         }
 
+        // ValidateOnRead: a repeated name in a compound is refused instead of replacing the
+        // earlier tag. The format's one rule that no flavor relaxes, so it does not wait on
+        // HasRestrictions like the ceilings below.
+        public bool RejectDuplicateNames { get; }
+
+
         public NbtBinaryReader(Stream input, NbtFlavor flavor,
                                long maxAllocation = long.MaxValue, bool validate = false) {
             if (input == null) throw new ArgumentNullException(nameof(input));
@@ -71,6 +78,7 @@ namespace fNbt {
             useVarInt = flavor.UsesVarInts;
             this.maxAllocation = maxAllocation;
             maxStringBytes = (int)Math.Min(int.MaxValue, maxAllocation);
+            RejectDuplicateNames = validate;
             if (validate && flavor.HasRestrictions) {
                 maxTagType = flavor.MaxTagType;
                 flavorMaxStringBytes = flavor.MaxStringBytes;
@@ -89,10 +97,18 @@ namespace fNbt {
         }
 
 
+        // Inlined by request: the tag type and every varint byte come through here, and neither
+        // JIT inlined it on its own.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte() {
             int value = stream.ReadByte();
-            if (value < 0) throw new EndOfStreamException();
+            if (value < 0) throw EndOfStream();
             return (byte)value;
+        }
+
+
+        static EndOfStreamException EndOfStream() {
+            return new EndOfStreamException();
         }
 
 
@@ -231,17 +247,21 @@ namespace fNbt {
         }
 
 
-        // The prefix is an unsigned 16-bit byte count in Java (valid up to 65,535 bytes), and
-        // an unsigned varint in BedrockNetwork. Comparing as uint also rejects varint lengths
-        // past int.MaxValue with a format error instead of an overflow.
+        // The prefix is an unsigned 16-bit byte count in Java and an unsigned varint in
+        // BedrockNetwork. Comparing as uint also rejects varint lengths past int.MaxValue with a
+        // format error instead of an overflow.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int ReadStringLength(int limit) {
             uint length = useVarInt ? ReadUnsignedVarInt32() : (ushort)ReadInt16();
-            if (length > (uint)limit) {
-                throw new NbtFormatException(
-                    "Declared string length (" + length + " bytes) exceeds the configured limit (" +
-                    limit + " bytes).");
-            }
+            if (length > (uint)limit) throw StringLengthError(length, limit);
             return (int)length;
+        }
+
+
+        static NbtFormatException StringLengthError(uint length, int limit) {
+            return new NbtFormatException(
+                "Declared string length (" + length + " bytes) exceeds the configured limit (" +
+                limit + " bytes).");
         }
 
 
@@ -276,10 +296,9 @@ namespace fNbt {
         }
 
 
-        /// <summary> Reads a length-prefixed string like <see cref="ReadString"/>, but returns
-        /// the cached instance when the same name bytes repeat. Real documents draw tag names
-        /// from a small set, so most reads allocate nothing. Entries are keyed by encoded bytes;
-        /// alternate encodings of one name get separate entries that decode equal. </summary>
+        /// <summary> Reads a length-prefixed name, reusing cached strings for repeated name bytes.
+        /// The cache keys use encoded bytes, so alternate encodings can produce distinct string
+        /// instances with equal values. </summary>
         public string ReadTagName() {
             int length = ReadStringLength(maxStringBytes);
             if (length == 0) return "";
@@ -299,9 +318,10 @@ namespace fNbt {
 
 
         string LookUpName(int length) {
-            // A document of mostly unique names keeps missing; drop the cache so reads
-            // stop paying for hashing and probes
-            if ((++nameLookups & 1023) == 0 && nameHits * 4 < nameLookups) {
+            // A document of mostly unique names keeps missing, so drop the cache and stop paying
+            // for hashing and probes. Judge early enough to keep the table small, late enough
+            // that a repetitive body can follow a unique-key header.
+            if ((++nameLookups & 63) == 0 && nameLookups >= NameCacheJudgeAfter && nameHits * 4 < nameLookups) {
                 nameCache = null;
                 nameCacheDisabled = true;
                 return NbtStringCodec.Decode(this.buffer, 0, length);
@@ -432,11 +452,12 @@ namespace fNbt {
         }
 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void FillBuffer(int numBytes) {
             int offset = 0;
             do {
                 int num = stream.Read(buffer, offset, numBytes - offset);
-                if (num == 0) throw new EndOfStreamException();
+                if (num == 0) throw EndOfStream();
                 offset += num;
             } while (offset < numBytes);
         }
@@ -598,10 +619,22 @@ namespace fNbt {
         // Rejects impossible array/list lengths that can't fit in the remaining stream,
         // to prevent massive allocations. Only seekable streams can be efficiently checked.
         public void EnsureCanRead(long byteCount) {
-            if (BaseStream.CanSeek && byteCount > BaseStream.Length - BaseStream.Position) {
+            if (TryGetRemaining(out long remaining) && byteCount > remaining) {
                 throw new EndOfStreamException(
                     "Declared data size (" + byteCount + " bytes) runs past the end of the stream.");
             }
+        }
+
+
+        // How much a seekable stream still holds. Queried live: a stream's length can change
+        // mid-read. Unknown on a non-seekable stream.
+        public bool TryGetRemaining(out long remaining) {
+            if (stream.CanSeek) {
+                remaining = stream.Length - stream.Position;
+                return true;
+            }
+            remaining = 0;
+            return false;
         }
 
 
@@ -611,7 +644,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<byte>();
             EnsureAllocation(length);
             EnsureCanRead(length);
-            byte[] result = new byte[length];
+            byte[] result = ArrayAllocator.ForOverwrite<byte>(length);
             ReadExactly(result, length);
             return result;
         }
@@ -622,7 +655,7 @@ namespace fNbt {
             EnsureAllocation((long)length * sizeof(int));
             // Varint elements are at least one byte each; fixed-width math would over-estimate
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(int));
-            int[] result = new int[length];
+            int[] result = ArrayAllocator.ForOverwrite<int>(length);
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
@@ -640,6 +673,11 @@ namespace fNbt {
                 }
                 return result;
             }
+#else
+            if (!useVarInt) {
+                ReadFixedWidth(result);
+                return result;
+            }
 #endif
             for (int i = 0; i < length; i++) result[i] = ReadInt32();
             return result;
@@ -650,7 +688,7 @@ namespace fNbt {
             if (length == 0) return Array.Empty<long>();
             EnsureAllocation((long)length * sizeof(long));
             EnsureCanRead(useVarInt ? length : (long)length * sizeof(long));
-            long[] result = new long[length];
+            long[] result = ArrayAllocator.ForOverwrite<long>(length);
 #if NET8_0_OR_GREATER
             if (!useVarInt) {
                 Span<byte> bytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(result.AsSpan());
@@ -667,10 +705,49 @@ namespace fNbt {
                 }
                 return result;
             }
+#else
+            if (!useVarInt) {
+                ReadFixedWidth(result);
+                return result;
+            }
 #endif
             for (int i = 0; i < length; i++) result[i] = ReadInt64();
             return result;
         }
+
+
+#if !NET8_0_OR_GREATER
+        // Fills the array through the scratch buffer, a buffer's worth of elements per stream
+        // call instead of one each. Bytes compose the way ReadInt32 and ReadInt64 do.
+        void ReadFixedWidth(int[] result) {
+            for (int i = 0; i < result.Length;) {
+                int n = Math.Min(buffer.Length / sizeof(int), result.Length - i);
+                FillBuffer(n * sizeof(int));
+                for (int p = 0; p < n * sizeof(int); p += sizeof(int), i++) {
+                    int value = 0;
+                    for (int k = 0; k < sizeof(int); k++) {
+                        value |= buffer[p + k] << (bigEndian ? 24 - 8 * k : 8 * k);
+                    }
+                    result[i] = value;
+                }
+            }
+        }
+
+
+        void ReadFixedWidth(long[] result) {
+            for (int i = 0; i < result.Length;) {
+                int n = Math.Min(buffer.Length / sizeof(long), result.Length - i);
+                FillBuffer(n * sizeof(long));
+                for (int p = 0; p < n * sizeof(long); p += sizeof(long), i++) {
+                    long value = 0;
+                    for (int k = 0; k < sizeof(long); k++) {
+                        value |= (long)buffer[p + k] << (bigEndian ? 56 - 8 * k : 8 * k);
+                    }
+                    result[i] = value;
+                }
+            }
+        }
+#endif
 
 
         public TagSelector? Selector { get; set; }

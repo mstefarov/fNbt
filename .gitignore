@@ -13,3 +13,6 @@ docs/_site
 docs/api
 BenchmarkDotNet.Artifacts/
 release/
+artifacts/
+TestResults/
+__pycache__/

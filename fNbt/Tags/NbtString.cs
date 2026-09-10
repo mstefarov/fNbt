@@ -24,18 +24,18 @@ namespace fNbt {
         string stringVal = "";
 
 
-        /// <summary> Creates an unnamed NbtString tag with the default value (empty string). </summary>
+        /// <summary> Creates an unnamed <see cref="NbtString"/> tag with the default value (empty string). </summary>
         public NbtString() { }
 
 
-        /// <summary> Creates an unnamed NbtString tag with the given value. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtString"/> tag with the given value. </summary>
         /// <param name="value"> String value to assign to this tag. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         public NbtString(string value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtString tag with the given name and value. </summary>
+        /// <summary> Creates an <see cref="NbtString"/> tag with the given name and value. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> String value to assign to this tag. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
@@ -46,7 +46,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a copy of given NbtString tag. </summary>
+        /// <summary> Creates a copy of given <see cref="NbtString"/> tag. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtString(NbtString other) {
@@ -77,8 +77,7 @@ namespace fNbt {
         }
 
 
-        /// <inheritdoc />
-        public override object Clone() {
+        internal override NbtTag Clone(int depthBudget) {
             return new NbtString(this);
         }
 

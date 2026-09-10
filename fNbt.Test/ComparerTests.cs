@@ -1,75 +1,85 @@
+using System;
+
 namespace fNbt.Test {
     [TestClass]
     public class ComparerTests {
         private readonly NbtComparer comparer = NbtComparer.Instance;
 
         [TestMethod]
-        public void BasicTagsEqualAndHashCode() {
-            var a = new NbtInt("foo", 123);
-            var b = new NbtInt("foo", 123);
-            var c = new NbtInt("foo", 456);    // different value
-            var d = new NbtInt("bar", 123);    // different name
+        public void ValueTagsWithEqualValuesHaveEqualHashes() {
+            NbtCompound original = TestFiles.MakeAllValuesRoot();
+            NbtCompound copy = TestFiles.MakeAllValuesRoot();
+            foreach (NbtTag tag in original) {
+                NbtTag equal = copy[tag.Name];
+                Assert.IsTrue(comparer.Equals(tag, equal), tag.Name);
+                Assert.AreEqual(comparer.GetHashCode(tag), comparer.GetHashCode(equal), tag.Name);
+            }
 
-            Assert.IsTrue(comparer.Equals(a, b), "Same type/name/value should be equal");
-            Assert.AreEqual(comparer.GetHashCode(a), comparer.GetHashCode(b), "Equal tags must have equal hash codes");
-
-            Assert.IsFalse(comparer.Equals(a, c), "Different values => not equal");
-            Assert.IsFalse(comparer.Equals(a, d), "Different names => not equal");
+            Assert.IsFalse(comparer.Equals(new NbtInt("foo", 123), new NbtInt("foo", 456)));
+            Assert.IsFalse(comparer.Equals(new NbtInt("foo", 123), new NbtInt("bar", 123)));
         }
 
         [TestMethod]
-        public void StringCaseSensitivity() {
-            var lower = new NbtString("same", "test");
-            var upper = new NbtString("same", "TEST");
-            Assert.IsFalse(comparer.Equals(lower, upper), "String comparison is case-sensitive");
-
-            // same for tag names
-            var nameLower = new NbtString("test", "same");
-            var nameUpper = new NbtString("TEST", "same");
-            Assert.IsFalse(comparer.Equals(nameLower, nameUpper), "Tag name comparison is case-sensitive");
+        public void EqualityDistinguishesNullAndTagTypes() {
+            NbtInt tag = new NbtInt("value", 1);
+            Assert.IsTrue(comparer.Equals(tag, tag));
+            Assert.IsTrue(comparer.Equals(null, null));
+            Assert.IsFalse(comparer.Equals(null, tag));
+            Assert.IsFalse(comparer.Equals(tag, null));
+            Assert.IsFalse(comparer.Equals(tag, new NbtByte("value", 1)));
+            Assert.Throws<ArgumentNullException>(() => comparer.GetHashCode(null));
         }
 
         [TestMethod]
-        public void StringUnicode() {
-            // make sure unicode strings that are loosely comparable (in some locales) but not identical (ordinal) are not equal.
-            var uVal1 = new NbtString("same", "\u00E9"); // e with accent (precomposed)
-            var uVal2 = new NbtString("same", "\u0065\u0301"); // e + combining acute accent (decomposed)
-            Assert.IsFalse(comparer.Equals(uVal1, uVal2), "Unicode strings with different codepoints should not match");
-
-            // test the same for tag NAMES
-            var uName1 = new NbtString("\u00E9", "same");
-            var uName2 = new NbtString("\u0065\u0301", "same");
-            Assert.IsFalse(comparer.Equals(uName1, uName2), "Tag names with different codepoints should not match");
+        public void NullNameNotEqualEmptyName() {
+            var nullName = new NbtInt(null, 42);
+            var emptyName = new NbtInt("", 42);
+            Assert.IsFalse(comparer.Equals(nullName, emptyName), "Null and empty names differ");
         }
 
         [TestMethod]
-        public void FloatAndDoubleNaN() {
+        public void NamesAndStringValuesUseOrdinalComparison() {
+            foreach ((string left, string right) in new[] {
+                ("test", "TEST"),
+                ("\u00E9", "\u0065\u0301") // precomposed versus decomposed acute accent
+            }) {
+                Assert.IsFalse(comparer.Equals(new NbtString("same", left), new NbtString("same", right)),
+                               "Values: " + left + " / " + right);
+                Assert.IsFalse(comparer.Equals(new NbtString(left, "same"), new NbtString(right, "same")),
+                               "Names: " + left + " / " + right);
+            }
+        }
+
+        [TestMethod]
+        public void NaNPayloadsCompareEqualAndHaveEqualHashes() {
             var f1 = new NbtFloat("f", float.NaN);
-            var f2 = new NbtFloat("f", float.NaN);
+            NbtFloat f2 = new NbtFloat("f", BitConverter.ToSingle(BitConverter.GetBytes(0x7fc00001), 0));
             Assert.IsTrue(comparer.Equals(f1, f2), "NaN floats should compare equal using Equals()");
             Assert.AreEqual(comparer.GetHashCode(f1), comparer.GetHashCode(f2), "Hash codes for NaN floats must match");
 
             var d1 = new NbtDouble("d", double.NaN);
-            var d2 = new NbtDouble("d", double.NaN);
+            NbtDouble d2 = new NbtDouble("d", BitConverter.Int64BitsToDouble(0x7ff8000000000001));
             Assert.IsTrue(comparer.Equals(d1, d2), "NaN doubles should compare equal");
             Assert.AreEqual(comparer.GetHashCode(d1), comparer.GetHashCode(d2), "Hash codes for NaN doubles must match");
         }
 
         [TestMethod]
-        public void ArrayTagEquality() {
-            var b1 = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
-            var b2 = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
-            var b3 = new NbtByteArray("arr", new byte[] { 3, 2, 1 });
-            Assert.IsTrue(comparer.Equals(b1, b2), "Same byte arrays should be equal");
-            Assert.IsFalse(comparer.Equals(b1, b3));
+        public void ArrayEqualityIncludesLengthAndEveryElement() {
+            NbtByteArray bytes = new NbtByteArray("arr", new byte[] { 1, 2, 3 });
+            Assert.IsTrue(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2, 3 })));
+            Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 3, 2, 1 })));
+            Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2 })));
+            Assert.IsFalse(comparer.Equals(bytes, new NbtByteArray("arr", new byte[] { 1, 2, 4 })));
 
-            var i1 = new NbtIntArray("arr", new[] { 1, -2, 3 });
-            var i2 = new NbtIntArray("arr", new[] { 1, -2, 3 });
-            Assert.IsTrue(comparer.Equals(i1, i2), "Same int arrays should be equal");
+            NbtIntArray ints = new NbtIntArray("arr", new[] { 1, -2, 3 });
+            Assert.IsTrue(comparer.Equals(ints, new NbtIntArray("arr", new[] { 1, -2, 3 })));
+            Assert.IsFalse(comparer.Equals(ints, new NbtIntArray("arr", new[] { 1, -2 })));
+            Assert.IsFalse(comparer.Equals(ints, new NbtIntArray("arr", new[] { 1, -2, 4 })));
 
-            var l1 = new NbtLongArray("arr", new long[] { 10, -20, 30 });
-            var l2 = new NbtLongArray("arr", new long[] { 10, -20, 30 });
-            Assert.IsTrue(comparer.Equals(l1, l2), "Same long arrays should be equal");
+            NbtLongArray longs = new NbtLongArray("arr", new long[] { 10, -20, 30 });
+            Assert.IsTrue(comparer.Equals(longs, new NbtLongArray("arr", new long[] { 10, -20, 30 })));
+            Assert.IsFalse(comparer.Equals(longs, new NbtLongArray("arr", new long[] { 10, -20 })));
+            Assert.IsFalse(comparer.Equals(longs, new NbtLongArray("arr", new long[] { 10, -20, 40 })));
         }
 
         [TestMethod]
@@ -79,24 +89,45 @@ namespace fNbt.Test {
             var list3 = new NbtList("l") { new NbtInt(3), new NbtInt(2), new NbtInt(1) };
 
             Assert.IsTrue(comparer.Equals(list1, list2), "Same order => equal");
+            Assert.AreEqual(comparer.GetHashCode(list1), comparer.GetHashCode(list2));
             Assert.IsFalse(comparer.Equals(list1, list3), "Different order => not equal");
+            Assert.IsFalse(comparer.Equals(list1, new NbtList("l") { new NbtInt(1), new NbtInt(2) }));
+            Assert.IsFalse(comparer.Equals(list1, new NbtList("l") { new NbtByte(1), new NbtByte(2), new NbtByte(3) }));
         }
 
         [TestMethod]
-        public void CompoundTagsIgnoresOrder() {
+        public void CompoundEqualityIgnoresOrderButIncludesEveryChild() {
+            // A shared prefix followed by a swapped pair exercises both the positional and the lookup paths
             var compA = new NbtCompound("c")
             {
+                new NbtByte("p", 0),
                 new NbtByte("a", 1),
                 new NbtByte("b", 2)
             };
             var compB = new NbtCompound("c")
             {
+                new NbtByte("p", 0),
                 new NbtByte("b", 2),
                 new NbtByte("a", 1)
             };
 
             Assert.IsTrue(comparer.Equals(compA, compB), "Compounds compare as sets regardless of insertion order");
-            Assert.AreEqual(comparer.GetHashCode(compA), comparer.GetHashCode(compB), "HashCode only considers count for compounds");
+            Assert.AreEqual(comparer.GetHashCode(compA), comparer.GetHashCode(compB));
+
+            compB["a"] = new NbtByte("a", 9);
+            Assert.IsFalse(comparer.Equals(compA, compB), "A reordered child has a different value");
+            compB["a"] = new NbtShort("a", 1);
+            Assert.IsFalse(comparer.Equals(compA, compB), "A reordered child has a different type");
+            compB["a"].Name = "missing";
+            Assert.IsFalse(comparer.Equals(compA, compB), "Equal counts do not imply equal child names");
+            compB.Remove("missing");
+            Assert.IsFalse(comparer.Equals(compA, compB), "A child is missing");
+
+            NbtCompound sameOrder = new NbtCompound(compA);
+            sameOrder["p"] = new NbtByte("p", 1);
+            Assert.IsFalse(comparer.Equals(compA, sameOrder), "The first child has a different value");
+            sameOrder["p"] = new NbtInt("p", 0);
+            Assert.IsFalse(comparer.Equals(compA, sameOrder), "The first child has a different type");
         }
 
         [TestMethod]
@@ -109,11 +140,20 @@ namespace fNbt.Test {
         }
 
         [TestMethod]
-        public void NullNameNotEqualEmptyName() {
-            var nullName = new NbtInt(null, 42);
-            var emptyName = new NbtInt("", 42);
-            Assert.IsFalse(comparer.Equals(nullName, emptyName), "Null name and empty name should not be equal");
-            Assert.AreNotEqual(comparer.GetHashCode(nullName), comparer.GetHashCode(emptyName), "Hash codes should not match");
+        public void EmptyListsAreEqualWhateverTheirListType() {
+            // The type of an empty list constrains what may be added; it is not part of its value
+            NbtList fresh = new NbtList("l");
+            NbtList loaded = new NbtList("l", NbtTagType.End);
+            NbtList declared = new NbtList("l", NbtTagType.Compound);
+            Assert.IsTrue(comparer.Equals(fresh, loaded));
+            Assert.IsTrue(comparer.Equals(loaded, declared));
+            Assert.AreEqual(comparer.GetHashCode(fresh), comparer.GetHashCode(declared));
+
+            // With elements in it, the type is part of the value again
+            NbtList ints = new NbtList("l") { new NbtInt(1) };
+            NbtList bytes = new NbtList("l") { new NbtByte(1) };
+            Assert.IsFalse(comparer.Equals(ints, bytes));
+            Assert.IsFalse(comparer.Equals(ints, declared));
         }
     }
 }

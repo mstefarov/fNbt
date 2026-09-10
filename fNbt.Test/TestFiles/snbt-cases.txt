@@ -1,0 +1,847 @@
+# One case per line: input (with the harness escapes ~uXXXX ~n ~t ~r ~~ ~D<n> ~L<n> ~S<n>),
+# a tab, the result of Minecraft 26.2 (OK plus Tag.toString(), or ERR), a tab, the result of 1.21.4.
+# Generated from the research harness that ran these inputs through the 1.21.4 and 26.2 server jars (2026-09-05); do not edit by hand.
+1	OK 1	OK 1
++1	OK 1	OK 1
+-1	OK -1	OK -1
+1b	OK 1b	OK 1b
+1B	OK 1b	OK 1b
+127b	OK 127b	OK 127b
+128b	ERR	OK "128b"
+-128b	OK -128b	OK -128b
+-129b	ERR	OK "-129b"
+255b	ERR	OK "255b"
+1s	OK 1s	OK 1s
+32768s	ERR	OK "32768s"
+1L	OK 1L	OK 1L
+1l	OK 1L	OK 1L
+1i	OK 1	OK "1i"
+1I	OK 1	OK "1I"
+2147483647	OK 2147483647	OK 2147483647
+2147483648	ERR	OK "2147483648"
+-2147483648	OK -2147483648	OK -2147483648
+-2147483649	ERR	OK "-2147483649"
+9223372036854775807L	OK 9223372036854775807L	OK 9223372036854775807L
+9223372036854775808L	ERR	OK "9223372036854775808L"
+1.0	OK 1.0d	OK 1.0d
+1.	OK 1.0d	OK 1.0d
+.5	OK 0.5d	OK 0.5d
+-.5	OK -0.5d	OK -0.5d
++.5	OK 0.5d	OK 0.5d
+1e5	OK 100000.0d	OK "1e5"
+1E5	OK 100000.0d	OK "1E5"
+1e+5	OK 100000.0d	OK "1e+5"
+1e-5	OK 1.0E-5d	OK "1e-5"
+1e5f	OK 100000.0f	OK 100000.0f
+1.0e+5d	OK 100000.0d	OK 100000.0d
+1E-05d	OK 1.0E-5d	OK 1.0E-5d
+1f	OK 1.0f	OK 1.0f
+1F	OK 1.0f	OK 1.0f
+1d	OK 1.0d	OK 1.0d
+1D	OK 1.0d	OK 1.0d
+1.5f	OK 1.5f	OK 1.5f
+-0.0f	OK 0.0f	OK 0.0f
+-0.0	OK 0.0d	OK 0.0d
+0.0	OK 0.0d	OK 0.0d
+NaN	OK "NaN"	OK "NaN"
+Infinity	OK "Infinity"	OK "Infinity"
+-Infinity	ERR	OK "-Infinity"
+Infinityd	OK "Infinityd"	OK "Infinityd"
+NaNf	OK "NaNf"	OK "NaNf"
+1e1000	ERR	OK "1e1000"
+1e1000f	ERR	OK Infinityf
+1e39f	ERR	OK Infinityf
+1e-50f	OK 0.0f	OK 0.0f
+0x1F	OK 31	OK "0x1F"
+0X1f	OK 31	OK "0X1f"
+0b101	OK 5	OK "0b101"
+0B101	OK 5	OK "0B101"
+0b102	ERR	OK "0b102"
+1_000	OK 1000	OK "1_000"
+1__0	OK 10	OK "1__0"
+0x_1	ERR	OK "0x_1"
+1_	ERR	OK "1_"
+_1	OK "_1"	OK "_1"
+0x	ERR	OK "0x"
+0xFFFFFFFF	OK -1	OK "0xFFFFFFFF"
+0xFFFFFFFFi	OK -1	OK "0xFFFFFFFFi"
+0x80000000	OK -2147483648	OK "0x80000000"
+0x100000000	ERR	OK "0x100000000"
+0xFF	OK 255	OK "0xFF"
+0xFFb	OK 4091	OK "0xFFb"
+0xFFub	OK -1b	OK "0xFFub"
+0xFFsb	ERR	OK "0xFFsb"
+0x7Fsb	OK 127b	OK "0x7Fsb"
+0x80sb	ERR	OK "0x80sb"
+-0x1	ERR	OK "-0x1"
+-0x1sb	OK -1b	OK "-0x1sb"
++0x1	OK 1	OK "+0x1"
+0b1111_1111ub	OK -1b	OK "0b1111_1111ub"
+07	ERR	OK "07"
+0	OK 0	OK 0
+00	ERR	OK "00"
+-0	OK 0	OK 0
+-00	ERR	OK "-00"
+0.0d	OK 0.0d	OK 0.0d
+0e0	OK 0.0d	OK "0e0"
+1e5d	OK 100000.0d	OK 100000.0d
+1.e5	OK 100000.0d	OK 100000.0d
+.e5	ERR	OK ".e5"
+1.5e	ERR	OK "1.5e"
+1.5e+	ERR	OK "1.5e+"
+1e	ERR	OK "1e"
+255ub	OK -1b	OK "255ub"
+256ub	ERR	OK "256ub"
+-1ub	ERR	OK "-1ub"
+-1sb	OK -1b	OK "-1sb"
+128sb	ERR	OK "128sb"
+65535us	OK -1s	OK "65535us"
+65536us	ERR	OK "65536us"
+4294967295ui	OK -1	OK "4294967295ui"
+4294967296ui	ERR	OK "4294967296ui"
+4294967295u	ERR	OK "4294967295u"
+18446744073709551615ul	OK -1L	OK "18446744073709551615ul"
+18446744073709551616ul	ERR	OK "18446744073709551616ul"
+1u	ERR	OK "1u"
+1ub	OK 1b	OK "1ub"
+1UB	OK 1b	OK "1UB"
+1Ub	OK 1b	OK "1Ub"
+1sB	OK 1b	OK "1sB"
+1su	ERR	OK "1su"
+1bs	ERR	OK "1bs"
+1ss	OK 1s	OK "1ss"
+1ll	ERR	OK "1ll"
+1LL	ERR	OK "1LL"
+1fd	ERR	OK "1fd"
+1.0F	OK 1.0f	OK 1.0f
+1.0fd	ERR	OK "1.0fd"
+1e5F	OK 100000.0f	OK 100000.0f
+1e5D	OK 100000.0d	OK 100000.0d
+1E5D	OK 100000.0d	OK 100000.0d
+3.4028235E38f	OK 3.4028235E38f	OK 3.4028235E38f
+3.4028236E38f	ERR	OK Infinityf
+1.7976931348623157E308	OK 1.7976931348623157E308d	OK 1.7976931348623157E308d
+1.7976931348623159E308	ERR	OK Infinityd
+1.0000000000000002	OK 1.0000000000000002d	OK 1.0000000000000002d
+0.1	OK 0.1d	OK 0.1d
+0.30000000000000004	OK 0.30000000000000004d	OK 0.30000000000000004d
+100000000	OK 100000000	OK 100000000
+1.0E7	OK 1.0E7d	OK 1.0E7d
+1.0e7	OK 1.0E7d	OK 1.0E7d
+12345678.9	OK 1.23456789E7d	OK 1.23456789E7d
+1E7	OK 1.0E7d	OK "1E7"
+1.0E-4	OK 1.0E-4d	OK 1.0E-4d
+0.0001	OK 1.0E-4d	OK 1.0E-4d
+1E-4d	OK 1.0E-4d	OK 1.0E-4d
+true	OK 1b	OK 1b
+false	OK 0b	OK 0b
+True	OK 1b	OK 1b
+TRUE	OK 1b	OK 1b
+truex	OK "truex"	OK "truex"
+false1	OK "false1"	OK "false1"
+trueish	OK "trueish"	OK "trueish"
+abc	OK "abc"	OK "abc"
+abc1	OK "abc1"	OK "abc1"
+1abc	ERR	OK "1abc"
+a-b.c+d	OK "a-b.c+d"	OK "a-b.c+d"
+-abc	ERR	OK "-abc"
++abc	ERR	OK "+abc"
+.abc	ERR	OK ".abc"
+a b	ERR	ERR
+a/b	ERR	ERR
+a:b	ERR	ERR
+a=b	ERR	ERR
+hello_world	OK "hello_world"	OK "hello_world"
+hello-world	OK "hello-world"	OK "hello-world"
+hello.world	OK "hello.world"	OK "hello.world"
+_a	OK "_a"	OK "_a"
+-	ERR	OK "-"
++	ERR	OK "+"
+.	ERR	OK "."
+a'b	ERR	ERR
+a"b	ERR	ERR
+a\b	ERR	ERR
+a{b	ERR	ERR
+abc(1)	ERR	ERR
+bool(1)	OK 1b	ERR
+bool(0)	OK 0b	ERR
+bool(true)	OK 1b	ERR
+bool(false)	OK 0b	ERR
+bool(2.5)	OK 1b	ERR
+bool(0.0)	OK 0b	ERR
+bool("1")	ERR	ERR
+bool()	ERR	ERR
+bool(1,2)	ERR	ERR
+BOOL(1)	ERR	ERR
+uuid("123e4567-e89b-12d3-a456-426614174000")	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+uuid('123e4567-e89b-12d3-a456-426614174000')	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+uuid(123e4567-e89b-12d3-a456-426614174000)	ERR	ERR
+uuid("not-a-uuid")	ERR	ERR
+uuid("00000000-0000-0000-0000-000000000000")	OK [I;0,0,0,0]	ERR
+uuid("123e4567-e89b-12d3-a456-426614174000",)	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+foo(1)	ERR	ERR
+foo()	ERR	ERR
+true(1)	ERR	ERR
+"abc"	OK "abc"	OK "abc"
+'abc'	OK "abc"	OK "abc"
+""	OK ""	OK ""
+''	OK ""	OK ""
+"a\"b"	OK 'a"b'	OK 'a"b'
+"a\\b"	OK "a\\b"	OK "a\\b"
+"a\'b"	OK "a'b"	ERR
+'a\'b'	OK "a'b"	OK "a'b"
+'a"b'	OK 'a"b'	OK 'a"b'
+"a'b"	OK "a'b"	OK "a'b"
+"a\nb"	OK "a\nb"	ERR
+"a\tb"	OK "a\tb"	ERR
+"a\rb"	OK "a\rb"	ERR
+"a\bb"	OK "a\bb"	ERR
+"a\fb"	OK "a\fb"	ERR
+"a\sb"	OK "a b"	ERR
+"a\x41b"	OK "aAb"	ERR
+"a\x4Gb"	ERR	ERR
+"a~u2603b"	OK "a\u2603b"	OK "a\u2603b"
+"a\U00002603b"	OK "a\u2603b"	ERR
+"a\U0001F600b"	OK "a\uD83D\uDE00b"	ERR
+"a\U00110000b"	ERR	ERR
+"a\ud83db"	OK "a\uD83Db"	ERR
+"a\N{Snowman}b"	OK "a\u2603b"	ERR
+"a\N{SNOWMAN}b"	OK "a\u2603b"	ERR
+"a\N{snowman}b"	OK "a\u2603b"	ERR
+"a\N{LATIN SMALL LETTER A}b"	OK "aab"	ERR
+"a\N{Nonexistent Name}b"	ERR	ERR
+"a\N{}b"	ERR	ERR
+"a\N{U+2603}b"	ERR	ERR
+"a\/b"	ERR	ERR
+"a\0b"	ERR	ERR
+"a\qb"	ERR	ERR
+"a~ud83d~ude00b"	OK "a\uD83D\uDE00b"	OK "a\uD83D\uDE00b"
+"a~nb"	OK "a\nb"	OK "a\u000Ab"
+"a~tb"	OK "a\tb"	OK "a\u0009b"
+"a~u0001b"	OK "a\x01b"	OK "a\u0001b"
+"a~u007Fb"	OK "a\u007Fb"	OK "a\u007Fb"
+"a~u0000b"	OK "a\x00b"	OK "a\u0000b"
+"abc	ERR	ERR
+"abc'	ERR	ERR
+'abc"	ERR	ERR
+"a\"	ERR	ERR
+"~S70000"	OK "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...(70002 chars)	OK "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...(70002 chars)
+{"a":1}	OK {a:1}	OK {a:1}
+{'a':1}	OK {a:1}	OK {a:1}
+{a:1}	OK {a:1}	OK {a:1}
+{"":1}	ERR	ERR
+{'':1}	ERR	ERR
+{:1}	ERR	ERR
+{a:1,a:2}	OK {a:2}	OK {a:2}
+{a:1,"a":2}	OK {a:2}	OK {a:2}
+{"~u00e9":1}	OK {"\u00E9":1}	OK {"\u00E9":1}
+{~u00e9:1}	ERR	ERR
+{1:2}	OK {"1":2}	OK {1:2}
+{1a:2}	OK {"1a":2}	OK {1a:2}
+{"1":2}	OK {"1":2}	OK {1:2}
+{a b:1}	ERR	ERR
+{"a b":1}	OK {"a b":1}	OK {"a b":1}
+{a-b:1}	OK {a-b:1}	OK {a-b:1}
+{a.b:1}	OK {a.b:1}	OK {a.b:1}
+{a+b:1}	OK {a+b:1}	OK {a+b:1}
+{-a:1}	OK {"-a":1}	OK {-a:1}
+{true:1}	OK {"true":1}	OK {true:1}
+{false:1}	OK {"false":1}	OK {false:1}
+{"true":1}	OK {"true":1}	OK {true:1}
+{a:1 b:2}	ERR	ERR
+{a:1,}	OK {a:1}	OK {a:1}
+{a:1,,}	ERR	ERR
+{,}	ERR	ERR
+{,a:1}	ERR	ERR
+{a:}	ERR	ERR
+{a}	ERR	ERR
+{a:1	ERR	ERR
+{a:1}}	ERR	ERR
+{a:1}garbage	ERR	ERR
+{a:1} garbage	ERR	ERR
+{a:1}{b:2}	ERR	ERR
+{a:1};	ERR	ERR
+{a:1},	ERR	ERR
+{ a : 1 , b : 2 }	OK {a:1,b:2}	OK {a:1,b:2}
+{a:1,b:{c:2,d:[1,2,3]}}	OK {a:1,b:{c:2,d:[1,2,3]}}	OK {a:1,b:{c:2,d:[1,2,3]}}
+{a:"1"}	OK {a:"1"}	OK {a:"1"}
+{a:'1'}	OK {a:"1"}	OK {a:"1"}
+{a:'"'}	OK {a:'"'}	OK {a:'"'}
+{a:"'"}	OK {a:"'"}	OK {a:"'"}
+{a:'\''}	OK {a:"'"}	OK {a:"'"}
+{"a\"b":1}	OK {'a"b':1}	OK {'a"b':1}
+{a:1,B:2,b:3,A:4,_:5,0:6}	OK {"0":6,A:4,B:2,_:5,a:1,b:3}	OK {0:6,A:4,B:2,_:5,a:1,b:3}
+{z:1,a:2,m:3}	OK {a:2,m:3,z:1}	OK {a:2,m:3,z:1}
+{a:{}}	OK {a:{}}	OK {a:{}}
+{a:[]}	OK {a:[]}	OK {a:[]}
+{a:[B;]}	OK {a:[B;]}	OK {a:[B;]}
+{}	OK {}	OK {}
+{ }	OK {}	OK {}
+  {}	OK {}	OK {}
+~D512	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+~D513	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(2053 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(2053 chars)
+~D600	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(2401 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(2401 chars)
+~D1000	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(4001 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(4001 chars)
+~D5000	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(20001 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(20001 chars)
+~L512	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+~L513	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(1026 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(1026 chars)
+~L600	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(1200 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(1200 chars)
+~L1000	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(2000 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(2000 chars)
+~L5000	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(10000 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(10000 chars)
+[]	OK []	OK []
+[ ]	OK []	OK []
+[,]	ERR	ERR
+[1,]	OK [1]	OK [1]
+[1,,]	ERR	ERR
+[,1]	ERR	ERR
+[1,2b]	OK [1,2b]	ERR
+[1,'a']	OK [1,"a"]	ERR
+[1,"a"]	OK [1,"a"]	ERR
+[[],[]]	OK [[],[]]	OK [[],[]]
+[{},{}]	OK [{},{}]	OK [{},{}]
+[[1],["a"]]	OK [[1],["a"]]	OK [[1],["a"]]
+[[1,2],[3.0]]	OK [[1,2],[3.0d]]	OK [[1,2],[3.0d]]
+[[B;1],[I;2]]	OK [[B;1B],[I;2]]	ERR
+[1b,2b]	OK [1b,2b]	OK [1b,2b]
+[1,2]	OK [1,2]	OK [1,2]
+[1.0,2]	OK [1.0d,2]	ERR
+[1,2.0]	OK [1,2.0d]	ERR
+['a',{b:3}]	OK ["a",{b:3}]	ERR
+[{b:3},'a']	OK [{b:3},"a"]	ERR
+[1	ERR	ERR
+[1,2	ERR	ERR
+[1 2]	ERR	ERR
+[true,false]	OK [1b,0b]	OK [1b,0b]
+[true,1]	OK [1b,1]	ERR
+[1,true]	OK [1,1b]	ERR
+[{}, 1]	OK [{},1]	ERR
+[END]	OK ["END"]	OK ["END"]
+[[[[]]]]	OK [[[[]]]]	OK [[[[]]]]
+[a,b,c]	OK ["a","b","c"]	OK ["a","b","c"]
+[a b]	ERR	ERR
+[a,b	ERR	ERR
+[1]]	ERR	ERR
+[1] ]	ERR	ERR
+[B;]	OK [B;]	OK [B;]
+[B; ]	OK [B;]	OK [B;]
+[B;1,2]	OK [B;1B,2B]	ERR
+[B;1b,2b]	OK [B;1B,2B]	OK [B;1B,2B]
+[B;1B,2B]	OK [B;1B,2B]	OK [B;1B,2B]
+[B;1,2,]	OK [B;1B,2B]	ERR
+[B;,]	ERR	ERR
+[B;1,,]	ERR	ERR
+[B;1s]	ERR	ERR
+[B;1i]	ERR	ERR
+[B;1L]	ERR	ERR
+[B;1.0]	ERR	ERR
+[B;128]	ERR	ERR
+[B;-128]	OK [B;-128B]	ERR
+[B;255ub]	OK [B;-1B]	ERR
+[B;256]	ERR	ERR
+[B;true]	ERR	OK [B;1B]
+[B;"1"]	ERR	ERR
+[B;a]	ERR	ERR
+[B;0x7F]	OK [B;127B]	ERR
+[B;0x7Fsb]	OK [B;127B]	ERR
+[B;0xFF]	OK [B;-1B]	ERR
+[B;0xFFub]	OK [B;-1B]	ERR
+[I;1b]	OK [I;1]	ERR
+[I;1s]	OK [I;1]	ERR
+[I;1]	OK [I;1]	OK [I;1]
+[I;1i]	OK [I;1]	ERR
+[I;1L]	ERR	ERR
+[I;1_000]	OK [I;1000]	ERR
+[I;2147483648]	ERR	ERR
+[I;0xFFFFFFFF]	OK [I;-1]	ERR
+[I;0xFFFFFFFFsi]	ERR	ERR
+[I;-1]	OK [I;-1]	OK [I;-1]
+[L;1]	OK [L;1L]	ERR
+[L;1b]	OK [L;1L]	ERR
+[L;1s]	OK [L;1L]	ERR
+[L;1i]	OK [L;1L]	ERR
+[L;1L]	OK [L;1L]	OK [L;1L]
+[L;1l]	OK [L;1L]	OK [L;1L]
+[L;9223372036854775807]	OK [L;9223372036854775807L]	ERR
+[L;9223372036854775808]	ERR	ERR
+[L;0xFFFFFFFFFFFFFFFF]	OK [L;-1L]	ERR
+[L;1.0]	ERR	ERR
+[i;1]	ERR	ERR
+[l;1]	ERR	ERR
+[b;1]	ERR	ERR
+[S;1]	ERR	ERR
+[D;1]	ERR	ERR
+[F;1]	ERR	ERR
+[B; 1b , 2b ]	OK [B;1B,2B]	OK [B;1B,2B]
+[ B;1b]	OK [B;1B]	ERR
+[B ;1b]	OK [B;1B]	ERR
+[B;1b;2b]	ERR	ERR
+["B";1]	ERR	ERR
+[B;[1]]	ERR	ERR
+[B;{}]	ERR	ERR
+[B;1	ERR	ERR
+[B;]]	ERR	ERR
+[I;]	OK [I;]	OK [I;]
+[L;]	OK [L;]	OK [L;]
+[I; ]	OK [I;]	OK [I;]
+[I;1,2,3]	OK [I;1,2,3]	OK [I;1,2,3]
+[L;1,2,3]	OK [L;1L,2L,3L]	ERR
+[B;-1,0,1]	OK [B;-1B,0B,1B]	ERR
+"x"	OK "x"	OK "x"
+'x'	OK "x"	OK "x"
+x	OK "x"	OK "x"
+[B;1]	OK [B;1B]	ERR
+1.5	OK 1.5d	OK 1.5d
+  {a:1}	OK {a:1}	OK {a:1}
+~t{a:1}~n	OK {a:1}	OK {a:1}
+{a:1}~n~n	OK {a:1}	OK {a:1}
+{a:1}x	ERR	ERR
+{a:1} x	ERR	ERR
+{a:1} ,	ERR	ERR
+1 2	ERR	ERR
+1,2	ERR	ERR
+"a" "b"	ERR	ERR
+abc def	ERR	ERR
+{a:1}{	ERR	ERR
+{ "a" : 1 }	OK {a:1}	OK {a:1}
+[ 1 , 2 ]	OK [1,2]	OK [1,2]
+[ B ; 1 ]	OK [B;1B]	ERR
+[B ; 1]	OK [B;1B]	ERR
+1 b	OK 1b	ERR
+1 .5	OK 1.5d	ERR
+- 1	OK -1	ERR
+1e 5	OK 100000.0d	ERR
+{a :1}	OK {a:1}	OK {a:1}
+{a: 1}	OK {a:1}	OK {a:1}
+{"a" :1}	OK {a:1}	OK {a:1}
+{a:~t1}	OK {a:1}	OK {a:1}
+{a:~n1~n}	OK {a:1}	OK {a:1}
+[1,~n2]	OK [1,2]	OK [1,2]
+[1~n,2]	OK [1,2]	OK [1,2]
+~E	ERR	ERR
+~W	ERR	ERR
+~t	ERR	ERR
+~n	ERR	ERR
+1 000	ERR	ERR
+0 x1F	OK 31	ERR
+0x 1F	OK 31	ERR
+1. 5	OK 1.5d	ERR
+1 e5	OK 100000.0d	ERR
+1e5 f	OK 100000.0f	ERR
+1 f	OK 1.0f	ERR
++ 1	OK 1	ERR
+-  1b	OK -1b	ERR
+1 _000	ERR	ERR
+1_ 000	ERR	ERR
+[B ; 1 , 2 ]	OK [B;1B,2B]	ERR
+[ I ; 1 ]	OK [I;1]	ERR
+{ a : 1 }	OK {a:1}	OK {a:1}
+{ "a" : "b" }	OK {a:"b"}	OK {a:"b"}
+" a "	OK " a "	OK " a "
+' a '	OK " a "	OK " a "
+b ool(1)	ERR	ERR
+bool (1)	OK 1b	ERR
+bool( 1 )	OK 1b	ERR
+uuid ( "123e4567-e89b-12d3-a456-426614174000" )	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+1_000_000L	OK 1000000L	OK "1_000_000L"
+1e5_0	OK 1.0E50d	OK "1e5_0"
+1_0.5	OK 10.5d	OK "1_0.5"
+1_0.5_0e1_0f	OK 1.05E11f	OK "1_0.5_0e1_0f"
+0x1p3	ERR	OK "0x1p3"
+1.0e1_0	OK 1.0E10d	OK "1.0e1_0"
+0x1_F	OK 31	OK "0x1_F"
+0b1_1	OK 3	OK "0b1_1"
+0x1__F	OK 31	OK "0x1__F"
+-1_000	OK -1000	OK "-1_000"
++1_000	OK 1000	OK "+1_000"
+1e+0_5	OK 100000.0d	OK "1e+0_5"
+1E+5f	OK 100000.0f	OK 100000.0f
+1.0E+5	OK 100000.0d	OK 100000.0d
+1.0E-5	OK 1.0E-5d	OK 1.0E-5d
+1e-5f	OK 1.0E-5f	OK 1.0E-5f
+0.000001	OK 1.0E-6d	OK 1.0E-6d
+0.0000001	OK 1.0E-7d	OK 1.0E-7d
+1000000.0	OK 1000000.0d	OK 1000000.0d
+10000000.0	OK 1.0E7d	OK 1.0E7d
+100000000.0	OK 1.0E8d	OK 1.0E8d
+1000000.0f	OK 1000000.0f	OK 1000000.0f
+10000000.0f	OK 1.0E7f	OK 1.0E7f
+9999999.0f	OK 9999999.0f	OK 9999999.0f
+16777217f	OK 1.6777216E7f	OK 1.6777216E7f
+0x7FFFFFFF	OK 2147483647	OK "0x7FFFFFFF"
+0x7FFFFFFFFFFFFFFFL	OK 9223372036854775807L	OK "0x7FFFFFFFFFFFFFFFL"
+0x8000000000000000L	OK -9223372036854775808L	OK "0x8000000000000000L"
+0x8000000000000000sL	ERR	OK "0x8000000000000000sL"
+0xFFFFFFFFFFFFFFFFL	OK -1L	OK "0xFFFFFFFFFFFFFFFFL"
+0xFFFFFFFFFFFFFFFFuL	OK -1L	OK "0xFFFFFFFFFFFFFFFFuL"
+0b11111111111111111111111111111111	OK -1	OK "0b11111111111111111111111111111111"
+0b111111111111111111111111111111111	ERR	OK "0b111111111111111111111111111111111"
+-0b1	ERR	OK "-0b1"
+-0b1si	OK -1	OK "-0b1si"
+1sl	OK 1L	OK "1sl"
+1ul	OK 1L	OK "1ul"
+1UL	OK 1L	OK "1UL"
+1Sl	OK 1L	OK "1Sl"
+0.5F	OK 0.5f	OK 0.5f
+.5f	OK 0.5f	OK 0.5f
+5.f	OK 5.0f	OK 5.0f
+5.F	OK 5.0f	OK 5.0f
+5.e1	OK 50.0d	OK 50.0d
+5.e1f	OK 50.0f	OK 50.0f
+5.e	ERR	OK "5.e"
+1.5E	ERR	OK "1.5E"
+1E	ERR	OK "1E"
+E5	OK "E5"	OK "E5"
+e5	OK "e5"	OK "e5"
+1.2.3	ERR	OK "1.2.3"
+1..2	ERR	OK "1..2"
+..1	ERR	OK "..1"
+1e5e5	ERR	OK "1e5e5"
+1d5	ERR	OK "1d5"
+1f5	ERR	OK "1f5"
+1L5	ERR	OK "1L5"
+--1	ERR	OK "--1"
++-1	ERR	OK "+-1"
+-+1	ERR	OK "-+1"
+++1	ERR	OK "++1"
+1-	ERR	OK "1-"
+1+	ERR	OK "1+"
+1-1	ERR	OK "1-1"
+1+1	ERR	OK "1+1"
+1.5-1	ERR	OK "1.5-1"
+2147483648L	OK 2147483648L	OK 2147483648L
+2147483648l	OK 2147483648L	OK 2147483648L
+2147483648i	ERR	OK "2147483648i"
+-2147483648i	OK -2147483648	OK "-2147483648i"
+2147483648ui	OK -2147483648	OK "2147483648ui"
+32767s	OK 32767s	OK 32767s
+32768S	ERR	OK "32768S"
+32768us	OK -32768s	OK "32768us"
+-32768s	OK -32768s	OK -32768s
+-32769s	ERR	OK "-32769s"
+-32768ss	OK -32768s	OK "-32768ss"
+127sb	OK 127b	OK "127sb"
+-128sb	OK -128b	OK "-128sb"
+128ub	OK -128b	OK "128ub"
+255UB	OK -1b	OK "255UB"
+0sb	OK 0b	OK "0sb"
+0ub	OK 0b	OK "0ub"
+00b	ERR	OK "00b"
+01b	ERR	OK "01b"
+0.0f	OK 0.0f	OK 0.0f
+00.0	OK 0.0d	OK 0.0d
+0.00	OK 0.0d	OK 0.0d
+.0	OK 0.0d	OK 0.0d
+0.	OK 0.0d	OK 0.0d
+0e5	OK 0.0d	OK "0e5"
+0e-5	OK 0.0d	OK "0e-5"
+0x0	OK 0	OK "0x0"
+0b0	OK 0	OK "0b0"
+0x00	OK 0	OK "0x00"
+0b00	OK 0	OK "0b00"
+-0x0	ERR	OK "-0x0"
+-0.0d	OK 0.0d	OK 0.0d
+-0e0	OK 0.0d	OK "-0e0"
+-.0	OK 0.0d	OK 0.0d
+-0b	OK 0b	OK 0b
+-0x	ERR	OK "-0x"
+[I;1ub]	OK [I;1]	ERR
+[I;1sb]	OK [I;1]	ERR
+[I;-1ub]	ERR	ERR
+[I;255ub]	OK [I;-1]	ERR
+[I;65535us]	OK [I;-1]	ERR
+[I;4294967295ui]	OK [I;-1]	ERR
+[I;1uL]	ERR	ERR
+[I;1.0]	ERR	ERR
+[I;1f]	ERR	ERR
+[I;true]	ERR	ERR
+[I;0b1]	OK [I;1]	ERR
+[I;0x1]	OK [I;1]	ERR
+[L;4294967295ui]	OK [L;-1L]	ERR
+[L;18446744073709551615ul]	OK [L;-1L]	ERR
+[L;1ub]	OK [L;1L]	ERR
+[L;0xFFFFFFFFFFFFFFFFsl]	ERR	ERR
+[B;0b11111111]	OK [B;-1B]	ERR
+[B;0b11111111sb]	ERR	ERR
+[B;0x7F,0x80]	OK [B;127B,-128B]	ERR
+[B;1,2,3,]	OK [B;1B,2B,3B]	ERR
+[B;1,2,3,,]	ERR	ERR
+[B;-0]	OK [B;0B]	ERR
+[B;+1]	OK [B;1B]	ERR
+[B;1b,2]	OK [B;1B,2B]	ERR
+[B;1,2b]	OK [B;1B,2B]	ERR
+[B;1B]	OK [B;1B]	OK [B;1B]
+[B;1_0]	OK [B;10B]	ERR
+[B;;]	ERR	ERR
+[B;1;]	ERR	ERR
+[B,1]	OK ["B",1]	ERR
+[B:1]	ERR	ERR
+[B;1 2]	ERR	ERR
+[B;1,,2]	ERR	ERR
+{a:1,a:"x"}	OK {a:"x"}	OK {a:"x"}
+{'a':1,"a":2,a:3}	OK {a:3}	OK {a:3}
+{a:1,b:2,a:3}	OK {a:3,b:2}	OK {a:3,b:2}
+{"a":1,"A":2}	OK {A:2,a:1}	OK {A:2,a:1}
+{~u2603:1}	ERR	ERR
+{"~u2603":1}	OK {"\u2603":1}	OK {"\u2603":1}
+{a~u2603:1}	ERR	ERR
+{"a~u0000b":1}	OK {"a\x00b":1}	OK {"a\u0000b":1}
+{"a~u0001b":1}	OK {"a\x01b":1}	OK {"a\u0001b":1}
+{"a~u007fb":1}	OK {"a\u007Fb":1}	OK {"a\u007Fb":1}
+{"a\x7Fb":1}	OK {"a\u007Fb":1}	ERR
+{"a\nb":1}	OK {"a\nb":1}	ERR
+{"a b":1,c:2}	OK {"a b":1,c:2}	OK {"a b":1,c:2}
+{a.b.c:1}	OK {a.b.c:1}	OK {a.b.c:1}
+{"a.b.c":1}	OK {a.b.c:1}	OK {a.b.c:1}
+{123:1}	OK {"123":1}	OK {123:1}
+{"123":1}	OK {"123":1}	OK {123:1}
+{0x1:1}	OK {"0x1":1}	OK {0x1:1}
+{1.5:1}	OK {"1.5":1}	OK {1.5:1}
+{true:1,false:2,TRUE:3}	OK {"TRUE":3,"false":2,"true":1}	OK {TRUE:3,false:2,true:1}
+{bool:1}	OK {bool:1}	OK {bool:1}
+{"bool(1)":1}	OK {"bool(1)":1}	OK {"bool(1)":1}
+{bool(1):1}	ERR	ERR
+{a:bool(1)}	OK {a:1b}	ERR
+{a:uuid("123e4567-e89b-12d3-a456-426614174000")}	OK {a:[I;306070887,-392490285,-1537850778,337068032]}	ERR
+{"":{}}	ERR	ERR
+{a:{"":1}}	ERR	ERR
+{a::1}	ERR	ERR
+{a:1:2}	ERR	ERR
+{a=1}	ERR	ERR
+{a 1}	ERR	ERR
+{"a":1,}	OK {a:1}	OK {a:1}
+{"a":1,,}	ERR	ERR
+{"a":1 ,}	OK {a:1}	OK {a:1}
+{"a":1, }	OK {a:1}	OK {a:1}
+{ "a":1 , }	OK {a:1}	OK {a:1}
+{a:1,b:2,}	OK {a:1,b:2}	OK {a:1,b:2}
+{a:1,b:2, }	OK {a:1,b:2}	OK {a:1,b:2}
+[1,2,]	OK [1,2]	OK [1,2]
+[1,2, ]	OK [1,2]	OK [1,2]
+[1,2 ,]	OK [1,2]	OK [1,2]
+[ , ]	ERR	ERR
+[1 ,, 2]	ERR	ERR
+[,,]	ERR	ERR
+[1,[2,[3,[4]]]]	OK [1,[2,[3,[4]]]]	ERR
+[[[[[1]]]]]	OK [[[[[1]]]]]	OK [[[[[1]]]]]
+[{a:1},{a:"1"}]	OK [{a:1},{a:"1"}]	OK [{a:1},{a:"1"}]
+[1b,1s,1,1L,1f,1d]	OK [1b,1s,1,1L,1.0f,1.0d]	ERR
+[1,1b]	OK [1,1b]	ERR
+["a",1,{},[],[B;],true]	OK ["a",1,{},[],[B;],1b]	ERR
+[bool(1),1]	OK [1b,1]	ERR
+[1,bool(1)]	OK [1,1b]	ERR
+[[B;1],[B;2]]	OK [[B;1B],[B;2B]]	ERR
+[[B;1],1]	OK [[B;1B],1]	ERR
+[1,[B;1]]	OK [1,[B;1B]]	ERR
+[[],1]	OK [[],1]	ERR
+[1,[]]	OK [1,[]]	ERR
+[{},{},{}]	OK [{},{},{}]	OK [{},{},{}]
+[[],[],[]]	OK [[],[],[]]	OK [[],[],[]]
+["a","b"]	OK ["a","b"]	OK ["a","b"]
+['a','b']	OK ["a","b"]	OK ["a","b"]
+[a]	OK ["a"]	OK ["a"]
+[a,]	OK ["a"]	OK ["a"]
+[a,,]	ERR	ERR
+[true]	OK [1b]	OK [1b]
+[true,]	OK [1b]	OK [1b]
+[1;2]	ERR	ERR
+[1:2]	ERR	ERR
+[1=2]	ERR	ERR
+"\\"	OK "\\"	OK "\\"
+"\\\\"	OK "\\\\"	OK "\\\\"
+"\""	OK '"'	OK '"'
+'\''	OK "'"	OK "'"
+'"'	OK '"'	OK '"'
+"'"	OK "'"	OK "'"
+"\'"	OK "'"	ERR
+'\"'	OK '"'	ERR
+"a\\nb"	OK "a\\nb"	OK "a\\nb"
+"\x00"	OK "\x00"	ERR
+"\x7F"	OK "\u007F"	ERR
+"\x80"	OK "\u0080"	ERR
+"\xFF"	OK "\u00FF"	ERR
+"\xff"	OK "\u00FF"	ERR
+"~u0000"	OK "\x00"	OK "\u0000"
+"~uD83D~uDE00"	OK "\uD83D\uDE00"	OK "\uD83D\uDE00"
+"\uD83D"	OK "\uD83D"	ERR
+"\uDE00"	OK "\uDE00"	ERR
+"\U0000D83D"	OK "\uD83D"	ERR
+"\U0010FFFF"	OK "\uDBFF\uDFFF"	ERR
+"\U00110000"	ERR	ERR
+"\UFFFFFFFF"	ERR	ERR
+"\N{Snowman}"	OK "\u2603"	ERR
+"\N{ SNOWMAN }"	OK "\u2603"	ERR
+"\N{SNOW MAN}"	ERR	ERR
+"\N{snow-man}"	ERR	ERR
+"\N{BLACK STAR}"	OK "\u2605"	ERR
+"\N{FULLWIDTH LATIN CAPITAL LETTER A}"	OK "\uFF21"	ERR
+"\N{NULL}"	OK "\x00"	ERR
+"\N{LINE FEED}"	ERR	ERR
+"\N{LF}"	ERR	ERR
+"\N{NEW LINE}"	ERR	ERR
+"\N{SPACE}"	OK " "	ERR
+"\N{LATIN SMALL LETTER A WITH ACUTE}"	OK "\u00E1"	ERR
+"\N{CJK UNIFIED IDEOGRAPH-4E00}"	ERR	ERR
+"\N{HANGUL SYLLABLE GA}"	ERR	ERR
+"\N{Latin Small Letter A}"	OK "a"	ERR
+"\N{latin small letter a}"	OK "a"	ERR
+"\N{LATIN_SMALL_LETTER_A}"	ERR	ERR
+"\N{}"	ERR	ERR
+"\N{a}"	ERR	ERR
+"\N"	ERR	ERR
+"\N{Snowman"	ERR	ERR
+"\s"	OK " "	ERR
+"\S"	ERR	ERR
+"\b"	OK "\b"	ERR
+"\B"	ERR	ERR
+"\t"	OK "\t"	ERR
+"\T"	ERR	ERR
+"\a"	ERR	ERR
+"\v"	ERR	ERR
+"\e"	ERR	ERR
+"\0"	ERR	ERR
+"\1"	ERR	ERR
+"\x4"	ERR	ERR
+"\x"	ERR	ERR
+"\u"	ERR	ERR
+"\u260"	ERR	ERR
+"~u2603x"	OK "\u2603x"	OK "\u2603x"
+"\U0000260"	ERR	ERR
+"\U00002603x"	OK "\u2603x"	ERR
+"~S1000000"	OK "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...(1000002 chars)	OK "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...(1000002 chars)
+"tab~there"	OK "tab\there"	OK "tab\u0009here"
+"nl~nhere"	OK "nl\nhere"	OK "nl\u000Ahere"
+"cr~rhere"	OK "cr\rhere"	OK "cr\u000Dhere"
+"~u0007bell"	OK "\x07bell"	OK "\u0007bell"
+"~u001Besc"	OK "\x1Besc"	OK "\u001Besc"
+"~u007Fdel"	OK "\u007Fdel"	OK "\u007Fdel"
+"~u0080c1"	OK "\u0080c1"	OK "\u0080c1"
+"~u00A0nbsp"	OK "\u00A0nbsp"	OK "\u00A0nbsp"
+"~u2028ls"	OK "\u2028ls"	OK "\u2028ls"
+"~uFEFFbom"	OK "\uFEFFbom"	OK "\uFEFFbom"
+"~uFFFFnonchar"	OK "\uFFFFnonchar"	OK "\uFFFFnonchar"
+"~uD800lone"	OK "\uD800lone"	OK "\uD800lone"
+' single "double" inside '	OK ' single "double" inside '	OK ' single "double" inside '
+" double 'single' inside "	OK " double 'single' inside "	OK " double 'single' inside "
+"mixed \" and ' and \\ "	OK 'mixed " and \' and \\ '	OK 'mixed " and \' and \\ '
+'mixed " and \' and \\ '	OK 'mixed " and \' and \\ '	OK 'mixed " and \' and \\ '
+bool(1b)	OK 1b	ERR
+bool(1s)	OK 1b	ERR
+bool(1L)	OK 1b	ERR
+bool(1f)	OK 1b	ERR
+bool(1d)	OK 1b	ERR
+bool(-1)	OK 1b	ERR
+bool(0.0f)	OK 0b	ERR
+bool(NaN)	ERR	ERR
+bool([])	ERR	ERR
+bool({})	ERR	ERR
+bool([B;1])	ERR	ERR
+bool('true')	ERR	ERR
+bool(bool(1))	OK 1b	ERR
+bool( true )	OK 1b	ERR
+bool(true,)	OK 1b	ERR
+bool(,)	ERR	ERR
+uuid("123E4567-E89B-12D3-A456-426614174000")	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+uuid("123e4567e89b12d3a456426614174000")	ERR	ERR
+uuid("123e4567-e89b-12d3-a456-42661417400")	OK [I;306070887,-392490285,-1537866714,1631679488]	ERR
+uuid("123e4567-e89b-12d3-a456-4266141740000")	ERR	ERR
+uuid("0-0-0-0-0")	OK [I;0,0,0,0]	ERR
+uuid("ffffffff-ffff-ffff-ffff-ffffffffffff")	OK [I;-1,-1,-1,-1]	ERR
+uuid("123e4567-e89b-12d3-a456-426614174000",1)	ERR	ERR
+uuid()	ERR	ERR
+uuid(1)	ERR	ERR
+uuid([I;1,2,3,4])	ERR	ERR
+uuid(uuid("123e4567-e89b-12d3-a456-426614174000"))	ERR	ERR
+bool(uuid("123e4567-e89b-12d3-a456-426614174000"))	ERR	ERR
+Bool(1)	ERR	ERR
+BOOL(true)	ERR	ERR
+uuid ("123e4567-e89b-12d3-a456-426614174000")	OK [I;306070887,-392490285,-1537850778,337068032]	ERR
+UUID("123e4567-e89b-12d3-a456-426614174000")	ERR	ERR
+true()	ERR	ERR
+false()	ERR	ERR
+true(true)	ERR	ERR
+abc()	ERR	ERR
+a.b(1)	ERR	ERR
+a-b(1)	ERR	ERR
+_a(1)	ERR	ERR
+- 5	OK -5	ERR
+[B ; 1b]	OK [B;1B]	ERR
+true1	OK "true1"	OK "true1"
+_abc	OK "_abc"	OK "_abc"
+abc_	OK "abc_"	OK "abc_"
+a.b-c+d	OK "a.b-c+d"	OK "a.b-c+d"
+{_a:1}	OK {_a:1}	OK {_a:1}
+{.a:1}	OK {.a:1}	OK {.a:1}
+{1a:1}	OK {"1a":1}	OK {1a:1}
+{+a:1}	OK {"+a":1}	OK {+a:1}
++1b	OK 1b	OK 1b
++1.5f	OK 1.5f	OK 1.5f
++0x1F	OK 31	OK "+0x1F"
+01	ERR	OK "01"
+007b	ERR	OK "007b"
+00.5	OK 0.5d	OK 0.5d
+.5e5	OK 50000.0d	OK 50000.0d
+1.0e5	OK 100000.0d	OK 100000.0d
+1e+	ERR	OK "1e+"
+"\x41B"	OK "AB"	ERR
+"\x4g"	ERR	ERR
+"\u004"	ERR	ERR
+"\u00411"	OK "A1"	ERR
+"\U0000004"	ERR	ERR
+"\U00000041"	OK "A"	ERR
+"\N{LATIN SMALL LETTER A}"	OK "a"	ERR
+"\N{NOPE}"	ERR	ERR
+"\q"	ERR	ERR
+"a\~nb"	OK "a\b"	ERR
+bool(256)	OK 1b	ERR
+bool(0.5)	OK 1b	ERR
+bool(1.5)	OK 1b	ERR
+bool("true")	ERR	ERR
+bool("false")	ERR	ERR
+bool([1])	ERR	ERR
+Infinityf	OK "Infinityf"	OK "Infinityf"
+-Infinityf	ERR	OK "-Infinityf"
+NaNd	OK "NaNd"	OK "NaNd"
+1e1000d	ERR	OK Infinityd
+3.5e38f	ERR	OK Infinityf
+1e999	ERR	OK "1e999"
+-1e999	ERR	OK "-1e999"
+1e308d	OK 1.0E308d	OK 1.0E308d
+1e309d	ERR	OK Infinityd
+0b	OK 0b	OK 0b
+0b2	ERR	OK "0b2"
+0xG	ERR	OK "0xG"
+1_b	ERR	OK "1_b"
+0x1F_	ERR	OK "0x1F_"
+1_000L	OK 1000L	OK "1_000L"
+0xFFul	OK 255L	OK "0xFFul"
+0x80b	OK 2059	OK "0x80b"
+0x80ub	OK -128b	OK "0x80ub"
+0xFFFFFFFFu	ERR	OK "0xFFFFFFFFu"
+0xFFFFFFFFui	OK -1	OK "0xFFFFFFFFui"
+-1us	ERR	OK "-1us"
+1si	OK 1	OK "1si"
+1S	OK 1s	OK 1s
+1uS	OK 1s	OK "1uS"
+0.5_5	OK 0.55d	OK "0.5_5"
+1_000.5	OK 1000.5d	OK "1_000.5"
+1e1_0	OK 1.0E10d	OK "1e1_0"
+[1,"a",{}]	OK [1,"a",{}]	ERR
+[[],[1]]	OK [[],[1]]	OK [[],[1]]
+[I;1b,2s,3]	OK [I;1,2,3]	ERR
+[L;1,2b]	OK [L;1L,2L]	ERR
+[B;1b,]	OK [B;1B]	OK [B;1B]
+[B;-129]	ERR	ERR
+[1,,2]	ERR	ERR
+{a:1;b:2}	ERR	ERR
+[B;1b,,]	ERR	ERR
+{1.5:2}	OK {"1.5":2}	OK {1.5:2}
+ 	ERR	ERR
+{} x	ERR	ERR
+{}{}	ERR	ERR
+[1]	OK [1]	OK [1]
+~n {} ~n	OK {}	OK {}
+{}~n	OK {}	OK {}
+~D2000	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(8001 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(8001 chars)
+~D10000	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(40001 chars)	OK {a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:{a:...(40001 chars)
+~L2000	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(4000 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(4000 chars)
+~L10000	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(20000 chars)	OK [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...(20000 chars)

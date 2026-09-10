@@ -44,8 +44,8 @@ namespace fNbt {
         readonly bool requireCompoundRootOnRead;
 
 
-        /// <summary> Creates a codec for the given flavor with the current default policy
-        /// settings. </summary>
+        /// <summary> Creates a codec for the given flavor with the current validation and
+        /// allocation defaults. </summary>
         /// <param name="flavor"> Encoding to read and write. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtFlavor flavor)
@@ -53,10 +53,9 @@ namespace fNbt {
 
 
         /// <summary> Creates a codec with the given options. </summary>
-        /// <param name="options"> Settings to use, snapshotted here. Later changes to the
-        /// instance do not affect this codec. </param>
-        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <c>Flavor</c> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
+        /// <param name="options"> Settings to copy. Later changes to these options do not
+        /// affect this codec. </param>
+        /// <exception cref="ArgumentNullException"> <paramref name="options"/> or its <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         public NbtCodec(NbtOptions options)
             : this(NbtOptions.ResolveForCodec(options, nameof(options))) { }
 
@@ -65,7 +64,7 @@ namespace fNbt {
             flavor = resolved.Flavor;
             maxAllocation = resolved.MaxAllocation;
             validateOnWrite = resolved.ValidateOnWrite && flavor.HasRestrictions;
-            validateOnRead = resolved.ValidateOnRead && flavor.HasRestrictions;
+            validateOnRead = resolved.ValidateOnRead;
             requireCompoundRootOnRead = resolved.ValidateOnRead && !flavor.AllowsNonCompoundRoot;
         }
 
@@ -75,7 +74,7 @@ namespace fNbt {
         /// <summary> Reads one NBT document from the given stream. The stream is left positioned
         /// exactly past the end of the document. </summary>
         /// <param name="stream"> Stream to read from. Does not need to be seekable. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="EndOfStreamException"> If the stream ends before the document does. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
@@ -89,7 +88,7 @@ namespace fNbt {
         /// <summary> Reads one NBT document from the given stream, requiring a specific root tag type. </summary>
         /// <param name="stream"> Stream to read from. Does not need to be seekable. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="expectedRootType"/> is not a concrete tag type. </exception>
         /// <exception cref="EndOfStreamException"> If the stream ends before the document does. </exception>
@@ -108,7 +107,7 @@ namespace fNbt {
         /// <param name="length"> Maximum number of bytes the document may occupy. Trailing bytes past the
         /// document's actual end are ignored. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> or <paramref name="length"/>
         /// do not describe a valid range within <paramref name="buffer"/>. </exception>
@@ -128,7 +127,7 @@ namespace fNbt {
         /// document's actual end are ignored. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentNullException"> <paramref name="buffer"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> or <paramref name="length"/>
         /// do not describe a valid range within <paramref name="buffer"/>; or <paramref name="expectedRootType"/>
@@ -209,7 +208,7 @@ namespace fNbt {
         /// the call, so pooled or stack memory is fine: the returned tags hold copies of their data. </summary>
         /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
         /// deep, exceeds a configured limit, fails enabled validation, or consists of a lone
@@ -225,7 +224,7 @@ namespace fNbt {
         /// <param name="buffer"> Bytes to read from. Trailing bytes past the document's actual end are ignored. </param>
         /// <param name="expectedRootType"> Root tag type that the document must have. </param>
         /// <param name="bytesConsumed"> Set to the exact number of bytes the document occupied. </param>
-        /// <returns> The root tag. Its <c>Name</c> is <c>null</c> for flavors without root names. </returns>
+        /// <returns> The root tag. Its <see cref="NbtTag.Name"/> is <c>null</c> for flavors without root names. </returns>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="expectedRootType"/> is not a concrete tag type. </exception>
         /// <exception cref="EndOfStreamException"> If the document extends past the end of <paramref name="buffer"/>. </exception>
         /// <exception cref="NbtFormatException"> If the document is malformed, nested more than 512 levels
@@ -313,15 +312,12 @@ namespace fNbt {
         /// or <paramref name="tag"/> is <c>null</c> and the flavor requires a compound root. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public void WriteTag(NbtTag? tag, Stream stream) {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             if (tag == null) {
-                if (!flavor.AllowsNonCompoundRoot) {
-                    throw new ArgumentNullException(nameof(tag),
-                                                    flavor.Name + " requires a TAG_Compound root and cannot represent an absent document.");
-                }
+                EnsureAbsentDocumentAllowed();
                 stream.WriteByte((byte)NbtTagType.End);
                 return;
             }
@@ -341,7 +337,7 @@ namespace fNbt {
         /// Documents before it are already written when this throws. </exception>
         /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. Documents before the offending one
         /// are already written when this throws. </exception>
         public void WriteConcatenatedTags(IEnumerable<NbtTag> tags, Stream stream) {
@@ -372,7 +368,7 @@ namespace fNbt {
         /// or <paramref name="tag"/> is <c>null</c> and the flavor requires a compound root. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         /// <remarks> Only the .NET 8 build has this overload. </remarks>
         public void WriteTag(NbtTag? tag, IBufferWriter<byte> output) {
@@ -397,7 +393,7 @@ namespace fNbt {
         /// Documents before it are already written when this throws. </exception>
         /// <exception cref="NbtFormatException"> If a tag is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. Documents before the offending one
         /// are already written when this throws. </exception>
         /// <remarks> Only the .NET 8 build has this overload. </remarks>
@@ -414,13 +410,26 @@ namespace fNbt {
 
 
         void ValidateDocument(NbtTag tag) {
+            ValidateRoot(tag);
+            if (validateOnWrite) {
+                flavor.ValidateTree(tag, NbtTag.MaxDepth);
+            }
+        }
+
+
+        void EnsureAbsentDocumentAllowed() {
+            if (!flavor.AllowsNonCompoundRoot) {
+                throw new ArgumentNullException("tag",
+                                                flavor.Name + " requires a TAG_Compound root and cannot represent an absent document.");
+            }
+        }
+
+
+        void ValidateRoot(NbtTag tag) {
             if (!flavor.AllowsNonCompoundRoot && tag.TagType != NbtTagType.Compound) {
                 throw new NbtFormatException(
                     flavor.Name + " requires a TAG_Compound root, but given tag is " +
                     NbtTag.GetCanonicalTagName(tag.TagType));
-            }
-            if (validateOnWrite) {
-                flavor.ValidateTree(tag, NbtTag.MaxDepth);
             }
         }
 
@@ -449,18 +458,25 @@ namespace fNbt {
         /// <exception cref="NotSupportedException"> The document does not fit in a single array. </exception>
         /// <exception cref="NbtFormatException"> If <paramref name="tag"/> is not a compound and the flavor requires one;
         /// if enabled validation rejects a tag type or string length; if a compound contains unnamed tags;
-        /// if a list has Unknown list type and no elements; if a string is too long;
+        /// if a string is too long;
         /// or if tags are nested more than 512 levels deep. </exception>
         public byte[] WriteTag(NbtTag? tag) {
-            // Sizing the tree up front buys an exact array from a single write pass. An absent
-            // document is a lone TAG_End byte, and WriteTag still checks that the flavor
-            // allows one.
-            long size = tag == null ? 1 : NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor);
+            // An absent document is a lone TAG_End byte
+            if (tag == null) {
+                EnsureAbsentDocumentAllowed();
+                return new[] { (byte)NbtTagType.End };
+            }
+            // Sizing the tree up front buys an exact array from a single write pass, and the
+            // sizing walk validates as it goes
+            ValidateRoot(tag);
+            long size = NbtSizer.SizeDocument(tag, flavor.HasRootName, flavor, validateOnWrite);
             if (size > int.MaxValue) {
                 throw new NotSupportedException("This NBT document is too large to fit in a single buffer.");
             }
-            byte[] result = new byte[size];
-            WriteTag(tag, new MemoryStream(result, 0, result.Length, true));
+            byte[] result = ArrayAllocator.ForOverwrite<byte>((int)size);
+            MemoryStream output = new MemoryStream(result, 0, result.Length, true);
+            WriteDocument(tag, CreateWriter(output));
+            ArrayAllocator.EnsureFilled(result, output.Position);
             return result;
         }
 

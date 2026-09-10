@@ -269,16 +269,15 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void SerializingWithoutListType() {
+        public void ListWithoutTypeSavesAsEnd() {
+            // A list that never committed to a type writes the element type Minecraft writes for
+            // every empty list, and comes back End-typed like any other loaded empty list
             var root = new NbtCompound("root") {
                 new NbtList("list")
             };
-            var file = new NbtFile(root);
-
-            using (var ms = new MemoryStream()) {
-                // list should throw NbtFormatException, because its ListType is Unknown
-                Assert.Throws<NbtFormatException>(() => file.SaveToStream(ms, NbtCompression.None));
-            }
+            NbtCompound reloaded = TestFiles.Reload(root);
+            Assert.AreEqual(NbtTagType.End, reloaded.Get<NbtList>("list").ListType);
+            NbtAssert.AreEqual(root, reloaded);
         }
 
 
@@ -400,6 +399,204 @@ namespace fNbt.Test {
             list.Insert(0, new NbtInt(123));
             // Inserting a tag should set ListType
             Assert.AreEqual(NbtTagType.Int, list.ListType);
+        }
+
+        [TestMethod]
+        public void ParsedListCapacityFollowsPlausibleDeclaredCount() {
+            // Each element is eight bytes on the wire, the size of the reference it costs up front
+            var list = new NbtList("items", NbtTagType.Long);
+            for (int i = 0; i < 100; i++) list.Add(new NbtLong(i));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            // A complete seekable input vouches for the count, so storage is exact
+            NbtList fromBuffer = TestFiles.Load(doc).RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, fromBuffer.Count);
+            Assert.AreEqual(100, fromBuffer.tags.Capacity);
+
+            // A non-seekable input cannot, so the list grows past the small preset
+            var streamed = new NbtFile();
+            streamed.LoadFromStream(new NonSeekableStream(new MemoryStream(doc)), NbtCompression.None);
+            NbtList fromStream = streamed.RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, fromStream.Count);
+            Assert.AreEqual(128, fromStream.tags.Capacity);
+        }
+
+        [TestMethod]
+        public void ListOfContainersKeepsBoundedGrowthOnSeekableInput() {
+            // A list header does not consume the bytes it declares, so nested container lists
+            // could each claim the whole remaining input; only leaf lists are presized
+            var list = new NbtList("items", NbtTagType.List);
+            for (int i = 0; i < 100; i++) list.Add(new NbtList(NbtTagType.Int));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            var file = new NbtFile();
+            file.LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null);
+            NbtList loaded = file.RootTag.Get<NbtList>("items");
+            Assert.AreEqual(100, loaded.Count);
+            Assert.AreEqual(128, loaded.tags.Capacity);
+        }
+
+#if NETCOREAPP
+        [TestMethod]
+        public void NestedCorruptListCountsDoNotMultiplyAllocation() {
+            // 511 nested list headers, each declaring a million elements, then padding
+            var ms = new MemoryStream();
+            ms.Write(new byte[] { 0x0A, 0, 0, 0x09, 0, 1, (byte)'l' }, 0, 7);
+            for (int i = 0; i < 511; i++) {
+                ms.Write(new byte[] { 0x09, 0x00, 0x0F, 0x42, 0x40 }, 0, 5);
+            }
+            ms.Write(new byte[2 * 1024 * 1024], 0, 2 * 1024 * 1024);
+            byte[] doc = ms.ToArray();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Assert.ThrowsException<NbtFormatException>(
+                () => new NbtFile().LoadFromBuffer(doc, 0, doc.Length, NbtCompression.None, null));
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.IsTrue(allocated < 4 * doc.Length, "Allocated " + allocated + " bytes for a " + doc.Length + " byte input");
+        }
+#endif
+
+        [TestMethod]
+        public void ListCountPastTheRemainingInputFailsBeforeReadingElements() {
+            var list = new NbtList("items", NbtTagType.Byte);
+            for (int i = 0; i < 100; i++) list.Add(new NbtByte(1));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+            // Declare 1,000 elements where 100 follow; the count sits right before the payload
+            int countAt = doc.Length - 100 - 1 - 4;
+            doc[countAt] = 0;
+            doc[countAt + 1] = 0;
+            doc[countAt + 2] = 0x03;
+            doc[countAt + 3] = 0xE8;
+
+            var stream = new MemoryStream(doc);
+            Assert.ThrowsException<EndOfStreamException>(
+                () => new NbtFile().LoadFromStream(stream, NbtCompression.None));
+            Assert.AreEqual(countAt + 4, stream.Position);
+        }
+
+
+        [TestMethod]
+        public void ShrunkSeekableStreamFailsWithEndOfStream() {
+            var list = new NbtList("items", NbtTagType.Byte);
+            for (int i = 0; i < 100; i++) list.Add(new NbtByte(1));
+            byte[] doc = new NbtFile(new NbtCompound("root") { list }).SaveToBuffer(NbtCompression.None);
+
+            Assert.ThrowsException<EndOfStreamException>(
+                () => new NbtFile().LoadFromStream(new ShrinkingStream(new MemoryStream(doc)), NbtCompression.None));
+        }
+
+
+        [TestMethod]
+        public void EmptyListTakesTypeOfFirstTagWhateverItsListType() {
+            // A loaded empty list carries End, the wire's spelling of "no elements"
+            NbtList loaded = TestFiles.Reload(new NbtCompound("root") {
+                new NbtList("empty", NbtTagType.End)
+            }).Get<NbtList>("empty");
+            Assert.AreEqual(NbtTagType.End, loaded.ListType);
+            loaded.Add(new NbtInt(1));
+            Assert.AreEqual(NbtTagType.Int, loaded.ListType);
+            Assert.AreEqual(1, loaded.Count);
+
+            NbtList inserted = new NbtList(NbtTagType.End);
+            inserted.Insert(0, new NbtString("a"));
+            Assert.AreEqual(NbtTagType.String, inserted.ListType);
+
+            NbtList ranged = new NbtList(NbtTagType.End);
+            ranged.AddRange(new NbtTag[] { new NbtByte(1), new NbtByte(2) });
+            Assert.AreEqual(NbtTagType.Byte, ranged.ListType);
+
+            // An empty batch leaves End in place, and a mixed batch is still refused whole
+            NbtList untouched = new NbtList(NbtTagType.End);
+            untouched.AddRange(new NbtTag[0]);
+            Assert.AreEqual(NbtTagType.End, untouched.ListType);
+            Assert.AreEqual(NbtTagType.End, new NbtList(new NbtTag[0], NbtTagType.End).ListType);
+            Assert.AreEqual(NbtTagType.End, new NbtList("copy", new NbtTag[0], NbtTagType.End).ListType);
+            TestFiles.Reload(new NbtCompound("root") { new NbtList("copy", new NbtTag[0], NbtTagType.End) });
+            Assert.Throws<ArgumentException>(
+                () => untouched.AddRange(new NbtTag[] { new NbtByte(1), new NbtInt(2) }));
+            Assert.AreEqual(NbtTagType.End, untouched.ListType);
+            Assert.AreEqual(0, untouched.Count);
+
+            // Once the list has elements, its type is fixed and End can no longer be assigned
+            Assert.Throws<ArgumentException>(() => loaded.ListType = NbtTagType.End);
+            Assert.Throws<ArgumentException>(() => loaded.Add(new NbtByte(1)));
+        }
+
+
+        [TestMethod]
+        public void CreateMixedStoresMixedTypesTheWayMinecraftDoes() {
+            // Tags of one type make an ordinary list
+            NbtList ints = NbtList.CreateMixed(new NbtInt(1), new NbtInt(2));
+            Assert.AreEqual(NbtTagType.Int, ints.ListType);
+            Assert.AreEqual(2, ints.Count);
+            Assert.AreEqual(0, NbtList.CreateMixed().Count);
+
+            // Mixed types become compounds with each tag under an empty key; plain compounds stay
+            NbtCompound plain = new NbtCompound { new NbtInt("k", 1) };
+            NbtCompound wrapperShaped = new NbtCompound { new NbtInt("", 5) };
+            NbtList mixed = NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), plain, wrapperShaped, new NbtList());
+            Assert.AreEqual(NbtTagType.Compound, mixed.ListType);
+            Assert.AreEqual(1, mixed.Get<NbtCompound>(0)[""].IntValue);
+            Assert.AreEqual("a", mixed.Get<NbtCompound>(1)[""].StringValue);
+            Assert.AreSame(plain, mixed[2]);
+            // A wrapper-shaped compound is wrapped again, so unwrapping gives it back
+            Assert.AreSame(wrapperShaped, mixed.Get<NbtCompound>(3)[""]);
+            Assert.AreEqual(NbtTagType.List, mixed.Get<NbtCompound>(4)[""].TagType);
+            Assert.AreEqual("[1,\"a\",{k:1},{\"\":5},[]]", mixed.ToSnbt());
+
+            // A list of compounds gets the same treatment, since that is what the wire holds
+            NbtList compounds = NbtList.CreateMixed(new NbtCompound { new NbtInt("", 5) }, new NbtCompound());
+            Assert.AreEqual(NbtTagType.Compound, compounds.ListType);
+            Assert.AreEqual(5, compounds.Get<NbtCompound>(0)[""][""].IntValue);
+            Assert.AreEqual(0, compounds.Get<NbtCompound>(1).Count);
+        }
+
+
+        [TestMethod]
+        public void CreateMixedRefusesWhatAddRefusesAndLeavesTheTagsAlone() {
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed((NbtTag[])null));
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed(new NbtInt(1), null));
+            Assert.Throws<ArgumentNullException>(() => NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), null));
+            NbtInt named = new NbtInt("named", 1);
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(named, new NbtString("a")));
+            NbtInt twice = new NbtInt(1);
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(twice, new NbtString("a"), twice));
+            NbtInt parented = new NbtInt(1);
+            NbtList owner = new NbtList { parented };
+            Assert.Throws<ArgumentException>(() => NbtList.CreateMixed(parented, new NbtString("a")));
+            Assert.IsNull(twice.Parent);
+            Assert.IsNull(twice.Name);
+            Assert.AreSame(owner, parented.Parent);
+        }
+
+
+        [TestMethod]
+        public void UnwrapMixedReadsTheWayMinecraftLoads() {
+            NbtCompound plain = new NbtCompound { new NbtInt("k", 1) };
+            NbtList mixed = NbtList.CreateMixed(new NbtInt(1), new NbtString("a"), plain,
+                                                new NbtCompound { new NbtInt("", 5) });
+            NbtTag[] parts = mixed.UnwrapMixed();
+            Assert.AreEqual(4, parts.Length);
+            Assert.AreEqual(1, parts[0].IntValue);
+            Assert.AreEqual("a", parts[1].StringValue);
+            Assert.AreSame(plain, parts[2]);
+            // One level comes off, so the wrapper-shaped compound is itself again
+            Assert.AreEqual(5, parts[3][""].IntValue);
+            // The tags are the list's own, not copies
+            Assert.AreSame(mixed.Get<NbtCompound>(0)[""], parts[0]);
+            Assert.IsNotNull(parts[0].Parent);
+
+            // A loaded list of compounds under empty keys reads as its values, as in the game;
+            // other lists come back as they are
+            NbtList loaded = new NbtList(new NbtTag[] {
+                new NbtCompound { new NbtInt("", 1) },
+                new NbtCompound { new NbtInt("", 2) }
+            });
+            Assert.AreEqual(1, loaded.UnwrapMixed()[0].IntValue);
+            Assert.AreEqual(2, loaded.UnwrapMixed()[1].IntValue);
+            NbtList ints = new NbtList(new NbtTag[] { new NbtInt(1) });
+            Assert.AreSame(ints[0], ints.UnwrapMixed()[0]);
+            Assert.AreEqual(0, new NbtList().UnwrapMixed().Length);
         }
     }
 }

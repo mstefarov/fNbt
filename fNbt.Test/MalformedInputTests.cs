@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 
 namespace fNbt.Test {
     // Corrupt and hostile input must fail cleanly.
@@ -93,22 +94,36 @@ namespace fNbt.Test {
         }
 
 
-        // Duplicate compound names must throw NbtFormatException.
-        [TestMethod]
-        public void DuplicateCompoundNamesThrowFormatException() {
-            byte[] doc = { 0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01,
-                           0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00 };
-            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc));
-        }
+        // r: { x = 1, y = 5, x = 2 }
+        static readonly byte[] RepeatedNameDoc = {
+            0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01, 0x01, 0x00, 0x01, (byte)'y', 0x05,
+            0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00
+        };
 
 
+        // Minecraft keeps the last value of a repeated name, and every reader that builds a
+        // tree does the same; the refusal is behind ValidateOnRead (ValidationTests)
         [TestMethod]
-        public void DuplicateCompoundNamesPutReaderIntoErrorState() {
-            byte[] doc = { 0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01,
-                           0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00 };
-            NbtReader reader = TestFiles.OpenReader(doc);
-            Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
-            Assert.IsTrue(reader.IsInErrorState);
+        public void DuplicateCompoundNamesKeepTheLastValueInTheFirstPlace() {
+            NbtCompound root = TestFiles.Load(RepeatedNameDoc).RootTag;
+            Assert.AreEqual(2, root.Count);
+            CollectionAssert.AreEqual(new[] { "x", "y" }, root.Names.ToArray());
+            Assert.AreEqual(2, root["x"].ByteValue);
+            Assert.AreSame(root, root["x"].Parent);
+
+            NbtReader reader = TestFiles.OpenReader(RepeatedNameDoc);
+            NbtAssert.AreEqual(root, reader.ReadAsTag());
+            Assert.IsFalse(reader.IsInErrorState);
+
+            NbtTag fromCodec = NbtCodec.For(NbtFlavor.Java).ReadTag(RepeatedNameDoc, 0, RepeatedNameDoc.Length, out _);
+            NbtAssert.AreEqual(root, fromCodec);
+
+            // The streaming reader hands out both entries; only the tree rule merges them
+            reader = TestFiles.OpenReader(RepeatedNameDoc);
+            Assert.IsTrue(reader.ReadToFollowing("x"));
+            Assert.AreEqual(1, reader.ReadValueAs<byte>());
+            Assert.IsTrue(reader.ReadToFollowing("x"));
+            Assert.AreEqual(2, reader.ReadValueAs<byte>());
         }
 
 
@@ -151,6 +166,9 @@ namespace fNbt.Test {
             using (var nss = new NonSeekableStream(ms)) {
                 Assert.Throws<EndOfStreamException>(
                     () => file.LoadFromStream(nss, NbtCompression.None));
+                ms.Position = 0;
+                Assert.Throws<EndOfStreamException>(
+                    () => file.LoadFromStream(nss, NbtCompression.None, tag => tag.Name != "a"));
             }
         }
 

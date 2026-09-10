@@ -1,0 +1,538 @@
+using System;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading;
+
+namespace fNbt.Test {
+    // NbtTag.ParseSnbt: the generous reading (modern grammar with old fall-backs), the
+    // documented deviations, error positions, the index overload, and round trips through ToSnbt.
+    // The game-verdict table is in SnbtGameCasesTests; these are the cases worth naming.
+    [TestClass]
+    public class SnbtParserTests {
+        static NbtTag Parse(string text) {
+            return NbtTag.ParseSnbt(text);
+        }
+
+
+        [TestMethod]
+        [Timeout(10000)]
+        public void NumbersParseToTheSameBitsOnEveryFramework() {
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0d").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0.0").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-0d").DoubleValue));
+            Assert.AreEqual(int.MinValue, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("-0.0f")).Value), 0));
+            Assert.AreEqual(int.MinValue, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("-0e1f")).Value), 0));
+            // .NET Framework's own parser reads the 16-digit text a unit too high
+            Assert.AreEqual(4588307191414157803, BitConverter.DoubleToInt64Bits(Parse("0.05652679975739602d").DoubleValue));
+            Assert.AreEqual(4588307191414157804, BitConverter.DoubleToInt64Bits(Parse("0.056526799757396023d").DoubleValue));
+            Assert.AreEqual(1L, BitConverter.DoubleToInt64Bits(Parse("4.9E-324d").DoubleValue));
+            Assert.AreEqual(1, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("1.4E-45f")).Value), 0));
+            // Just above the largest value but below the halfway point to infinity
+            int maxSingle = BitConverter.ToInt32(BitConverter.GetBytes(float.MaxValue), 0);
+            Assert.AreEqual(maxSingle, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("3.4028235677973365e38f")).Value), 0));
+            Assert.AreEqual(maxSingle, BitConverter.ToInt32(BitConverter.GetBytes(((NbtFloat)Parse("3.4028235677973366e38f")).Value), 0));
+            Assert.IsTrue(float.IsPositiveInfinity(((NbtFloat)Parse("3.4028235677973367e38f")).Value));
+            Assert.AreEqual(BitConverter.DoubleToInt64Bits(double.MaxValue), BitConverter.DoubleToInt64Bits(Parse("1.7976931348623158E308d").DoubleValue));
+            Assert.IsTrue(double.IsPositiveInfinity(Parse("1.7976931348623159E308d").DoubleValue));
+            // Absurd exponents and digit counts
+            Assert.AreEqual(0L, BitConverter.DoubleToInt64Bits(Parse("0.01e-2147483648d").DoubleValue));
+            Assert.AreEqual(long.MinValue, BitConverter.DoubleToInt64Bits(Parse("-1e-99999999999d").DoubleValue));
+            Assert.AreEqual(-8238024276155674125, BitConverter.DoubleToInt64Bits(
+                Parse("-8.394338450683387" + new string('0', 801) + "E-243d").DoubleValue));
+        }
+
+
+        static SnbtParseException Refuses(string text) {
+            return Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt(text));
+        }
+
+
+        // [0,[0,...[]...]]: every level but the innermost is a list of mixed types
+        static string MixedNesting(int levels) {
+            string text = "[]";
+            for (int i = 0; i < levels; i++) text = "[0," + text + "]";
+            return text;
+        }
+
+
+        [TestMethod]
+        public void ScalarsReadWithTheirTypes() {
+            Assert.AreEqual(1, Parse("1").IntValue);
+            Assert.AreEqual(NbtTagType.Int, Parse("1").TagType);
+            Assert.AreEqual(NbtTagType.Byte, Parse("1b").TagType);
+            Assert.AreEqual(NbtTagType.Short, Parse("1S").TagType);
+            Assert.AreEqual(NbtTagType.Int, Parse("1i").TagType);
+            Assert.AreEqual(NbtTagType.Long, Parse("1l").TagType);
+            Assert.AreEqual(NbtTagType.Float, Parse("1f").TagType);
+            Assert.AreEqual(NbtTagType.Double, Parse("1d").TagType);
+            Assert.AreEqual(NbtTagType.Double, Parse("1.5").TagType);
+            Assert.AreEqual(NbtTagType.Double, Parse("1e5").TagType);
+            Assert.AreEqual(100000.0, Parse("1E+5").DoubleValue);
+            Assert.AreEqual(0.5, Parse(".5").DoubleValue);
+            Assert.AreEqual(1.0, Parse("1.").DoubleValue);
+            Assert.AreEqual(31, Parse("0x1F").IntValue);
+            Assert.AreEqual(5, Parse("0B101").IntValue);
+            Assert.AreEqual(1000000L, Parse("1_000_000L").LongValue);
+            Assert.AreEqual(255, Parse("255ub").ByteValue);
+            Assert.AreEqual(255, Parse("255b").ByteValue);
+            Assert.AreEqual(128, Parse("128B").ByteValue);
+            Assert.AreEqual(-106, ((NbtByte)Parse("-106b")).SignedValue);
+            Assert.AreEqual(240, Parse("-16sb").ByteValue);
+            Assert.AreEqual(-1, Parse("0xFFFFFFFF").IntValue);
+            Assert.AreEqual(-1L, Parse("18446744073709551615ul").LongValue);
+            Assert.AreEqual(4091, Parse("0xFFb").IntValue);
+            Assert.AreEqual(0, Parse("0b").ByteValue);
+            Assert.AreEqual(1, Parse("true").ByteValue);
+            Assert.AreEqual(0, Parse("FALSE").ByteValue);
+            Assert.AreEqual("abc", Parse("abc").StringValue);
+            Assert.AreEqual("a.b-c+d", Parse("a.b-c+d").StringValue);
+            Assert.AreEqual("a b", Parse("\"a b\"").StringValue);
+            Assert.AreEqual("a\"b", Parse("'a\"b'").StringValue);
+            Assert.AreEqual("it's", Parse("\"it's\"").StringValue);
+        }
+
+
+        [TestMethod]
+        public void WhitespaceIsSkippedEverywhereTheModernGameSkipsIt() {
+            Assert.AreEqual("{a:1b,b:-5,c:1.5d,d:[B;1B,2B],e:1b}",
+                            Parse(" { a : 1 b , b : - 5 , c : 1 .5 , d : [ B ; 1 , 2 ] , e : bool ( 1 ) } ").ToSnbt());
+            Assert.AreEqual("[1,2]", Parse("\t[\n1,\r\n2\n]\n").ToSnbt());
+            Assert.AreEqual("{}", Parse("\uFEFF{}").ToSnbt());
+            // Between a signedness prefix and the type letter too, and before a float suffix
+            Assert.AreEqual("-16b", Parse("240u b").ToSnbt());
+            Assert.AreEqual("[I;-16]", Parse("[I;240u b]").ToSnbt());
+            Assert.AreEqual("-1", Parse("-1s i").ToSnbt());
+            Assert.AreEqual("1b", Parse("1 u b").ToSnbt());
+            Assert.AreEqual("1.5f", Parse("1.5 f").ToSnbt());
+            // Java's whitespace includes the four information separators, which .NET's does not
+            Assert.AreEqual("{a:1}", Parse("{a:1\u001C}").ToSnbt());
+            Assert.AreEqual("[1,2]", Parse("\u001F[1\u001D,\u001E2]").ToSnbt());
+        }
+
+
+        [TestMethod]
+        public void OldReadingsFillInWhereTheModernGrammarRefuses() {
+            Assert.AreEqual("1st", Parse("1st").StringValue);
+            Assert.AreEqual("-foo", Parse("-foo").StringValue);
+            Assert.AreEqual(".5x", Parse(".5x").StringValue);
+            Assert.AreEqual("007", Parse("007").StringValue);
+            Assert.AreEqual("300b", Parse("300b").StringValue);
+            Assert.AreEqual("-129b", Parse("-129b").StringValue);
+            Assert.AreEqual("255sb", Parse("255sb").StringValue);
+            Assert.AreEqual("4294967296", Parse("4294967296").StringValue);
+            Assert.AreEqual("1e", Parse("1e").StringValue);
+            Assert.AreEqual("1.5.2", Parse("1.5.2").StringValue);
+            Assert.AreEqual("0x", Parse("0x").StringValue);
+            Assert.AreEqual("1._5", Parse("1._5").StringValue);
+            Assert.AreEqual("1e_5", Parse("1e_5").StringValue);
+            Assert.AreEqual("0b_1", Parse("0b_1").StringValue);
+            Assert.AreEqual("0_1", Parse("0_1").StringValue);
+            Assert.AreEqual("1_", Parse("1_").StringValue);
+            Assert.AreEqual("-0x1", Parse("-0x1").StringValue);
+            // Overflowing floats are the infinities the old parser stored
+            Assert.IsTrue(float.IsPositiveInfinity(Parse("1e39f").FloatValue));
+            Assert.IsTrue(double.IsPositiveInfinity(Parse("1.0e1000").DoubleValue));
+            Assert.IsTrue(double.IsNegativeInfinity(Parse("-1e999d").DoubleValue));
+            Assert.AreEqual("1e1000", Parse("1e1000").StringValue);
+            // Booleans inside byte arrays
+            CollectionAssert.AreEqual(new byte[] { 1, 0 }, ((NbtByteArray)Parse("[B;true,false]")).Value);
+        }
+
+
+        [TestMethod]
+        public void NonFiniteNamesWithSuffixesAreNumbers() {
+            Assert.IsTrue(float.IsNaN(Parse("NaNf").FloatValue));
+            Assert.IsTrue(float.IsPositiveInfinity(Parse("Infinityf").FloatValue));
+            Assert.IsTrue(float.IsNegativeInfinity(Parse("-Infinityf").FloatValue));
+            Assert.IsTrue(double.IsNaN(Parse("NaNd").DoubleValue));
+            Assert.IsTrue(double.IsPositiveInfinity(Parse("+InfinityD").DoubleValue));
+            Assert.AreEqual("NaN", Parse("NaN").StringValue);
+            Assert.AreEqual("Infinity", Parse("Infinity").StringValue);
+            Assert.AreEqual("Infinityx", Parse("Infinityx").StringValue);
+        }
+
+
+        [TestMethod]
+        public void EscapesFollowTheModernGrammar() {
+            Assert.AreEqual("a\\b\"c'd\be f\tg\nh\fi\rj", Parse("\"a\\\\b\\\"c\\'d\\be\\sf\\tg\\nh\\fi\\rj\"").StringValue);
+            Assert.AreEqual("AB", Parse("\"\\x41B\"").StringValue);
+            Assert.AreEqual("A1", Parse("\"\\u00411\"").StringValue);
+            Assert.AreEqual("\ud83d\ude00", Parse("\"\\U0001F600\"").StringValue);
+            Assert.AreEqual("\ud83d", Parse("\"\\uD83D\"").StringValue);
+            Assert.AreEqual("\u00ff", Parse("\"\\xFF\"").StringValue);
+            // Raw control characters and a backslash-newline-letter sequence, as the game reads them
+            Assert.AreEqual("a\nb\u0000c", Parse("\"a\nb\u0000c\"").StringValue);
+            Assert.AreEqual("a\nb", Parse("\"a\\\n nb\"").StringValue);
+            Refuses("\"\\q\"");
+            Refuses("\"\\x4\"");
+            Refuses("\"\\x4G\"");
+            Refuses("\"\\u260\"");
+            Refuses("\"\\U00110000\"");
+            Refuses("\"abc");
+            Refuses("\"abc\\");
+            StringAssert.Contains(Refuses("\"\\N{SNOWMAN}\"").Message, "not supported");
+        }
+
+
+        [TestMethod]
+        public void CompoundsKeepInsertionOrderAndLetLaterDuplicatesWin() {
+            NbtCompound c = (NbtCompound)Parse("{zz:1,\"a b\":2,'q':3,1a:4,-x:5,\"\":6,zz:7,}");
+            Assert.AreEqual("{zz:7,\"a b\":2,q:3,\"1a\":4,\"-x\":5,\"\":6}", c.ToSnbt());
+            Assert.AreEqual(7, c["zz"].IntValue);
+            Assert.IsNull(Parse("{}").Name);
+            Refuses("{a:1 b:2}");
+            Refuses("{a}");
+            Refuses("{a:}");
+            Refuses("{,}");
+            Refuses("{a:1,,}");
+            Refuses("{a:1");
+            Refuses("{a:1;b:2}");
+            Refuses("{a=1}");
+            Refuses("{a");
+            Refuses("{a:1,");
+            Refuses("{:1}");
+        }
+
+
+        [TestMethod]
+        public void ListsWrapMixedElementsLikeTheGameDoesOnDisk() {
+            NbtList homogeneous = (NbtList)Parse("[1,2,]");
+            Assert.AreEqual(NbtTagType.Int, homogeneous.ListType);
+            Assert.AreEqual(2, homogeneous.Count);
+
+            NbtList empty = (NbtList)Parse("[ ]");
+            Assert.AreEqual(NbtTagType.End, empty.ListType);
+            empty.Add(new NbtInt(1));
+
+            NbtList mixed = (NbtList)Parse("[1,\"a\",{},[2],{\"\":5},{k:1}]");
+            Assert.AreEqual(NbtTagType.Compound, mixed.ListType);
+            Assert.AreEqual(1, mixed.Get<NbtCompound>(0)[""].IntValue);
+            Assert.AreEqual("a", mixed.Get<NbtCompound>(1)[""].StringValue);
+            Assert.AreEqual(0, mixed.Get<NbtCompound>(2).Count);
+            Assert.AreEqual(NbtTagType.List, mixed.Get<NbtCompound>(3)[""].TagType);
+            // A wrapper-shaped compound is wrapped again, so unwrapping on print gives it back
+            Assert.AreEqual(5, mixed.Get<NbtCompound>(4)[""][""].IntValue);
+            Assert.AreEqual(1, mixed.Get<NbtCompound>(5)["k"].IntValue);
+            Assert.AreEqual("[1,\"a\",{},[2],{\"\":5},{k:1}]", mixed.ToSnbt());
+            // A wrapper-shaped compound is wrapped again inside any list of compounds, as the game
+            // does on save, so a loaded document's text does not drift through repeated round trips
+            NbtList loaded = (NbtList)Parse("[{\"\":1},{\"\":2}]");
+            Assert.AreEqual(1, loaded.Get<NbtCompound>(0)[""][""].IntValue);
+            Assert.AreEqual("[{\"\":1},{\"\":2}]", loaded.ToSnbt());
+            Assert.AreEqual("[{\"\":1},{k:2}]", Parse("[{\"\":1},{k:2}]").ToSnbt());
+
+            // Lists of lists may differ inside; lists of different array kinds are mixed
+            Assert.AreEqual(NbtTagType.List, ((NbtList)Parse("[[1],[\"a\"]]")).ListType);
+            Assert.AreEqual(NbtTagType.Compound, ((NbtList)Parse("[[B;1],[I;2]]")).ListType);
+            Refuses("[,]");
+            Refuses("[1,,2]");
+            Refuses("[1 2]");
+            Refuses("[1");
+            Refuses("[1]]");
+            Refuses("[");
+            Refuses("[1,");
+            Refuses("[B");
+            Refuses("[B;");
+        }
+
+
+        [TestMethod]
+        public void ArraysTakeAnyIntegerThatFits() {
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 127, 255, 255, 128 },
+                                      ((NbtByteArray)Parse("[B;1,2b,0x7F,0xFF,255ub,-128]")).Value);
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, -1 }, ((NbtIntArray)Parse("[I;1b,2s,3,0xFFFFFFFF]")).Value);
+            CollectionAssert.AreEqual(new[] { 1L, -1L, long.MinValue },
+                                      ((NbtLongArray)Parse("[L;1,-1b,-9223372036854775808L]")).Value);
+            Assert.AreEqual(0, ((NbtByteArray)Parse("[B;]")).Value.Length);
+            Assert.AreEqual(0, ((NbtIntArray)Parse("[ I ; ]")).Value.Length);
+            Assert.AreEqual(1, ((NbtLongArray)Parse("[L;1,]")).Value.Length);
+            Refuses("[L;,]");
+            // Unsuffixed elements take the array's type, and either signedness fits
+            Assert.AreEqual(long.MaxValue, ((NbtLongArray)Parse("[L;9223372036854775807]")).Value[0]);
+            Assert.AreEqual(-1L, ((NbtLongArray)Parse("[L;0xFFFFFFFFFFFFFFFF]")).Value[0]);
+            Assert.AreEqual(128, ((NbtByteArray)Parse("[B;128]")).Value[0]);
+            Refuses("[B;256]");
+            Refuses("[B;-129]");
+            Refuses("[I;4294967296]");
+            Refuses("[B;1.0]");
+            Refuses("[B;\"1\"]");
+            Refuses("[B;1;2]");
+            // Prefixes in either case; other letters are not prefixes
+            Assert.AreEqual(NbtTagType.ByteArray, Parse("[b;1]").TagType);
+            Assert.AreEqual(NbtTagType.IntArray, Parse("[ i ; 1, 2 ]").TagType);
+            Assert.AreEqual(NbtTagType.LongArray, Parse("[l;]").TagType);
+            Refuses("[S;1]");
+            Refuses("[d;1]");
+        }
+
+
+        [TestMethod]
+        public void OperationsEvaluateAtParseTime() {
+            Assert.AreEqual(1, Parse("bool(1)").ByteValue);
+            Assert.AreEqual(0, Parse("bool(0.0)").ByteValue);
+            Assert.AreEqual(1, Parse("bool(0.5)").ByteValue);
+            Assert.AreEqual(1, Parse("bool(true)").ByteValue);
+            Assert.AreEqual(1, Parse("bool(bool(-1L),)").ByteValue);
+            CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
+                                      ((NbtIntArray)Parse("uuid('123e4567-E89B-12d3-a456-426614174000')")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0\")")).Value);
+            // Java's UUID.fromString: any number of digits per group within 36 characters, leading
+            // zeros included, a leading plus, masked to width
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-0000000000001\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-00000000000000001\")")).Value);
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0 },
+                                      ((NbtIntArray)Parse("uuid(\"" + new string('0', 27) + "1-0-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 65535, -1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-07fffffffffffffff\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 1 }, ((NbtIntArray)Parse("uuid(\"+0-0-0-0-+1\")")).Value);
+            CollectionAssert.AreEqual(new[] { 591751049, 0, 0, 0 }, ((NbtIntArray)Parse("uuid(\"123456789-0-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 591724544, 0, 0 }, ((NbtIntArray)Parse("uuid(\"0-12345-0-0-0\")")).Value);
+            CollectionAssert.AreEqual(new[] { 0, 0, 65535, -1 }, ((NbtIntArray)Parse("uuid(\"0-0-0-0-7fffffffffffffff\")")).Value);
+            StringAssert.Contains(Refuses("bool()").Message, "bool/0");
+            StringAssert.Contains(Refuses("bool(1,2)").Message, "bool/2");
+            StringAssert.Contains(Refuses("foo(1)").Message, "foo/1");
+            Refuses("bool(\"true\")");
+            Refuses("bool([])");
+            Refuses("uuid(1)");
+            Refuses("uuid(\"not-a-uuid\")");
+            Refuses("uuid(\"123e4567e89b12d3a456426614174000\")");
+            Refuses("{bool(1):1}");
+            Refuses("bool(");
+            Refuses("bool(1");
+            Refuses("bool(1 2)");
+            Refuses("bool(1,");
+            Refuses("uuid(\"123e45678-e89b-12d3-a456-426614174000\")");
+            Refuses("uuid(\"123e456g-e89b-12d3-a456-426614174000\")");
+            Refuses("uuid(\"-0-0-0-0\")");
+            Refuses("uuid(\"0-0-0-0-ffffffffffffffff\")");
+            Refuses("uuid(\"0-0-0-0-08000000000000000\")");
+            Refuses("uuid(\"" + new string('0', 28) + "1-0-0-0-0\")");
+            Refuses("uuid(\"0-0-0-0-\")");
+            Refuses("uuid(\"0-0-0-0-0-0\")");
+            Refuses("uuid(\"123e4567-e89b-12d3-a456-4266141740000\")");
+            CollectionAssert.AreEqual(new[] { 306070887, -392490285, -1537850778, 337068032 },
+                                      ((NbtIntArray)Parse("uuid(\"123e4567-e89b-12d3-a456-426614174000\",)")).Value);
+        }
+
+
+        [TestMethod]
+        public void RootsMayBeAnyTagAndTrailingTextIsRefused() {
+            Assert.AreEqual(NbtTagType.Byte, Parse("true").TagType);
+            Assert.AreEqual(NbtTagType.String, Parse("'x'").TagType);
+            Assert.AreEqual(NbtTagType.ByteArray, Parse("[B;1b]").TagType);
+            Assert.AreEqual(NbtTagType.Compound, Parse(" \n{}\n ").TagType);
+            Assert.Throws<ArgumentNullException>(() => NbtTag.ParseSnbt(null));
+            Refuses("");
+            Refuses("   ");
+            Refuses("{} x");
+            Refuses("{}{}");
+            Refuses("1 2");
+            Refuses("abc def");
+        }
+
+
+        [TestMethod]
+        public void ErrorsCarryTheIndexAndTheLineAndColumn() {
+            SnbtParseException ex = Refuses("{a:1,\n b:[1,,2]}");
+            Assert.AreEqual(12, ex.Index);
+            Assert.AreEqual(2, ex.Line);
+            Assert.AreEqual(7, ex.Column);
+            StringAssert.Contains(ex.Message, "at index 12 (line 2, column 7)");
+            Assert.AreEqual(1, Refuses("").Line);
+            Assert.AreEqual(1, Refuses("").Column);
+            Assert.AreEqual(0, Refuses("").Index);
+            Assert.AreEqual(3, Refuses("{} x").Index);
+            Assert.AreEqual(1, Refuses("\"\\q\"").Index);
+            // A bad array element is reported where it is, not at the bracket
+            Assert.AreEqual(6, Refuses("[B;1, 300]").Index);
+            Assert.AreEqual(5, Refuses("[I;1,\"x\"]").Index);
+        }
+
+
+        [TestMethod]
+        public void IndexOverloadStopsAfterOneValue() {
+            string command = "give @s stone[custom_data={a:1,b:\"x y\"}] 3";
+            int at = command.IndexOf('{');
+            NbtTag tag = NbtTag.ParseSnbt(command, at, out int consumed);
+            Assert.AreEqual("{a:1,b:\"x y\"}", tag.ToSnbt());
+            Assert.AreEqual("] 3", command.Substring(at + consumed));
+
+            Assert.AreEqual("1abc", NbtTag.ParseSnbt("  1abc", 0, out consumed).StringValue);
+            Assert.AreEqual(6, consumed);
+            Assert.AreEqual("a", NbtTag.ParseSnbt("a b", 0, out consumed).StringValue);
+            Assert.AreEqual(1, consumed);
+            // Whitespace before the value counts, whitespace after it is left alone
+            Assert.AreEqual(1, NbtTag.ParseSnbt(" \t1 \n", 0, out consumed).IntValue);
+            Assert.AreEqual(3, consumed);
+            NbtTag.ParseSnbt("{} ", 0, out consumed);
+            Assert.AreEqual(2, consumed);
+            SnbtParseException ex = Assert.Throws<SnbtParseException>(() => NbtTag.ParseSnbt("x {", 2, out consumed));
+            Assert.AreEqual(3, ex.Index);
+            Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", 2, out consumed));
+            Assert.Throws<ArgumentOutOfRangeException>(() => NbtTag.ParseSnbt("x", -1, out consumed));
+            Assert.Throws<NbtFormatException>(() => NbtTag.ParseSnbt("x", 1, out consumed));
+            Assert.Throws<ArgumentNullException>(() => NbtTag.ParseSnbt(null, 0, out consumed));
+        }
+
+
+        [TestMethod]
+        public void NestingBeyondTheDepthLimitIsRefused() {
+            string ok = new string('[', 512) + new string(']', 512);
+            Assert.AreEqual(ok, Parse(ok).ToSnbt());
+            SnbtParseException ex = Refuses(new string('[', 513) + new string(']', 513));
+            Assert.AreEqual(512, ex.Index);
+            StringAssert.Contains(ex.Message, "512 levels) at index 512");
+            Refuses(string.Concat(Enumerable.Repeat("{a:", 513)) + "1" + new string('}', 513));
+            // Operation calls nest like containers
+            Assert.AreEqual(1, Parse(string.Concat(Enumerable.Repeat("bool(", 512)) + "1" + new string(')', 512)).ByteValue);
+            Refuses(string.Concat(Enumerable.Repeat("bool(", 513)) + "1" + new string(')', 513));
+            // An array is a value, so it fits under the deepest list, as it does in a binary file
+            Assert.AreEqual(NbtTagType.List, Parse(new string('[', 512) + "[B;]" + new string(']', 512)).TagType);
+            Refuses(new string('[', 513) + "[B;]" + new string(']', 513));
+            // Wrapper compounds count: 255 mixed levels around [] make 511 containers, 256 make 513
+            Parse(MixedNesting(255)).Clone();
+            ex = Refuses(MixedNesting(256));
+            StringAssert.Contains(ex.Message, "512 levels");
+        }
+
+
+        [TestMethod]
+        public void ParsingIsCultureIndependent() {
+            CultureInfo previous = Thread.CurrentThread.CurrentCulture;
+            try {
+                Thread.CurrentThread.CurrentCulture = new CultureInfo("de-DE");
+                Assert.AreEqual(1.5, Parse("1.5").DoubleValue);
+                Assert.AreEqual(1000000.0, Parse("1e6").DoubleValue);
+                Assert.AreEqual("1,5", Parse("\"1,5\"").StringValue);
+            } finally {
+                Thread.CurrentThread.CurrentCulture = previous;
+            }
+        }
+
+
+        [TestMethod]
+        public void EveryTagTypeRoundTripsThroughText() {
+            NbtCompound root = TestFiles.MakeAllValuesRoot();
+            root.Add(new NbtString("quotes", "it's \"both\" \\ and\nnewline"));
+            root.Add(new NbtList("mixedOnDisk", new NbtTag[] {
+                new NbtCompound { new NbtInt("", 1) },
+                new NbtCompound { new NbtString("", "a") }
+            }));
+            root.Add(new NbtFloat("nan", float.NaN));
+            root.Add(new NbtDouble("inf", double.NegativeInfinity));
+            // Text carries no element type, so an empty list comes back End-typed, as from a file
+            root.Add(new NbtList("empty", NbtTagType.End));
+            foreach (SnbtLayout layout in new[] { SnbtLayout.Compact, SnbtLayout.Spaced, SnbtLayout.Indented }) {
+                string text = root.ToSnbt(new SnbtOptions { WriteLayout = layout });
+                NbtTag back = Parse(text);
+                back.Name = root.Name;
+                NbtAssert.AreEqual(root, back, layout.ToString());
+            }
+            // Text carries no element type for an empty list, and the comparer needs none
+            NbtCompound lists = TestFiles.MakeAllListsRoot();
+            NbtTag parsed = Parse(lists.ToSnbt());
+            parsed.Name = lists.Name;
+            NbtAssert.AreEqual(lists, parsed);
+        }
+
+
+        [TestMethod]
+        public void SpacedNumberPartsStayOutOfTheNextWord() {
+            // The whitespace the grammar allows inside a number must not carry it into a word that
+            // happens to start with a suffix letter, an e or a dot
+            NbtTag tag = NbtTag.ParseSnbt("1.5 foo", 0, out int consumed);
+            Assert.AreEqual(NbtTagType.Double, tag.TagType);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+
+            tag = NbtTag.ParseSnbt("1.5 exp", 0, out consumed);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+
+            tag = NbtTag.ParseSnbt("5 bx", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(5, tag.IntValue);
+            Assert.AreEqual(1, consumed);
+
+            tag = NbtTag.ParseSnbt("15 .foo", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(2, consumed);
+
+            // A word that is only a suffix still belongs to the number
+            tag = NbtTag.ParseSnbt("1.5 f oo", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Float, tag.TagType);
+            Assert.AreEqual(5, consumed);
+            tag = NbtTag.ParseSnbt("240u b x", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Byte, tag.TagType);
+            Assert.AreEqual(6, consumed);
+
+            // A reading the whitespace spoiled, as a leading zero, an overflow or a range
+            // failure, is taken again without it too
+            tag = NbtTag.ParseSnbt("0 1", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(0, tag.IntValue);
+            Assert.AreEqual(1, consumed);
+            tag = NbtTag.ParseSnbt("1.5 e999", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Double, tag.TagType);
+            Assert.AreEqual(1.5, tag.DoubleValue);
+            Assert.AreEqual(3, consumed);
+            tag = NbtTag.ParseSnbt("300 b", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Int, tag.TagType);
+            Assert.AreEqual(300, tag.IntValue);
+            Assert.AreEqual(3, consumed);
+            tag = NbtTag.ParseSnbt("1s bx", 0, out consumed);
+            Assert.AreEqual(NbtTagType.Short, tag.TagType);
+            Assert.AreEqual(2, consumed);
+            // Glued to the number, the overflow is the old parser's infinity
+            tag = NbtTag.ParseSnbt("1.5e999 x", 0, out consumed);
+            Assert.IsTrue(double.IsPositiveInfinity(tag.DoubleValue));
+            Assert.AreEqual(7, consumed);
+
+            // A whole-text parse refuses the word instead of misreading the number
+            StringAssert.Contains(Refuses("1.5 foo").Message, "trailing");
+            StringAssert.Contains(Refuses("5 bx").Message, "trailing");
+            // Glued characters still make the old-era string
+            Assert.AreEqual("1.5fx", Parse("1.5fx").StringValue);
+        }
+
+
+        [TestMethod]
+        public void IndexOverloadReadsAPrefixTheWayItsOwnTextReads() {
+            // Whatever follows a value must not change it: the tag the index overload returns is
+            // the one a whole-text parse of the consumed characters gives
+            string[] texts = {
+                "0 1", "0 x", "0 xg", "0 07", "0 1 2", "0 bx", "0 x1z", "0x 1", "0b 1", "0 b 1", "0 b1 b",
+                "1 e999", "1e999 x", "1.5 e999", "1.5 e999d", "1.5e999 x", "1.5 e", "1.5 e x", "1e x",
+                "1.5 e+ 2", "1 .5", "1 . 5", "1 .", "1 .5x", ".5 .5", "1. e5", "- 1", "- 1x", "-",
+                "1 _0", "1_ 0", "1 s", "1 u s", "1 us x", "1s b", "1s bx", "1 l1", "1L L", "1 f", "1.5 F x",
+                "300 b", "-129 b", "255 b", "4294967296 i", "9999999999 1", "007 1", "1abc d", "1.5fx 1",
+                "true x", "truex", "NaNf x", "-Infinityd,", "Infinity d", "\"a\" b", "'a'b", "\"a\\\"b\"c",
+                "{a:1} x", "{a:1}}", "{ a : 1 , } b", "[1,2]]", "[1, 2 ] ,", "[B;1b] x", "[I; 0, 1 ]x",
+                "bool(1) x", "bool (1)x", "bool x", "uuid (\"0-0-0-0-0\") z", "\uFEFF1 2", "a-b c",
+            };
+            foreach (string text in texts) {
+                NbtTag prefix = NbtTag.ParseSnbt(text, 0, out int consumed);
+                Assert.IsTrue(consumed > 0 && consumed <= text.Length, text);
+                NbtTag whole = Parse(text.Substring(0, consumed));
+                Assert.AreEqual(whole.TagType, prefix.TagType, text);
+                Assert.AreEqual(whole.ToSnbt(), prefix.ToSnbt(), text);
+            }
+        }
+
+
+        [TestMethod]
+        [Timeout(10000)]
+        public void ContainersInsideTypedArraysFailBeforeAnyRecursion() {
+            // Arrays take no nesting level, so a nested array must be refused before it is parsed
+            // or deep nesting overflows the stack ahead of the element type check
+            StringBuilder deep = new StringBuilder();
+            for (int i = 0; i < 5000; i++) deep.Append("[B;");
+            deep.Append('0').Append(']', 5000);
+            SnbtParseException ex = Refuses(deep.ToString());
+            StringAssert.Contains(ex.Message, "Invalid array element type");
+            Assert.AreEqual(3, ex.Index);
+            Assert.AreEqual(3, Refuses("[I;{}]").Index);
+            Assert.AreEqual(4, Refuses("[L; [1]]").Index);
+        }
+    }
+}

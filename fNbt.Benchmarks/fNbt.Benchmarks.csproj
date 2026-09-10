@@ -30,6 +30,10 @@
   <PropertyGroup Condition="'$(FNbtNuGetVersion)' != '' and $([MSBuild]::VersionLessThan('$(FNbtNuGetVersion)', '2.0'))">
     <DefineConstants>$(DefineConstants);FNBT_BASELINE</DefineConstants>
   </PropertyGroup>
+  <!-- FNBT_BASELINE_2_0 marks a build against any package below 2.1, which lacks SNBT. -->
+  <PropertyGroup Condition="'$(FNbtNuGetVersion)' != '' and $([MSBuild]::VersionLessThan('$(FNbtNuGetVersion)', '2.1'))">
+    <DefineConstants>$(DefineConstants);FNBT_BASELINE_2_0</DefineConstants>
+  </PropertyGroup>
   
   <ItemGroup>
     <None Update="TestFiles\bigtest.nbt">

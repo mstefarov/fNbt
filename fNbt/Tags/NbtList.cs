@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace fNbt {
@@ -12,15 +13,21 @@ namespace fNbt {
             get { return NbtTagType.List; }
         }
 
-        internal readonly List<NbtTag> tags = new List<NbtTag>();
+        internal readonly List<NbtTag> tags;
 
-        // Real lists are small, and a 5-byte list header should not be able to force a large allocation out
-        // of a corrupt length. Longer lists just grow as before.
+        // Real lists are small, and a 5-byte list header should not be able to force a large
+        // allocation out of a corrupt length. Longer lists grow as they go, unless the input can
+        // vouch for the count.
         const int MaxPresizedCapacity = 16;
 
-        /// <summary> Gets or sets the tag type of this list. All tags in this NbtTag must be of the same type. </summary>
-        /// <exception cref="ArgumentException"> If the given NbtTagType does not match the type of existing list items (for non-empty lists). </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> If the given NbtTagType is not a recognized tag type. </exception>
+        /// <summary> Gets or sets the tag type of this list. All tags in this <see cref="NbtTag"/> must be of the same type.
+        /// The type of an empty list is a constraint on what may be added, not part of its value:
+        /// <see cref="NbtTagType.Unknown"/> (a new list) and <see cref="NbtTagType.End"/> (a loaded or parsed one) both let the first tag
+        /// added set the type, and a declared type is enforced. Files store the declared type, or
+        /// <see cref="NbtTagType.End"/> for <see cref="NbtTagType.Unknown"/>, readers accept any type for an empty list, SNBT carries none,
+        /// and <see cref="NbtComparer"/> treats every empty list as equal to every other. </summary>
+        /// <exception cref="ArgumentException"> If the given <see cref="NbtTagType"/> does not match the type of existing list items (for non-empty lists). </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> If the given <see cref="NbtTagType"/> is not a recognized tag type. </exception>
         public NbtTagType ListType {
             get { return listType; }
             set {
@@ -49,21 +56,21 @@ namespace fNbt {
         NbtTagType listType;
 
 
-        /// <summary> Creates an unnamed NbtList with empty contents and undefined ListType. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtList"/> with empty contents and undefined <see cref="ListType"/>. </summary>
         public NbtList()
             : this(null, null, NbtTagType.Unknown) { }
 
 
-        /// <summary> Creates an NbtList with given name, empty contents, and undefined ListType. </summary>
+        /// <summary> Creates an <see cref="NbtList"/> with given name, empty contents, and undefined <see cref="ListType"/>. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtList(string? tagName)
             : this(tagName, null, NbtTagType.Unknown) { }
 
 
-        /// <summary> Creates an unnamed NbtList with the given contents, and inferred ListType. 
-        /// If given tag array is empty, NbtTagType remains Unknown. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtList"/> with the given contents, and inferred <see cref="ListType"/>.
+        /// If given tag array is empty, <see cref="NbtTagType"/> remains Unknown. </summary>
         /// <param name="tags"> Collection of tags to insert into the list. All tags are expected to be of the same type.
-        /// ListType is inferred from the first tag. List may be empty, but may not be <c>null</c>. </param>
+        /// <see cref="ListType"/> is inferred from the first tag. List may be empty, but may not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If given tags are of mixed types. </exception>
         public NbtList(IEnumerable<NbtTag> tags)
@@ -73,8 +80,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an unnamed NbtList with empty contents and an explicitly specified ListType.
-        /// If ListType is Unknown, it will be inferred from the type of the first added tag.
+        /// <summary> Creates an unnamed <see cref="NbtList"/> with empty contents and an explicitly specified <see cref="ListType"/>.
+        /// If <see cref="ListType"/> is Unknown, it will be inferred from the type of the first added tag.
         /// Otherwise, all tags added to this list are expected to be of the given type. </summary>
         /// <param name="givenListType"> Type of the list elements. May be Unknown. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a recognized tag type. </exception>
@@ -82,11 +89,11 @@ namespace fNbt {
             : this(null, null, givenListType) { }
 
 
-        /// <summary> Creates an NbtList with the given name and contents, and inferred ListType. 
-        /// If given tag array is empty, NbtTagType remains Unknown. </summary>
+        /// <summary> Creates an <see cref="NbtList"/> with the given name and contents, and inferred <see cref="ListType"/>.
+        /// If given tag array is empty, <see cref="NbtTagType"/> remains Unknown. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to insert into the list. All tags are expected to be of the same type.
-        /// ListType is inferred from the first tag. List may be empty, but may not be <c>null</c>. </param>
+        /// <see cref="ListType"/> is inferred from the first tag. List may be empty, but may not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tags"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> If given tags are of mixed types. </exception>
         public NbtList(string? tagName, IEnumerable<NbtTag> tags)
@@ -96,7 +103,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an unnamed NbtList with the given contents, and an explicitly specified ListType. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtList"/> with the given contents, and an explicitly specified <see cref="ListType"/>. </summary>
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType).
         /// List may be empty, but may not be <c>null</c>. </param>
@@ -112,16 +119,16 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtList with the given name, empty contents, and an explicitly specified ListType. </summary>
+        /// <summary> Creates an <see cref="NbtList"/> with the given name, empty contents, and an explicitly specified <see cref="ListType"/>. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="givenListType"> Type of the list elements.
-        /// If givenListType is Unknown, ListType will be inferred from the first tag added to this NbtList. </param>
+        /// If givenListType is Unknown, <see cref="ListType"/> will be inferred from the first tag added to this <see cref="NbtList"/>. </param>
         /// <exception cref="ArgumentOutOfRangeException"> <paramref name="givenListType"/> is not a valid tag type. </exception>
         public NbtList(string? tagName, NbtTagType givenListType)
             : this(tagName, null, givenListType) { }
 
 
-        /// <summary> Creates an NbtList with the given name and contents, and an explicitly specified ListType. </summary>
+        /// <summary> Creates an <see cref="NbtList"/> with the given name and contents, and an explicitly specified <see cref="ListType"/>. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="tags"> Collection of tags to insert into the list.
         /// All tags are expected to be of the same type (matching givenListType). May be empty or <c>null</c>. </param>
@@ -130,6 +137,7 @@ namespace fNbt {
         /// <exception cref="ArgumentException"> If given tags do not match <paramref name="givenListType"/> or are of mixed types;
         /// or a tag is named, already has a Parent, or appears more than once. </exception>
         public NbtList(string? tagName, IEnumerable<NbtTag>? tags, NbtTagType givenListType) {
+            this.tags = new List<NbtTag>();
             name = tagName;
             ListType = givenListType;
 
@@ -142,12 +150,15 @@ namespace fNbt {
                 this.tags.Add(tag);
                 tag.Parent = this;
             }
-            listType = effectiveType;
+            // An empty batch leaves a tolerated End type in place
+            if (toAdd.Count > 0) {
+                listType = effectiveType;
+            }
         }
 
 
-        /// <summary> Creates a deep copy of given NbtList. </summary>
-        /// <param name="other"> An existing NbtList to copy. May not be <c>null</c>. </param>
+        /// <summary> Creates a deep copy of given <see cref="NbtList"/>. </summary>
+        /// <param name="other"> An existing <see cref="NbtList"/> to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <exception cref="NbtFormatException"> <paramref name="other"/> is nested deeper than 512 levels. </exception>
         public NbtList(NbtList other)
@@ -159,7 +170,7 @@ namespace fNbt {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
             name = other.name;
             listType = other.listType;
-            tags.Capacity = other.tags.Count;
+            tags = new List<NbtTag>(other.tags.Count);
             foreach (NbtTag tag in other.tags) {
                 NbtTag childClone = tag.Clone(childDepthBudget);
                 tags.Add(childClone);
@@ -171,9 +182,9 @@ namespace fNbt {
         /// <summary> Gets or sets the tag at the specified index. </summary>
         /// <returns> The tag at the specified index. </returns>
         /// <param name="tagIndex"> The zero-based index of the tag to get or set. </param>
-        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the NbtList. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the <see cref="NbtList"/>. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> Given tag's type does not match ListType;
+        /// <exception cref="ArgumentException"> Given tag's type does not match the declared <see cref="ListType"/>;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public override NbtTag this[int tagIndex] {
             get { return tags[tagIndex]; }
@@ -192,19 +203,19 @@ namespace fNbt {
 
         /// <summary> Gets the tag at the specified index, cast to the requested type. </summary>
         /// <param name="tagIndex"> The zero-based index of the tag to get. </param>
-        /// <typeparam name="T"> Type to cast the result to. Must derive from NbtTag. </typeparam>
+        /// <typeparam name="T"> Type to cast the result to. Must derive from <see cref="NbtTag"/>. </typeparam>
         /// <returns> The tag at the specified index. </returns>
-        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the NbtList. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in the <see cref="NbtList"/>. </exception>
         /// <exception cref="InvalidCastException"> If tag could not be cast to the desired tag. </exception>
         public T Get<T>(int tagIndex) where T : NbtTag {
             return (T)tags[tagIndex];
         }
 
 
-        /// <summary> Adds all tags from the specified collection to the end of this NbtList. </summary>
-        /// <param name="newTags"> The collection whose elements should be added to this NbtList. </param>
+        /// <summary> Adds all tags from the specified collection to the end of this <see cref="NbtList"/>. </summary>
+        /// <param name="newTags"> The collection whose elements should be added to this <see cref="NbtList"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTags"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If given tags do not match ListType or are of mixed types;
+        /// <exception cref="ArgumentException"> If given tags do not match the declared <see cref="ListType"/> or are of mixed types;
         /// or a tag is named, already has a Parent, is this list or one of its ancestors,
         /// or appears more than once. </exception>
         public void AddRange(IEnumerable<NbtTag> newTags) {
@@ -217,7 +228,18 @@ namespace fNbt {
                 tags.Add(tag);
                 tag.Parent = this;
             }
-            listType = effectiveType;
+            // An empty batch leaves a tolerated End type in place
+            if (toAdd.Count > 0) {
+                listType = effectiveType;
+            }
+        }
+
+
+        // The type the next added tag is checked against. An empty list has not committed to a
+        // type: End is only the wire's spelling of "no elements", so it counts as Unknown here and
+        // the first tag added decides.
+        NbtTagType TypeForAdd {
+            get { return tags.Count == 0 && listType == NbtTagType.End ? NbtTagType.Unknown : listType; }
         }
 
 
@@ -245,7 +267,7 @@ namespace fNbt {
         // Checks that every tag in the batch can be added, without changing any fields.
         // Returns the ListType the list would have after a successful add.
         NbtTagType ValidateForAdd(List<NbtTag> toAdd, string paramName) {
-            NbtTagType effectiveType = listType;
+            NbtTagType effectiveType = TypeForAdd;
             HashSet<NbtTag> seen = new HashSet<NbtTag>();
             foreach (NbtTag tag in toAdd) {
                 if (tag == null) {
@@ -260,15 +282,15 @@ namespace fNbt {
         }
 
 
-        /// <summary> Copies all tags in this NbtList to an array. </summary>
+        /// <summary> Copies all tags in this <see cref="NbtList"/> to an array. </summary>
         /// <returns> Array of NbtTags. </returns>
         public NbtTag[] ToArray() {
             return tags.ToArray();
         }
 
 
-        /// <summary> Copies all tags in this NbtList to an array, and casts it to the desired type. </summary>
-        /// <typeparam name="T"> Type to cast every member of NbtList to. Must derive from NbtTag. </typeparam>
+        /// <summary> Copies all tags in this <see cref="NbtList"/> to an array, and casts it to the desired type. </summary>
+        /// <typeparam name="T"> Type to cast every member of <see cref="NbtList"/> to. Must derive from <see cref="NbtTag"/>. </typeparam>
         /// <returns> Array of NbtTags cast to the desired type. </returns>
         /// <exception cref="InvalidCastException"> If contents of this list cannot be cast to the given type. </exception>
         public T[] ToArray<T>() where T : NbtTag {
@@ -280,7 +302,133 @@ namespace fNbt {
         }
 
 
+        /// <summary> Creates an unnamed list from tags of any types, stored the way Minecraft stores
+        /// a list of mixed types. Tags of one type other than compound make an ordinary list. Any
+        /// other input makes a list of compounds in which every tag that is not a plain compound
+        /// sits under an empty key, the wrapper compounds Minecraft 1.21.5 and later write to disk;
+        /// a compound that already has that shape is wrapped again, so <see cref="UnwrapMixed"/>
+        /// gives every tag back as it was. A wrapped tag gets the empty name and its wrapper as
+        /// <see cref="NbtTag.Parent"/>. </summary>
+        /// <param name="elements"> Tags to hold. Each must be unnamed and have no Parent. </param>
+        /// <returns> The new list. </returns>
+        /// <exception cref="ArgumentNullException"> <paramref name="elements"/> or a tag in it is <c>null</c>. </exception>
+        /// <exception cref="ArgumentException"> A tag is named, already has a Parent, or appears more than once. </exception>
+        public static NbtList CreateMixed(params NbtTag[] elements) {
+            if (elements == null) throw new ArgumentNullException(nameof(elements));
+            if (RawElementType(elements) != NbtTagType.Compound) return new NbtList(elements);
+            // Validate before wrapping: wrapping names the tags and gives them a parent
+            HashSet<NbtTag> seen = new HashSet<NbtTag>();
+            foreach (NbtTag element in elements) {
+                if (element == null) {
+                    throw new ArgumentNullException(nameof(elements), "A tag in the collection is null.");
+                } else if (!seen.Add(element)) {
+                    throw new ArgumentException("The same tag instance was given more than once.", nameof(elements));
+                } else if (element.Parent != null) {
+                    throw new ArgumentException("A tag may only be added to one compound/list at a time.");
+                } else if (element.Name != null) {
+                    throw new ArgumentException("Named tag given. A list may only contain unnamed tags.");
+                }
+            }
+            NbtTag[] wrapped = new NbtTag[elements.Length];
+            for (int i = 0; i < wrapped.Length; i++) {
+                wrapped[i] = WrapIfNeeded(elements[i]);
+            }
+            return new NbtList(wrapped, NbtTagType.Compound);
+        }
+
+
+        /// <summary> Returns the elements the way Minecraft reads them. In a list of compounds, a
+        /// compound holding one tag under an empty key stands for that tag, the wrapper form in
+        /// which Minecraft 1.21.5 and later store a list of mixed types; every other list returns
+        /// its elements as they are. One level of wrapping is removed. The tags are this list's
+        /// own, so <see cref="NbtTag.Clone()"/> one before adding it elsewhere; an unwrapped value
+        /// and its clone carry the empty name the wrapper gave them, which a list refuses until
+        /// <see cref="NbtTag.Name"/> is set to <c>null</c>. </summary>
+        /// <returns> The elements, unwrapped. </returns>
+        public NbtTag[] UnwrapMixed() {
+            NbtTag[] result = new NbtTag[tags.Count];
+            for (int i = 0; i < result.Length; i++) {
+                result[i] = TryUnwrap(tags[i]);
+            }
+            return result;
+        }
+
+
+        // The parser's lists: the elements are fresh, unnamed and unparented, so nothing is
+        // checked, and a homogeneous batch becomes the list's own storage
+        internal static NbtList FromParsed(List<NbtTag> elements) {
+            NbtTagType type = RawElementType(elements);
+            if (type != NbtTagType.Compound) return new NbtList(elements, type);
+            List<NbtTag> wrapped = new List<NbtTag>(elements.Count);
+            foreach (NbtTag element in elements) {
+                wrapped.Add(WrapIfNeeded(element));
+            }
+            return new NbtList(wrapped, NbtTagType.Compound);
+        }
+
+
+        // Takes the collection as the list's storage, unchecked
+        NbtList(List<NbtTag> owned, NbtTagType type) {
+            tags = owned;
+            listType = type;
+            foreach (NbtTag tag in owned) {
+                tag.Parent = this;
+            }
+        }
+
+
+        // A mixed list goes on the wire as a list of compounds, which is Minecraft's own save rule
+        // and the one CreateMixed, UnwrapMixed and the SNBT layer follow.
+        static NbtTagType RawElementType(IEnumerable<NbtTag> elements) {
+            NbtTagType type = NbtTagType.End;
+            foreach (NbtTag element in elements) {
+                if (element == null) continue;
+                if (type == NbtTagType.End) {
+                    type = element.TagType;
+                } else if (element.TagType != type) {
+                    return NbtTagType.Compound;
+                }
+            }
+            return type;
+        }
+
+
+        static NbtTag WrapIfNeeded(NbtTag element) {
+            if (element is NbtCompound compound && !IsWrapper(compound)) return element;
+            element.Name = "";
+            return new NbtCompound(new[] { element });
+        }
+
+
+        internal static NbtTag TryUnwrap(NbtTag element) {
+            return element is NbtCompound compound && IsWrapper(compound) ? compound[""]! : element;
+        }
+
+
+        static bool IsWrapper(NbtCompound compound) {
+            return compound.Count == 1 && compound.Contains("");
+        }
+
+
         #region Reading / Writing
+
+        // A seekable input vouches for a leaf list's count: the reference array takes at most the
+        // bytes left in the stream, and a count those cannot hold fails up front. Container lists
+        // keep the preset, since a header does not consume the bytes it declares and nested lists
+        // would each claim the whole remainder. So does a selector, which may drop elements.
+        static int ReadCapacity(NbtBinaryReader readStream, NbtTagType elementType, int length) {
+            if (length <= MaxPresizedCapacity) return length;
+            if (elementType != NbtTagType.List && elementType != NbtTagType.Compound &&
+                readStream.Selector == null && readStream.TryGetRemaining(out long remaining)) {
+                if (length > remaining) {
+                    throw new EndOfStreamException(
+                        "Declared list length (" + length + " elements) runs past the end of the stream.");
+                }
+                return (int)Math.Min(length, remaining / IntPtr.Size);
+            }
+            return MaxPresizedCapacity;
+        }
+
 
         internal override bool ReadTag(NbtBinaryReader readStream, int depthBudget) {
             if (readStream.Selector != null && !readStream.Selector(this)) {
@@ -301,7 +449,7 @@ namespace fNbt {
             // The reference array grows to hold every element, so it counts against the cap the
             // way an array payload does. The element objects themselves are not counted.
             readStream.EnsureAllocation((long)length * IntPtr.Size);
-            tags.Capacity = Math.Min(length, MaxPresizedCapacity);
+            tags.Capacity = ReadCapacity(readStream, newListType, length);
 
             for (int i = 0; i < length; i++) {
                 NbtTag newTag = NbtTag.Create(newListType);
@@ -316,7 +464,6 @@ namespace fNbt {
 
         internal override void WriteTag(NbtBinaryWriter writeStream, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            EnsureListType();
             writeStream.WriteTagHeader(NbtTagType.List, Name);
             WritePayload(writeStream, childDepthBudget);
         }
@@ -324,20 +471,19 @@ namespace fNbt {
 
         internal override void WriteData(NbtBinaryWriter writeStream, int depthBudget) {
             int childDepthBudget = ConsumeDepthBudget(depthBudget);
-            EnsureListType();
             WritePayload(writeStream, childDepthBudget);
         }
 
 
-        void EnsureListType() {
-            if (ListType == NbtTagType.Unknown) {
-                throw NbtFormatException.UnknownListType();
-            }
+        // The element type that goes on the wire. A list that never committed to one writes
+        // End, which is what Minecraft writes for every empty list.
+        internal NbtTagType WireListType {
+            get { return listType == NbtTagType.Unknown ? NbtTagType.End : listType; }
         }
 
 
         void WritePayload(NbtBinaryWriter writeStream, int childDepthBudget) {
-            writeStream.Write(ListType);
+            writeStream.Write(WireListType);
             writeStream.Write(tags.Count);
             foreach (NbtTag tag in tags) {
                 tag.WriteData(writeStream, childDepthBudget);
@@ -349,8 +495,8 @@ namespace fNbt {
 
         #region Implementation of IEnumerable<NBtTag> and IEnumerable
 
-        /// <summary> Returns an enumerator that iterates through all tags in this NbtList. </summary>
-        /// <returns> An IEnumerator&lt;NbtTag&gt; that can be used to iterate through the list. </returns>
+        /// <summary> Returns an enumerator that iterates through all tags in this <see cref="NbtList"/>. </summary>
+        /// <returns> An IEnumerator&lt;<see cref="NbtTag"/>&gt; that can be used to iterate through the list. </returns>
         public IEnumerator<NbtTag> GetEnumerator() {
             return tags.GetEnumerator();
         }
@@ -365,35 +511,36 @@ namespace fNbt {
 
         #region Implementation of IList<NbtTag> and ICollection<NbtTag>
 
-        /// <summary> Determines the index of a specific tag in this NbtList </summary>
+        /// <summary> Determines the index of a specific tag in this <see cref="NbtList"/> </summary>
         /// <returns> The index of tag if found in the list; otherwise, -1. </returns>
-        /// <param name="tag"> The tag to locate in this NbtList. </param>
+        /// <param name="tag"> The tag to locate in this <see cref="NbtList"/>. </param>
         public int IndexOf(NbtTag? tag) {
             if (tag == null) return -1;
             return tags.IndexOf(tag);
         }
 
 
-        /// <summary> Inserts an item to this NbtList at the specified index. </summary>
+        /// <summary> Inserts an item to this <see cref="NbtList"/> at the specified index. </summary>
         /// <param name="tagIndex"> The zero-based index at which newTag should be inserted. </param>
-        /// <param name="newTag"> The tag to insert into this NbtList. </param>
-        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in this NbtList. </exception>
+        /// <param name="newTag"> The tag to insert into this <see cref="NbtList"/>. </param>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="tagIndex"/> is not a valid index in this <see cref="NbtList"/>. </exception>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match ListType;
+        /// <exception cref="ArgumentException"> <paramref name="newTag"/> does not match the declared <see cref="ListType"/>;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Insert(int tagIndex, NbtTag newTag) {
-            ValidateCanAttach(newTag, listType, nameof(newTag));
+            NbtTagType effectiveType = TypeForAdd;
+            ValidateCanAttach(newTag, effectiveType, nameof(newTag));
             tags.Insert(tagIndex, newTag);
             newTag.Parent = this;
-            if (listType == NbtTagType.Unknown) {
+            if (effectiveType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
         }
 
 
-        /// <summary> Removes a tag at the specified index from this NbtList. </summary>
+        /// <summary> Removes a tag at the specified index from this <see cref="NbtList"/>. </summary>
         /// <param name="index"> The zero-based index of the item to remove. </param>
-        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is not a valid index in the NbtList. </exception>
+        /// <exception cref="ArgumentOutOfRangeException"> <paramref name="index"/> is not a valid index in the <see cref="NbtList"/>. </exception>
         public void RemoveAt(int index) {
             NbtTag tag = this[index];
             tags.RemoveAt(index);
@@ -401,22 +548,23 @@ namespace fNbt {
         }
 
 
-        /// <summary> Adds a tag to this NbtList. </summary>
-        /// <param name="newTag"> The tag to add to this NbtList. </param>
+        /// <summary> Adds a tag to this <see cref="NbtList"/>. </summary>
+        /// <param name="newTag"> The tag to add to this <see cref="NbtList"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="newTag"/> is <c>null</c>. </exception>
-        /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match ListType;
+        /// <exception cref="ArgumentException"> If <paramref name="newTag"/> does not match the declared <see cref="ListType"/>;
         /// or it already has a Parent; or it is this list or one of its ancestors; or it is named. </exception>
         public void Add(NbtTag newTag) {
-            ValidateCanAttach(newTag, listType, nameof(newTag));
+            NbtTagType effectiveType = TypeForAdd;
+            ValidateCanAttach(newTag, effectiveType, nameof(newTag));
             tags.Add(newTag);
             newTag.Parent = this;
-            if (listType == NbtTagType.Unknown) {
+            if (effectiveType == NbtTagType.Unknown) {
                 listType = newTag.TagType;
             }
         }
 
 
-        /// <summary> Removes all tags from this NbtList. </summary>
+        /// <summary> Removes all tags from this <see cref="NbtList"/>. </summary>
         public void Clear() {
             for (int i = 0; i < tags.Count; i++) {
                 tags[i].Parent = null;
@@ -425,33 +573,33 @@ namespace fNbt {
         }
 
 
-        /// <summary> Determines whether this NbtList contains a specific tag. </summary>
-        /// <returns> true if given tag is found in this NbtList; otherwise, false. </returns>
-        /// <param name="item"> The tag to locate in this NbtList. </param>
+        /// <summary> Determines whether this <see cref="NbtList"/> contains a specific tag. </summary>
+        /// <returns> true if given tag is found in this <see cref="NbtList"/>; otherwise, false. </returns>
+        /// <param name="item"> The tag to locate in this <see cref="NbtList"/>. </param>
         public bool Contains(NbtTag item) {
             return tags.Contains(item);
         }
 
 
-        /// <summary> Copies the tags of this NbtList to an array, starting at a particular array index. </summary>
-        /// <param name="array"> The one-dimensional array that is the destination of the tag copied from NbtList.
+        /// <summary> Copies the tags of this <see cref="NbtList"/> to an array, starting at a particular array index. </summary>
+        /// <param name="array"> The one-dimensional array that is the destination of the tag copied from <see cref="NbtList"/>.
         /// The array must have zero-based indexing. </param>
         /// <param name="arrayIndex"> The zero-based index in array at which copying begins. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="array"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentOutOfRangeException"> arrayIndex is less than 0. </exception>
         /// <exception cref="ArgumentException"> Given array is multidimensional; arrayIndex is equal to or greater than the length of array;
-        /// the number of tags in this NbtList is greater than the available space from arrayIndex to the end of the destination array;
-        /// or type NbtTag cannot be cast automatically to the type of the destination array. </exception>
+        /// the number of tags in this <see cref="NbtList"/> is greater than the available space from arrayIndex to the end of the destination array;
+        /// or type <see cref="NbtTag"/> cannot be cast automatically to the type of the destination array. </exception>
         public void CopyTo(NbtTag[] array, int arrayIndex) {
             tags.CopyTo(array, arrayIndex);
         }
 
 
-        /// <summary> Removes the first occurrence of a specific NbtTag from this NbtList.
+        /// <summary> Removes the first occurrence of a specific <see cref="NbtTag"/> from this <see cref="NbtList"/>.
         /// Looks for exact object matches, not name matches. </summary>
-        /// <returns> true if tag was successfully removed from this NbtList; otherwise, false.
+        /// <returns> true if tag was successfully removed from this <see cref="NbtList"/>; otherwise, false.
         /// This method also returns false if tag is not found. </returns>
-        /// <param name="tag"> The tag to remove from this NbtList. </param>
+        /// <param name="tag"> The tag to remove from this <see cref="NbtList"/>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="tag"/> is <c>null</c>. </exception>
         public bool Remove(NbtTag tag) {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
@@ -463,8 +611,8 @@ namespace fNbt {
         }
 
 
-        /// <summary> Gets the number of tags contained in the NbtList. </summary>
-        /// <returns> The number of tags contained in the NbtList. </returns>
+        /// <summary> Gets the number of tags contained in the <see cref="NbtList"/>. </summary>
+        /// <returns> The number of tags contained in the <see cref="NbtList"/>. </returns>
         public int Count {
             get { return tags.Count; }
         }
@@ -533,13 +681,6 @@ namespace fNbt {
         }
 
         #endregion
-
-
-        /// <inheritdoc />
-        /// <exception cref="NbtFormatException"> This tag is nested deeper than 512 levels. </exception>
-        public override object Clone() {
-            return new NbtList(this, MaxDepth);
-        }
 
 
         internal override NbtTag Clone(int depthBudget) {

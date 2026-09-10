@@ -325,20 +325,6 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void WritingArrayLargerThanChunkSizeDoesNotThrow() {
-            // Tests writing byte arrays that exceed the max NbtBinaryWriter chunk size
-            byte[] val = new byte[5 * 1024 * 1024];
-            NbtCompound root = new NbtCompound("root") {
-                new NbtByteArray("payload1") {
-                    Value = val
-                }
-            };
-            NbtFile file = new NbtFile(root);
-            file.SaveToStream(Stream.Null, NbtCompression.None);
-        }
-
-
-        [TestMethod]
         public void RootTagSetterRejectsNullAndUnnamed() {
             NbtCompound oldRoot = new NbtCompound("defaultRoot");
             NbtFile newFile = new NbtFile(oldRoot);

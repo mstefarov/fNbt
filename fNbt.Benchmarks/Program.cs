@@ -11,11 +11,21 @@ using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace fNbt.Benchmarks;
 
 class Program {
     public const string BaselineIncompatible = "BaselineIncompatible";
+    public const string Baseline20Incompatible = "Baseline20Incompatible";
+
+#if NETFRAMEWORK
+    // BenchmarkDotNet's in-place Framework toolchain omits TargetFrameworkAttribute, enabling
+    // legacy managed GZip inflation. Use csproj so local and NuGet jobs both use native zlib.
+    static Job OnCsProjToolchain(Job job) {
+        return job.WithToolchain(CsProjClassicNetToolchain.Net48);
+    }
+#endif
     public const string VeryStable = "VeryStable";
     public const string Average = "Average";
     public const string Unstable = "Unstable";
@@ -45,8 +55,11 @@ class Program {
 
         // Benchmarks using 2.0 APIs can't compile against a 1.x baseline package. Source #if
         // guards don't help, since BenchmarkDotNet generates boilerplate from the default build.
-        if (customArgs.BaselineVersion != null && IsPre2(customArgs.BaselineVersion)) {
+        if (customArgs.BaselineVersion != null && IsBelow(customArgs.BaselineVersion, 2, 0)) {
             initialConfig.AddFilter(new ExcludeCategoryFilter(BaselineIncompatible));
+        }
+        if (customArgs.BaselineVersion != null && IsBelow(customArgs.BaselineVersion, 2, 1)) {
+            initialConfig.AddFilter(new ExcludeCategoryFilter(Baseline20Incompatible));
         }
 
         if (customArgs.ServerGc && customArgs.BaselineVersion == null) {
@@ -69,6 +82,9 @@ class Program {
             Job job = parsedJobs.Length == 0 || parsedJobs[0].Meta.IsMutator
                 ? Job.Default
                 : parsedJobs[0];
+#if NETFRAMEWORK
+            job = OnCsProjToolchain(job);
+#endif
             if (customArgs.ServerGc) {
                 job = job.WithGcServer(true);
                 logger.WriteLineInfo("// Server GC scenario: jobs run with GcServer=true");
@@ -84,6 +100,11 @@ class Program {
                 .WithBaseline(true));
             logger.WriteLineInfo($"// Baseline job added: {job.Id}-NuGet (fNbt {version})");
         }
+#if NETFRAMEWORK
+        else if (!parsedConfig.GetJobs().Any()) {
+            initialConfig.AddJob(OnCsProjToolchain(Job.Default));
+        }
+#endif
 
         // The switcher needs the args itself, not just the config built from them. Hand it an
         // empty array and it ignores --filter and drops into interactive selection.
@@ -115,9 +136,12 @@ class Program {
             || arg.Equals("--version", StringComparison.OrdinalIgnoreCase));
     }
 
-    // Mirrors the FNBT_BASELINE condition in the csproj
-    static bool IsPre2(string version) {
-        return int.TryParse(version.Split('.')[0], out int major) && major < 2;
+    // Mirrors the FNBT_BASELINE conditions in the csproj, which ignore a prerelease label too
+    static bool IsBelow(string version, int major, int minor) {
+        string[] parts = version.Split('-', '+')[0].Split('.');
+        return int.TryParse(parts[0], out int actualMajor)
+            && int.TryParse(parts.Length > 1 ? parts[1] : "0", out int actualMinor)
+            && (actualMajor < major || actualMajor == major && actualMinor < minor);
     }
 }
 

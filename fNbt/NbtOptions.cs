@@ -35,7 +35,7 @@ namespace fNbt {
 
 
         /// <summary> The flavor used by entry points constructed without one: <see cref="NbtFile"/>,
-        /// <see cref="NbtReader"/>, <see cref="NbtWriter"/>, and <c>NbtFile.ReadRootTagName</c>.
+        /// <see cref="NbtReader"/>, <see cref="NbtWriter"/>, and <see cref="NbtFile.ReadRootTagName(string)"/>.
         /// Initially <see cref="NbtFlavor.Java"/>. Every such entry point works with named roots,
         /// so flavors without a root name are rejected here; pass those to <see cref="NbtCodec"/>
         /// explicitly. </summary>
@@ -57,8 +57,8 @@ namespace fNbt {
 
         /// <summary> Initial <see cref="ValidateOnRead"/> value for new options and for entry
         /// points constructed without options. Initially <c>false</c>. Enabling it process-wide
-        /// makes documents that merely bend a flavor's rules throw where they previously loaded,
-        /// even in code that did not opt in. </summary>
+        /// makes documents that merely bend a flavor's rules or repeat a name throw where they
+        /// previously loaded, even in code that did not opt in. </summary>
         public static bool DefaultValidateOnRead {
             get { return CurrentPolicy.ValidateOnRead; }
             set { ReplacePolicy(value, null, null); }
@@ -138,9 +138,13 @@ namespace fNbt {
         public NbtFlavor Flavor { get; set; }
 
         /// <summary> Whether reads enforce the flavor's conformance rules (permitted tag types,
-        /// string ceilings, and for <see cref="NbtCodec"/> the root tag type) in addition to
-        /// parsing. Initialized from <see cref="DefaultValidateOnRead"/>. When off, reads accept
-        /// anything parseable, so files that merely bend the rules still load. </summary>
+        /// string ceilings, and for <see cref="NbtCodec"/> the root tag type) and the format's
+        /// rule against a repeated name in a compound, in addition to parsing. The repeated-name
+        /// check covers the members a load builds into a compound; <see cref="NbtReader"/>'s
+        /// streaming walk and the members a selector skips go unchecked. Initialized from
+        /// <see cref="DefaultValidateOnRead"/>. When off, reads accept anything parseable, so
+        /// files that merely bend the rules still load, and a repeated name keeps the last value
+        /// in the first tag's place, the way Minecraft loads it. </summary>
         public bool ValidateOnRead { get; set; }
 
         /// <summary> Whether writes enforce the flavor's conformance rules, refusing to produce a
@@ -149,6 +153,8 @@ namespace fNbt {
         /// (like <see cref="NbtFlavor.Java"/>) pay no cost either way. </summary>
         public bool ValidateOnWrite { get; set; }
 
+        long maxAllocation;
+
         /// <summary> Maximum size, in bytes, of any single allocation made on behalf of a length
         /// declared in the input: array payloads, list-as-array reads, strings, and the array of
         /// references a loaded list holds its elements in (one pointer per element; the element
@@ -156,9 +162,18 @@ namespace fNbt {
         /// declaring huge lengths, which matters most on compressed and non-seekable streams where
         /// declared lengths cannot be checked against the bytes actually available.
         /// Per-allocation, not a total document quota. Initialized from
-        /// <see cref="DefaultMaxAllocation"/>; <see cref="long.MaxValue"/> means no limit, and the
-        /// value must be positive when the options are used. </summary>
-        public long MaxAllocation { get; set; }
+        /// <see cref="DefaultMaxAllocation"/>; <see cref="long.MaxValue"/> means no limit. </summary>
+        /// <exception cref="ArgumentOutOfRangeException"> value is zero or negative. </exception>
+        public long MaxAllocation {
+            get { return maxAllocation; }
+            set {
+                if (value <= 0) {
+                    throw new ArgumentOutOfRangeException(nameof(value), value,
+                                                          "MaxAllocation must be positive.");
+                }
+                maxAllocation = value;
+            }
+        }
 
 
         // Immutable settings for one entry point, produced by the Resolve methods below so that
@@ -212,13 +227,8 @@ namespace fNbt {
             if (flavor == null) {
                 throw new ArgumentNullException(paramName, "Options must name a flavor.");
             }
-            long maxAllocation = options.MaxAllocation;
-            if (maxAllocation <= 0) {
-                throw new ArgumentOutOfRangeException(paramName, maxAllocation,
-                                                      "MaxAllocation must be positive.");
-            }
             return new Resolved(flavor, options.ValidateOnRead, options.ValidateOnWrite,
-                                maxAllocation);
+                                options.MaxAllocation);
         }
 
 

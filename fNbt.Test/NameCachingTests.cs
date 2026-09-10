@@ -6,6 +6,9 @@ using System.Linq;
 namespace fNbt.Test {
     [TestClass]
     public sealed class NameCachingTests {
+        // Each warm-up compound supplies two short names.
+        const int WarmupCompoundCount = (NbtBinaryReader.NameCacheActivation + 1) / 2;
+
         static NbtCompound MakeSchemaDoc(int compoundCount, Func<int, int, string> namer) {
             var list = new NbtList("Items", NbtTagType.Compound);
             for (int i = 0; i < compoundCount; i++) {
@@ -20,16 +23,29 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void RepeatedNamesShareOneInstance() {
-            // Names repeated across compounds may come back as one string instance. That is
-            // intended, so pin it.
-            string[] names = { "alpha", "beta", "gamma" };
-            NbtCompound root = TestFiles.Reload(MakeSchemaDoc(60, (i, f) => names[f]));
+        public void TreeAndStreamingReadersCacheShortNamesAlongsideLongNames() {
+            int firstCachedIndex = WarmupCompoundCount;
+            int secondCachedIndex = firstCachedIndex + 1;
+            int compoundCount = secondCachedIndex + 1;
+            string longName = new string('x', 100);
+            byte[] doc = new NbtFile(MakeSchemaDoc(compoundCount, (i, f) => f == 2 ? longName : "field" + f))
+                .SaveToBuffer(NbtCompression.None);
+            NbtCompound root = TestFiles.Load(doc).RootTag;
             var items = (NbtList)root["Items"];
-            string name30 = ((NbtCompound)items[30]).Tags.First().Name;
-            string name50 = ((NbtCompound)items[50]).Tags.First().Name;
-            Assert.AreEqual("alpha", name30);
-            Assert.AreSame(name30, name50);
+            Assert.AreEqual(compoundCount, items.Count);
+            Assert.AreEqual(secondCachedIndex * 3 + 2, items[secondCachedIndex][longName].IntValue);
+            Assert.AreEqual("field0", ((NbtCompound)items[firstCachedIndex]).Tags.First().Name);
+            Assert.AreSame(items[firstCachedIndex]["field1"].Name, items[secondCachedIndex]["field1"].Name);
+
+            NbtReader reader = TestFiles.OpenReader(doc);
+            var occurrences = new List<string>();
+            while (reader.ReadToFollowing()) {
+                if (reader.TagName == "field1") {
+                    occurrences.Add(reader.TagName);
+                }
+            }
+            Assert.AreEqual(compoundCount, occurrences.Count);
+            Assert.AreSame(occurrences[firstCachedIndex], occurrences[secondCachedIndex]);
         }
 
 
@@ -40,15 +56,6 @@ namespace fNbt.Test {
             var items = (NbtList)root["Items"];
             Assert.AreEqual(2000, items.Count);
             Assert.AreEqual(1500 * 3 + 2, ((NbtCompound)items[1500])["n1500_2"].IntValue);
-        }
-
-
-        [TestMethod]
-        public void LongNamesStillParse() {
-            string longName = new string('x', 100);
-            NbtCompound root = TestFiles.Reload(MakeSchemaDoc(20, (i, f) => longName + f));
-            var items = (NbtList)root["Items"];
-            Assert.AreEqual(15 * 3 + 1, ((NbtCompound)items[15])[longName + "1"].IntValue);
         }
 
 
@@ -72,12 +79,24 @@ namespace fNbt.Test {
                     foreach (char c in name) ms.WriteByte((byte)c);
                 }
                 BeginCompound(""); // root
+                // Cross the cache's activation threshold before testing alternate encodings.
+                for (int i = 0; i < WarmupCompoundCount; i++) {
+                    BeginCompound("warm" + i);
+                    WriteNamedByte(new byte[] { (byte)'w' }, 0);
+                    ms.WriteByte(0x00);
+                }
                 BeginCompound("first");
                 WriteNamedByte(new byte[] { (byte)'a', 0x00, (byte)'b' }, 1);
                 ms.WriteByte(0x00); // end "first"
                 BeginCompound("second");
                 WriteNamedByte(new byte[] { (byte)'a', 0xC0, 0x80, (byte)'b' }, 2);
                 ms.WriteByte(0x00); // end "second"
+                BeginCompound("third");
+                WriteNamedByte(new byte[] { (byte)'a', 0x00, (byte)'b' }, 3);
+                ms.WriteByte(0x00);
+                BeginCompound("fourth");
+                WriteNamedByte(new byte[] { (byte)'a', 0xC0, 0x80, (byte)'b' }, 4);
+                ms.WriteByte(0x00);
                 ms.WriteByte(0x00); // end root
                 doc = ms.ToArray();
             }
@@ -86,45 +105,43 @@ namespace fNbt.Test {
             string nameB = ((NbtCompound)file.RootTag["second"]).Tags.First().Name;
             Assert.AreEqual(nameA, nameB);
             Assert.AreEqual("a\0b", nameA);
+            Assert.AreSame(nameA, ((NbtCompound)file.RootTag["third"]).Tags.First().Name);
+            Assert.AreSame(nameB, ((NbtCompound)file.RootTag["fourth"]).Tags.First().Name);
+            string[] children = { "first", "second", "third", "fourth" };
+            for (int i = 0; i < children.Length; i++) {
+                Assert.AreEqual(i + 1, file.RootTag[children[i]]["a\0b"].ByteValue);
+            }
         }
 
 
         [TestMethod]
-        public void DuplicateNamesInOneCompoundStillRejected() {
+        public void DuplicateNamesInOneCompoundStillDetected() {
             // Cached names must not bypass decoded-name duplicate detection
             byte[] doc;
             using (var ms = new MemoryStream()) {
-                ms.WriteByte(0x0A);
-                ms.WriteByte(0);
-                ms.WriteByte(0);
-                for (int i = 0; i < 12; i++) {
-                    ms.WriteByte(0x01); // TAG_Byte "dup"
-                    ms.WriteByte(0);
-                    ms.WriteByte(3);
-                    foreach (char c in "dup") ms.WriteByte((byte)c);
-                    ms.WriteByte((byte)i);
+                var writer = new NbtWriter(ms, "root");
+                for (int i = 0; i < WarmupCompoundCount; i++) {
+                    writer.BeginCompound("warm" + i);
+                    writer.WriteByte("dup", 0);
+                    writer.EndCompound();
                 }
-                ms.WriteByte(0x00);
+                // NbtWriter permits duplicate names; the tree reader must notice them.
+                writer.BeginCompound("duplicates");
+                writer.WriteByte("dup", 1);
+                writer.WriteByte("dup", 2);
+                writer.EndCompound();
+                writer.EndCompound();
+                writer.Finish();
                 doc = ms.ToArray();
             }
-            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc));
-        }
-
-
-        [TestMethod]
-        public void NbtReaderNamesAreCachedToo() {
-            byte[] doc = new NbtFile(MakeSchemaDoc(60, (i, f) => "field" + f))
-                .SaveToBuffer(NbtCompression.None);
             NbtReader reader = TestFiles.OpenReader(doc);
-            var occurrences = new List<string>();
-            while (reader.ReadToFollowing()) {
-                if (reader.TagName == "field1") {
-                    occurrences.Add(reader.TagName);
-                }
-            }
-            Assert.AreEqual(60, occurrences.Count);
-            // Early occurrences precede cache activation; late ones must share one instance
-            Assert.AreSame(occurrences[30], occurrences[50]);
+            Assert.IsTrue(reader.ReadToFollowing("duplicates"));
+            Assert.IsTrue(reader.ReadToFollowing());
+            string firstName = reader.TagName;
+            Assert.IsTrue(reader.ReadToFollowing());
+            Assert.AreSame(firstName, reader.TagName);
+            Assert.AreEqual(2, TestFiles.Load(doc).RootTag.Get<NbtCompound>("duplicates")["dup"].ByteValue);
+            Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, new NbtOptions { ValidateOnRead = true }));
         }
     }
 }

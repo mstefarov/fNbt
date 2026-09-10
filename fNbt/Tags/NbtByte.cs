@@ -12,24 +12,31 @@ namespace fNbt {
         /// <summary> Value/payload of this tag (a single byte). </summary>
         public byte Value { get; set; }
 
+        /// <summary> <see cref="Value"/> read as the signed byte Minecraft stores: the same eight
+        /// bits, so 255 reads as -1 and assigning -1 stores 255. </summary>
+        public sbyte SignedValue {
+            get { return unchecked((sbyte)Value); }
+            set { Value = unchecked((byte)value); }
+        }
 
-        /// <summary> Creates an unnamed NbtByte tag with the default value of 0. </summary>
+
+        /// <summary> Creates an unnamed <see cref="NbtByte"/> tag with the default value of 0. </summary>
         public NbtByte() { }
 
 
-        /// <summary> Creates an unnamed NbtByte tag with the given value. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtByte"/> tag with the given value. </summary>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtByte(byte value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtByte tag with the given name and the default value of 0. </summary>
+        /// <summary> Creates an <see cref="NbtByte"/> tag with the given name and the default value of 0. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtByte(string? tagName)
             : this(tagName, 0) { }
 
 
-        /// <summary> Creates an NbtByte tag with the given name and value. </summary>
+        /// <summary> Creates an <see cref="NbtByte"/> tag with the given name and value. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtByte(string? tagName, byte value) {
@@ -38,7 +45,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a copy of given NbtByte tag. </summary>
+        /// <summary> Creates a copy of given <see cref="NbtByte"/> tag. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtByte(NbtByte other) {
@@ -69,8 +76,7 @@ namespace fNbt {
         }
 
 
-        /// <inheritdoc />
-        public override object Clone() {
+        internal override NbtTag Clone(int depthBudget) {
             return new NbtByte(this);
         }
 

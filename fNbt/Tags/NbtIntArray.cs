@@ -25,21 +25,21 @@ namespace fNbt {
         int[] ints;
 
 
-        /// <summary> Creates an unnamed NbtIntArray tag, containing an empty array of ints. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtIntArray"/> tag, containing an empty array of ints. </summary>
         public NbtIntArray()
             : this((string?)null) { }
 
 
-        /// <summary> Creates an unnamed NbtIntArray tag, containing the given array of ints. </summary>
-        /// <param name="value"> Int array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <summary> Creates an unnamed <see cref="NbtIntArray"/> tag, containing the given array of ints. </summary>
+        /// <param name="value"> Int array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given int array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a int[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a int[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtIntArray(int[] value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtIntArray tag with the given name, containing an empty array of ints. </summary>
+        /// <summary> Creates an <see cref="NbtIntArray"/> tag with the given name, containing an empty array of ints. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtIntArray(string? tagName) {
             name = tagName;
@@ -47,12 +47,12 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates an NbtIntArray tag with the given name, containing the given array of ints. </summary>
+        /// <summary> Creates an <see cref="NbtIntArray"/> tag with the given name, containing the given array of ints. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
-        /// <param name="value"> Int array to assign to this tag's Value. May not be <c>null</c>. </param>
+        /// <param name="value"> Int array to assign to this tag's <see cref="Value"/>. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="value"/> is <c>null</c>. </exception>
         /// <remarks> Given int array will be cloned. To avoid unnecessary copying, call one of the other constructor
-        /// overloads (that do not take a int[]) and then set the Value property yourself. </remarks>
+        /// overloads (that do not take a int[]) and then set the <see cref="Value"/> property yourself. </remarks>
         public NbtIntArray(string? tagName, int[] value) {
             if (value == null) throw new ArgumentNullException(nameof(value));
             name = tagName;
@@ -60,7 +60,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a deep copy of given NbtIntArray. </summary>
+        /// <summary> Creates a deep copy of given <see cref="NbtIntArray"/>. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         /// <remarks> Int array of given tag will be cloned. </remarks>
@@ -108,8 +108,7 @@ namespace fNbt {
         }
 
 
-        /// <inheritdoc />
-        public override object Clone() {
+        internal override NbtTag Clone(int depthBudget) {
             return new NbtIntArray(this);
         }
 

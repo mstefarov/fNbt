@@ -2,11 +2,8 @@ using System;
 using System.IO;
 
 namespace fNbt {
-    // Feeds a raw DeflateStream and remembers the last chunk it handed over. A raw inflater
-    // stops at the end of the final block and never reads on, so once it reports the end the
-    // container trailer starts somewhere inside that chunk, or right after it in the source.
-    // Given the trailer bytes the checksum says to expect, ValidateTrailer finds them without
-    // seeking and without reading past them.
+    // DeflateStream does not report where the compressed data ends within its last read.
+    // Keep those bytes so we can look for the checksum trailer.
     internal sealed class TrailerLocatingStream : Stream {
         readonly Stream baseStream;
         byte[] tail = Array.Empty<byte>();
@@ -48,21 +45,17 @@ namespace fNbt {
         }
 
 
-        // Call after the inflater has been read to its end. The trailer is the first place the
-        // expected bytes appear, searched from the end of the remembered chunk; a match that
-        // straddles the chunk's end is completed from the source, reading only what the match
-        // still needs. A false match costs a byte count that is off by a few bytes, at odds of
-        // about one in 2^32 per candidate position. A trailer that cannot be found, or a source
-        // that ends before the trailer is complete, fails with the caller's message.
+        // Call after reading DeflateStream to its end. To keep reads fast, we look for
+        // the expected bytes instead of parsing the compressed data again. A match in
+        // the wrong place can hide a damaged or missing trailer.
         public void ValidateTrailer(byte[] expected, string mismatchMessage) {
             int length = expected.Length;
             for (int start = tailLength - length; start >= 0; start--) {
                 if (Matches(tail, start, expected, 0, length)) return;
             }
 
-            // Bytes of the trailer that already arrived sit at the very end of the chunk; the rest
-            // are the next bytes of the source. Longer prefixes are tried first, and every read
-            // stays inside the trailer under whichever hypothesis holds.
+            // The trailer may be split across reads. Try the longest matching part first,
+            // then read only what is still missing.
             byte[] rest = new byte[length];
             int have = 0;
             for (int inTail = Math.Min(length - 1, tailLength); inTail >= 0; inTail--) {

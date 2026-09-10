@@ -2,9 +2,10 @@ using System;
 
 namespace fNbt {
     /// <summary> Exception thrown when a format violation is detected while
-    /// parsing or serializing an NBT file. </summary>
+    /// parsing or serializing an NBT file. <see cref="SnbtParseException"/> is the form
+    /// thrown for SNBT text, and carries the position. </summary>
     [Serializable]
-    public sealed class NbtFormatException : Exception {
+    public class NbtFormatException : Exception {
         internal NbtFormatException(string message)
             : base(message) { }
 
@@ -20,6 +21,13 @@ namespace fNbt {
         }
 
 
+        internal static NbtFormatException StringTooLong(NbtFlavor flavor, long byteCount) {
+            return new NbtFormatException(
+                "String is " + byteCount + " bytes, but the " + flavor.Name +
+                " flavor allows at most " + flavor.MaxStringBytes + ".");
+        }
+
+
         internal static NbtFormatException NotCompoundRoot() {
             return new NbtFormatException("Given NBT stream does not start with a TAG_Compound.");
         }
@@ -30,8 +38,16 @@ namespace fNbt {
         }
 
 
-        internal static NbtFormatException UnknownListType() {
-            return new NbtFormatException("NbtList had no elements and an Unknown ListType");
+        internal static NbtFormatException StringEncoding(Exception ex) {
+            return new NbtFormatException("String contains a lone surrogate, which cannot be encoded as standard UTF-8.", ex);
+        }
+
+
+        internal const string DepthLimitMessage =
+            "NBT tags are nested deeper than the supported limit (512 levels).";
+
+        internal static NbtFormatException DepthLimit() {
+            return new NbtFormatException(DepthLimitMessage);
         }
     }
 }

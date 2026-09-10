@@ -13,23 +13,23 @@ namespace fNbt {
         public double Value { get; set; }
 
 
-        /// <summary> Creates an unnamed NbtDouble tag with the default value of 0. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtDouble"/> tag with the default value of 0. </summary>
         public NbtDouble() { }
 
 
-        /// <summary> Creates an unnamed NbtDouble tag with the given value. </summary>
+        /// <summary> Creates an unnamed <see cref="NbtDouble"/> tag with the given value. </summary>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtDouble(double value)
             : this(null, value) { }
 
 
-        /// <summary> Creates an NbtDouble tag with the given name and the default value of 0. </summary>
+        /// <summary> Creates an <see cref="NbtDouble"/> tag with the given name and the default value of 0. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         public NbtDouble(string? tagName)
             : this(tagName, 0) { }
 
 
-        /// <summary> Creates an NbtDouble tag with the given name and value. </summary>
+        /// <summary> Creates an <see cref="NbtDouble"/> tag with the given name and value. </summary>
         /// <param name="tagName"> Name to assign to this tag. May be <c>null</c>. </param>
         /// <param name="value"> Value to assign to this tag. </param>
         public NbtDouble(string? tagName, double value) {
@@ -38,7 +38,7 @@ namespace fNbt {
         }
 
 
-        /// <summary> Creates a copy of given NbtDouble tag. </summary>
+        /// <summary> Creates a copy of given <see cref="NbtDouble"/> tag. </summary>
         /// <param name="other"> Tag to copy. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="other"/> is <c>null</c>. </exception>
         public NbtDouble(NbtDouble other) {
@@ -69,8 +69,7 @@ namespace fNbt {
         }
 
 
-        /// <inheritdoc />
-        public override object Clone() {
+        internal override NbtTag Clone(int depthBudget) {
             return new NbtDouble(this);
         }
 

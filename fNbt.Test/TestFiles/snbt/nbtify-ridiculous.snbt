@@ -1,0 +1,9 @@
+[
+  {
+    IsRidiculous: 1b,
+    Bugrock: 24,
+    'wow this\nkey\b\f\n\r\t\"\\\' is ridicul\0us for süre': true,
+    ElkosaurusTex: "Lawn-dry-mæt",
+    Noice: [L;7l,3l,9l,6l,1l,5l,4l,3l,1l,33l]
+  }
+]

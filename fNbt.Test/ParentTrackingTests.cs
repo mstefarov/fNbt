@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace fNbt.Test {
     [TestClass]
@@ -149,17 +150,28 @@ namespace fNbt.Test {
         // AddRange and the collection constructors must be atomic.
         [TestMethod]
         public void CompoundAddRangeIsAtomic() {
-            var dst = new NbtCompound("dst");
-            var a = new NbtInt("a", 1);
-            var b = new NbtInt("b", 2);
-            var dup = new NbtInt("a", 3);
-            var d = new NbtInt("d", 4);
-            var batch = new NbtTag[] { a, b, dup, d };
+            foreach (bool conflictsWithDestination in new[] { false, true }) {
+                NbtTag[] original = conflictsWithDestination
+                    ? new NbtTag[] { new NbtInt("first", 99), new NbtInt("b", 100) }
+                    : Array.Empty<NbtTag>();
+                NbtCompound dst = new NbtCompound("dst", original);
+                NbtInt a = new NbtInt("a", 1);
+                NbtInt b = new NbtInt("b", 2);
+                NbtInt dup = new NbtInt(conflictsWithDestination ? "c" : "a", 3);
+                NbtInt d = new NbtInt("d", 4);
+                NbtTag[] batch = { a, b, dup, d };
 
-            Assert.Throws<ArgumentException>(() => dst.AddRange(batch));
-            Assert.AreEqual(0, dst.Count);
-            foreach (NbtTag tag in batch) {
-                Assert.IsNull(tag.Parent);
+                Assert.Throws<ArgumentException>(() => dst.AddRange(batch));
+                CollectionAssert.AreEqual(original, dst.ToArray());
+                foreach (NbtTag tag in original) {
+                    Assert.AreSame(tag, dst[tag.Name]);
+                    Assert.AreSame(dst, tag.Parent);
+                }
+                foreach (NbtTag tag in batch) Assert.IsNull(tag.Parent);
+
+                dup.Name = "c";
+                NbtCompound retry = new NbtCompound("retry", batch);
+                foreach (NbtTag tag in batch) Assert.AreSame(retry, tag.Parent);
             }
         }
 

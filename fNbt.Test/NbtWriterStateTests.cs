@@ -258,11 +258,12 @@ namespace fNbt.Test {
 
         [TestMethod]
         public void WriteTagRefusedUpFrontLeavesWriterUsable() {
-            // A list with no element type is refused before the emission window opens, like
-            // the tag layer would refuse it, so nothing is written and the writer goes on
+            // An overlong value is measured before the emission window opens, like the tag
+            // layer would refuse it, so nothing is written and the writer goes on
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
-                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteTag(new NbtList("l")));
+                var tooLong = new NbtString("s", new string('x', ushort.MaxValue + 1));
+                NbtAssert.WritesNothing<NbtFormatException>(ms, () => writer.WriteTag(tooLong));
                 NbtAssert.WriterStillUsable(writer);
             }
         }

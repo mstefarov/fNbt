@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 
 namespace fNbt.Test {
@@ -70,6 +71,46 @@ namespace fNbt.Test {
                     Assert.AreEqual(ms.Length, ms.Position, compression.ToString());
                     Assert.AreEqual(ms.Length, bytesRead, compression.ToString());
                     TestFiles.AssertSmallFile(file);
+                }
+            }
+        }
+
+
+        [TestMethod]
+        public void GZipLoadDrainsPayloadAfterTheRoot() {
+            byte[] root = MakeDoc(NbtCompression.None);
+            byte[] tail = new byte[64 * 1024];
+            new Random(64000).NextBytes(tail);
+            byte[] doc;
+            using (MemoryStream output = new MemoryStream()) {
+                using (GZipStream gzip = new GZipStream(output, CompressionMode.Compress, true)) {
+                    gzip.Write(root, 0, root.Length);
+                    gzip.Write(tail, 0, tail.Length);
+                }
+                doc = output.ToArray();
+            }
+            // The trailer must remain beyond the inflater's first input buffer.
+            Assert.IsTrue(doc.Length > 32 * 1024);
+            byte[] corrupt = Flip(doc, doc.Length - 8);
+
+            foreach (int bufferSize in new[] { 0, 8192 }) {
+                foreach (bool seekable in new[] { true, false }) {
+                    foreach (bool badTrailer in new[] { false, true }) {
+                        string context = "buffer " + bufferSize + ", seekable " + seekable + ", corrupt " + badTrailer;
+                        using (MemoryStream input = new MemoryStream(badTrailer ? corrupt : doc))
+                        using (Stream source = seekable ? input : new PartialReadStream(new NonSeekableStream(input), 7)) {
+                            NbtFile file = new NbtFile { BufferSize = bufferSize };
+                            if (badTrailer) {
+                                Assert.Throws<InvalidDataException>(
+                                    () => file.LoadFromStream(source, NbtCompression.GZip), context);
+                            } else {
+                                long bytesRead = file.LoadFromStream(source, NbtCompression.GZip);
+                                Assert.AreEqual((long)doc.Length, bytesRead, context);
+                                Assert.AreEqual(input.Length, input.Position, context);
+                                TestFiles.AssertSmallFile(file);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -323,6 +364,15 @@ namespace fNbt.Test {
                 .Concat(doc.Skip(10))
                 .ToArray();
 
+            // Truncate at every header byte, including within optional fields and their terminators.
+            for (int length = 0; length < headerBytes.Length + 2; length++) {
+                using (Stream truncated = new NonSeekableStream(new MemoryStream(fancy, 0, length))) {
+                    Assert.Throws<EndOfStreamException>(
+                        () => new NbtFile().LoadFromStream(truncated, NbtCompression.GZip),
+                        "Header length " + length);
+                }
+            }
+
             // A wrong header CRC is rejected on both paths
             byte[] badCrc = (byte[])fancy.Clone();
             badCrc[headerBytes.Length] ^= 0xFF;
@@ -337,6 +387,22 @@ namespace fNbt.Test {
                 Assert.Throws<InvalidDataException>(
                     () => new NbtFile().LoadFromStream(badSource, NbtCompression.GZip),
                     seekable ? "seekable" : "non-seekable");
+            }
+        }
+
+
+        [TestMethod]
+        public void NonSeekableGZipLoadRejectsInvalidHeaders() {
+            byte[] doc = MakeDoc(NbtCompression.GZip);
+            // Bad magic bytes, unsupported compression method, and reserved flag bits.
+            foreach (int index in new[] { 0, 1, 2, 3 }) {
+                byte[] malformed = (byte[])doc.Clone();
+                malformed[index] = 0xE0;
+                using (Stream source = new NonSeekableStream(new MemoryStream(malformed))) {
+                    Assert.Throws<InvalidDataException>(
+                        () => new NbtFile().LoadFromStream(source, NbtCompression.GZip),
+                        "Header byte " + index);
+                }
             }
         }
 

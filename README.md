@@ -9,7 +9,7 @@ Minecraft Java, Minecraft Bedrock, and ClassiCube use.
 The library provides a choice of convenient high-level APIs (NbtFile/NbtTag) that present an object model,
 or lower-level higher-performance APIs (NbtReader/NbtWriter) that read/write data directly to/from streams.
 
-Current released version is 2.0.0 (3 September 2026).
+Current released version is 2.1.0 (9 September 2026).
 
 fNbt is based in part on Erik Davidson's (aphistic's) original LibNbt library,
 now completely rewritten by Matvei Stefarov (fragmer).
@@ -23,6 +23,7 @@ now completely rewritten by Matvei Stefarov (fragmer).
 - Compound tags implement `ICollection<NbtTag>` and List tags implement `IList<NbtTag>`, for easy traversal and LINQ integration.
 - Good performance and low memory overhead.
 - Built-in pretty-printing of individual tags or whole files.
+- Converts to and from SNBT, the text form Minecraft Java uses in commands and `.snbt` files.
 - Every class and method is fully documented, annotated, and unit-tested.
 - Supports every NBT flavor: Java Edition files and network packets, Bedrock Edition files and
   network packets (varint encoding), and ClassiCube maps.
@@ -138,11 +139,29 @@ using (var fileStream = File.Create("foo.nbt", bufferSize: 4 * 1024)) {
     Console.WriteLine( myRandomTag.ToString("    ") ); // spaces
 ```
 
+#### Converting to and from SNBT (stringified NBT)
+```cs
+    NbtTag tag = NbtTag.ParseSnbt("{Name:\"Steve\",Health:20.0f,Tags:[\"a\",\"b\"]}");
+    string compact = tag.ToSnbt();   // {Name:"Steve",Health:20.0f,Tags:["a","b"]}
+    string indented = tag.ToSnbt(new SnbtOptions { WriteLayout = SnbtLayout.Indented });
+
+    // An .snbt file holds one compound; give it a name to save it as a regular NBT file
+    var root = (NbtCompound)NbtTag.ParseSnbt(File.ReadAllText("structure.snbt"));
+    root.Name = "";
+    new NbtFile(root).SaveToFile("structure.nbt", NbtCompression.GZip);
+
+    // Minecraft stores a list of mixed types as compounds with each value under an empty key.
+    // CreateMixed builds that form and UnwrapMixed reads through it.
+    NbtList line = NbtList.CreateMixed(new NbtString("Hello "), new NbtCompound { new NbtString("text", "world") });
+    string snbt = line.ToSnbt();                                      // ["Hello ",{text:"world"}]
+    NbtTag[] parts = ((NbtList)NbtTag.ParseSnbt(snbt)).UnwrapMixed(); // NbtString, NbtCompound
+```
+
 #### Check out unit tests in fNbt.Test for more examples.
 
 
 ## API REFERENCE
-Online reference can be found at https://fcraft.net/fnbt/v2.0.0/
+Online reference can be found at https://fcraft.net/fnbt/v2.1.0/
 
 
 ## LICENSING

@@ -199,12 +199,11 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void InstanceMaxAllocationValidatedAtUse() {
-            // Instance setters are unchecked; the entry point's resolve rejects the value
-            using (var ms = new MemoryStream()) {
-                Assert.Throws<ArgumentOutOfRangeException>(
-                    () => new NbtWriter(ms, "r", new NbtOptions { MaxAllocation = 0 }));
-            }
+        public void MaxAllocationSetterValidatesEagerly() {
+            var options = new NbtOptions { MaxAllocation = 1 };
+            Assert.Throws<ArgumentOutOfRangeException>(() => options.MaxAllocation = 0);
+            Assert.Throws<ArgumentOutOfRangeException>(() => options.MaxAllocation = -1);
+            Assert.AreEqual(1, options.MaxAllocation);
         }
     }
 }

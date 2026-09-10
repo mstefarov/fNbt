@@ -78,18 +78,44 @@ namespace fNbt.Test {
 
 
         [TestMethod]
-        public void WriteValidationChecksEmptyListElementTypes() {
+        public void ReadValidationRejectsRepeatedNames() {
+            // r: { x = 1, x = 2 }, which the default read merges (MalformedInputTests)
+            byte[] doc = { 0x0A, 0x00, 0x01, (byte)'r', 0x01, 0x00, 0x01, (byte)'x', 0x01,
+                           0x01, 0x00, 0x01, (byte)'x', 0x02, 0x00 };
+            var strict = new NbtOptions { ValidateOnRead = true };
+
+            NbtFormatException ex = Assert.Throws<NbtFormatException>(() => TestFiles.Load(doc, strict));
+            StringAssert.Contains(ex.Message, "Duplicate tag name in compound: x");
+
+            NbtReader reader = TestFiles.OpenReader(doc, strict);
+            Assert.Throws<NbtFormatException>(() => reader.ReadAsTag());
+            Assert.IsTrue(reader.IsInErrorState);
+
+            // Java has no flavor restrictions, and the rule is the format's, not a flavor's
+            var codec = new NbtCodec(strict);
+            Assert.Throws<NbtFormatException>(() => codec.ReadTag(doc, 0, doc.Length, out _));
+        }
+
+
+        [TestMethod]
+        public void WriteValidationChecksListElementTypes() {
             // The element type is written even when no elements follow it
             var root = new NbtCompound("r") { new NbtList("l", NbtTagType.LongArray) };
-            Assert.Throws<NbtFormatException>(() => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(root));
+            NbtCodec strict = new NbtCodec(NbtFlavor.JavaLegacy);
+            Assert.Throws<NbtFormatException>(() => strict.WriteTag(root));
 
-            // An unset element type gets the list's own message, not an empty type name
+            // A list that never committed to a type writes as End, which every flavor permits
             var unset = new NbtCompound("r") { new NbtList("l") };
-            NbtFormatException ex = Assert.Throws<NbtFormatException>(
-                () => new NbtCodec(NbtFlavor.JavaLegacy).WriteTag(unset));
-            StringAssert.Contains(ex.Message, "Unknown ListType");
+            NbtAssert.AreEqual(unset, TestFiles.Load(strict.WriteTag(unset), NbtFlavor.JavaLegacy).RootTag);
             new NbtCodec(NbtFlavor.Java).WriteTag(root);
             new NbtCodec(new NbtOptions { Flavor = NbtFlavor.JavaLegacy, ValidateOnWrite = false }).WriteTag(root);
+
+            using (MemoryStream output = new MemoryStream()) {
+                // Stream writes validate the tree without the buffer overload's sizing walk.
+                NbtAssert.WritesNothing<NbtFormatException>(output, () => strict.WriteTag(root, output));
+                strict.WriteTag(unset, output);
+                NbtAssert.AreEqual(unset, TestFiles.Load(output.ToArray(), NbtFlavor.JavaLegacy).RootTag);
+            }
 
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "r", NbtFlavor.Bedrock);

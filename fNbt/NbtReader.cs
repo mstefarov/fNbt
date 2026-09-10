@@ -5,7 +5,7 @@ using System.Text;
 
 namespace fNbt {
     /// <summary> Represents a reader that provides fast, non-cached, forward-only access to NBT data.
-    /// Each instance of NbtReader reads one complete file. </summary>
+    /// Each instance of <see cref="NbtReader"/> reads one complete file. </summary>
     public class NbtReader {
         enum ParseState {
             AtStreamBeginning,
@@ -38,8 +38,8 @@ namespace fNbt {
         readonly bool canSeekStream;
 
 
-        /// <summary> Initializes a new instance of the NbtReader class with the current defaults
-        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <c>NbtOptions</c> defaults). </summary>
+        /// <summary> Initializes a new instance of the <see cref="NbtReader"/> class with the current defaults
+        /// (<see cref="NbtOptions.DefaultFlavor"/> and the other <see cref="NbtOptions"/> defaults). </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable. </exception>
@@ -47,7 +47,7 @@ namespace fNbt {
             : this(stream, NbtOptions.ResolveDefaults()) { }
 
 
-        /// <summary> Initializes a new instance of the NbtReader class. </summary>
+        /// <summary> Initializes a new instance of the <see cref="NbtReader"/> class. </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <param name="bigEndian"> Whether NBT data is in Big-Endian encoding. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/> is <c>null</c>. </exception>
@@ -57,7 +57,7 @@ namespace fNbt {
             : this(stream, bigEndian ? NbtFlavor.Java : NbtFlavor.Bedrock) { }
 
 
-        /// <summary> Initializes a new instance of the NbtReader class for the given flavor,
+        /// <summary> Initializes a new instance of the <see cref="NbtReader"/> class for the given flavor,
         /// with the current default policy settings. </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <param name="flavor"> Encoding to read with. </param>
@@ -68,16 +68,15 @@ namespace fNbt {
             : this(stream, NbtOptions.ResolveForFile(flavor, nameof(flavor))) { }
 
 
-        /// <summary> Initializes a new instance of the NbtReader class with the given options.
+        /// <summary> Initializes a new instance of the <see cref="NbtReader"/> class with the given options.
         /// When read validation is on, the flavor's tag-type range and string ceiling are enforced;
-        /// <c>MaxAllocation</c> caps declared-length allocations either way. </summary>
+        /// <see cref="NbtOptions.MaxAllocation"/> caps declared-length allocations either way. </summary>
         /// <param name="stream"> Stream to read from. </param>
         /// <param name="options"> Settings to use, resolved here. May not be <c>null</c>. </param>
         /// <exception cref="ArgumentNullException"> <paramref name="stream"/>, <paramref name="options"/>,
-        /// or the options' <c>Flavor</c> is <c>null</c>. </exception>
+        /// or the options' <see cref="NbtOptions.Flavor"/> is <c>null</c>. </exception>
         /// <exception cref="ArgumentException"> <paramref name="stream"/> is not readable;
         /// or the options' flavor has no root name (use <see cref="NbtCodec"/> for those). </exception>
-        /// <exception cref="ArgumentOutOfRangeException"> <c>MaxAllocation</c> is zero or negative. </exception>
         public NbtReader(Stream stream, NbtOptions options)
             : this(stream, NbtOptions.ResolveForFile(options, nameof(options))) { }
 
@@ -179,7 +178,7 @@ namespace fNbt {
         }
 
         /// <summary> Gets the offset of the current tag's first byte from the stream position at which
-        /// this NbtReader was created, which is the start of the document. Always 0 if the stream is
+        /// this <see cref="NbtReader"/> was created, which is the start of the document. Always 0 if the stream is
         /// not seekable. </summary>
         /// <exception cref="OverflowException"> The offset does not fit in an <c>int</c>;
         /// use <see cref="LongTagStartOffset"/> for documents past 2 GiB. </exception>
@@ -188,17 +187,17 @@ namespace fNbt {
         }
 
         /// <summary> Gets the offset of the current tag's first byte from the stream position at which
-        /// this NbtReader was created, which is the start of the document, as a <c>long</c>.
+        /// this <see cref="NbtReader"/> was created, which is the start of the document, as a <c>long</c>.
         /// Always 0 if the stream is not seekable. </summary>
         public long LongTagStartOffset { get; private set; }
 
         /// <summary> Gets the number of tags read from the stream so far
         /// (including the current tag and all skipped tags). 
-        /// If <c>SkipEndTags</c> is <c>false</c>, all end tags are also counted. </summary>
+        /// If <see cref="SkipEndTags"/> is <c>false</c>, all end tags are also counted. </summary>
         public int TagsRead { get; private set; }
 
         /// <summary> Gets the depth of the current tag in the hierarchy.
-        /// <c>RootTag</c> is at depth 1, its descendant tags are 2, etc. </summary>
+        /// The root tag is at depth 1, its descendant tags are 2, etc. </summary>
         public int Depth { get; private set; }
 
         /// <summary> If the current tag is TAG_List, returns type of the list elements. </summary>
@@ -213,7 +212,7 @@ namespace fNbt {
         /// <summary> If the parent tag is TAG_List, returns index of the current tag. </summary>
         public int ListIndex { get; private set; }
 
-        /// <summary> Gets whether this NbtReader instance is in state of error.
+        /// <summary> Gets whether this <see cref="NbtReader"/> instance is in state of error.
         /// No further reading can be done from this instance if a parse error occurred. </summary>
         public bool IsInErrorState {
             get { return (state == ParseState.Error); }
@@ -223,7 +222,7 @@ namespace fNbt {
         /// <summary> Reads the next tag from the stream. </summary>
         /// <returns> true if the next tag was read successfully; false if there are no more tags to read. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public bool ReadToFollowing() {
             switch (state) {
                 case ParseState.AtStreamBeginning:
@@ -392,7 +391,7 @@ namespace fNbt {
         void GoDown() {
             if (Depth > NbtTag.MaxDepth) {
                 state = ParseState.Error;
-                throw new NbtFormatException(NbtTag.DepthLimitMessage);
+                throw NbtFormatException.DepthLimit();
             }
             if (nodes == null) {
                 nodes = new Node[4];
@@ -492,7 +491,7 @@ namespace fNbt {
         /// <param name="tagName"> Name of the tag. May be null (to look for next unnamed tag). </param>
         /// <returns> <c>true</c> if a matching tag is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public bool ReadToFollowing(string? tagName) {
             while (ReadToFollowing()) {
                 if (TagName == tagName) {
@@ -503,14 +502,14 @@ namespace fNbt {
         }
 
 
-        /// <summary> Advances the NbtReader to the next descendant tag with the specified name.
+        /// <summary> Advances the <see cref="NbtReader"/> to the next descendant tag with the specified name.
         /// If none matches, the reader is left on the first tag outside the current tag's subtree:
         /// its next sibling, an enclosing container's End tag when <see cref="SkipEndTags"/> is
         /// <c>false</c>, or the end of the stream. </summary>
         /// <param name="tagName"> Name of the tag you wish to move to. May be null (to look for next unnamed tag). </param>
         /// <returns> <c>true</c> if a matching descendant tag is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public bool ReadToDescendant(string? tagName) {
             if (state == ParseState.Error) {
                 throw new InvalidReaderStateException(ErroneousStateError);
@@ -529,11 +528,11 @@ namespace fNbt {
         }
 
 
-        /// <summary> Advances the NbtReader to the next sibling tag, skipping any child tags.
-        /// If there are no more siblings, NbtReader is positioned on the tag following the last of this tag's descendants. </summary>
+        /// <summary> Advances the <see cref="NbtReader"/> to the next sibling tag, skipping any child tags.
+        /// If there are no more siblings, <see cref="NbtReader"/> is positioned on the tag following the last of this tag's descendants. </summary>
         /// <returns> <c>true</c> if a sibling element is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public bool ReadToNextSibling() {
             if (state == ParseState.Error) {
                 throw new InvalidReaderStateException(ErroneousStateError);
@@ -555,12 +554,12 @@ namespace fNbt {
         }
 
 
-        /// <summary> Advances the NbtReader to the next sibling tag with the specified name.
-        /// If a matching sibling tag is not found, NbtReader is positioned on the tag following the last siblings. </summary>
+        /// <summary> Advances the <see cref="NbtReader"/> to the next sibling tag with the specified name.
+        /// If a matching sibling tag is not found, <see cref="NbtReader"/> is positioned on the tag following the last siblings. </summary>
         /// <param name="tagName"> The name of the sibling tag you wish to move to. </param>
         /// <returns> <c>true</c> if a matching sibling element is found; otherwise <c>false</c>. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public bool ReadToNextSibling(string? tagName) {
             while (ReadToNextSibling()) {
                 if (TagName == tagName) {
@@ -575,7 +574,7 @@ namespace fNbt {
         /// In other words, reads until parent tag's sibling. </summary>
         /// <returns> Total number of tags that were skipped. Returns 0 if end of the stream is reached. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public int Skip() {
             if (state == ParseState.Error) {
                 throw new InvalidReaderStateException(ErroneousStateError);
@@ -634,14 +633,14 @@ namespace fNbt {
 
 
         /// <summary> Reads the entirety of the current tag, including any descendants,
-        /// and constructs an NbtTag object of the appropriate type. Cannot be called on an End tag,
-        /// which no NbtTag represents; the reader stays usable after that refusal. </summary>
-        /// <returns> Constructed NbtTag object. </returns>
+        /// and constructs an <see cref="NbtTag"/> object of the appropriate type. Cannot be called on an End tag,
+        /// which no <see cref="NbtTag"/> represents; the reader stays usable after that refusal. </summary>
+        /// <returns> Constructed <see cref="NbtTag"/> object. </returns>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
         /// <exception cref="InvalidOperationException"> The reader is on an End tag, or the tag's value has
-        /// already been read and CacheTagValues is false. </exception>
+        /// already been read and <see cref="CacheTagValues"/> is false. </exception>
         public NbtTag ReadAsTag() {
             switch (state) {
                 case ParseState.Error:
@@ -711,11 +710,11 @@ namespace fNbt {
                 parentAsList.Add(thisTag);
             } else if (parent is NbtCompound parentAsCompound) {
                 try {
-                    parentAsCompound.Add(thisTag);
-                } catch (ArgumentException) {
-                    // A duplicate name is malformed input, not a caller error.
+                    parentAsCompound.AddLoaded(thisTag, reader.RejectDuplicateNames);
+                } catch (NbtFormatException) {
+                    // A refused duplicate name is malformed input, not a caller error
                     state = ParseState.Error;
-                    throw new NbtFormatException("Duplicate tag name in compound: " + thisTag.Name);
+                    throw;
                 }
             } else {
                 // cannot happen unless NbtReader is bugged
@@ -819,7 +818,7 @@ namespace fNbt {
         /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="InvalidOperationException"> Value has already been read, or there is no value to read. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         /// <exception cref="InvalidCastException"> Tag value cannot be converted to the requested type. </exception>
         /// <exception cref="FormatException"> A string value is not in a format the requested type accepts,
         /// or names no member of the requested enum type. </exception>
@@ -827,14 +826,14 @@ namespace fNbt {
         public T ReadValueAs<T>() {
             object value = ReadValue();
             if (value is T exact) return exact;
-            if (typeof(T).IsEnum) return (T)ConvertToEnum(value, typeof(T));
+            if (typeof(T).IsEnum) return (T)ConvertToEnum(value, typeof(T), Type.GetTypeCode(typeof(T)));
             return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
         }
 
 
-        // Enum.ToObject widens any integral value; names go through Enum.Parse, whose bad-name
-        // failure is reported like any other unparseable string
-        static object ConvertToEnum(object value, Type enumType) {
+        // Enum.ToObject can silently wrap numbers. Convert first to check that the value fits.
+        // Typed overloads avoid an extra allocation.
+        static object ConvertToEnum(object value, Type enumType, TypeCode underlyingCode) {
             if (value is string name) {
                 try {
                     return Enum.Parse(enumType, name);
@@ -843,7 +842,24 @@ namespace fNbt {
                 }
             }
             if (value is byte || value is short || value is int || value is long) {
-                return Enum.ToObject(enumType, value);
+                switch (underlyingCode) {
+                    case TypeCode.SByte:
+                        return Enum.ToObject(enumType, Convert.ToSByte(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Byte:
+                        return Enum.ToObject(enumType, Convert.ToByte(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int16:
+                        return Enum.ToObject(enumType, Convert.ToInt16(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt16:
+                        return Enum.ToObject(enumType, Convert.ToUInt16(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int32:
+                        return Enum.ToObject(enumType, Convert.ToInt32(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt32:
+                        return Enum.ToObject(enumType, Convert.ToUInt32(value, CultureInfo.InvariantCulture));
+                    case TypeCode.Int64:
+                        return Enum.ToObject(enumType, Convert.ToInt64(value, CultureInfo.InvariantCulture));
+                    case TypeCode.UInt64:
+                        return Enum.ToObject(enumType, Convert.ToUInt64(value, CultureInfo.InvariantCulture));
+                }
             }
             throw new InvalidCastException("Cannot convert a " + value.GetType() + " value to " + enumType + ".");
         }
@@ -855,7 +871,7 @@ namespace fNbt {
         /// <exception cref="EndOfStreamException"> End of stream has been reached (no more tags can be read). </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         /// <exception cref="InvalidOperationException"> Value has already been read, or there is no value to read. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         public object ReadValue() {
             if (state == ParseState.Error) {
                 throw new InvalidReaderStateException(ErroneousStateError);
@@ -944,7 +960,7 @@ namespace fNbt {
         /// <typeparamref name="T"/> is not a type values can be converted to. </exception>
         /// <exception cref="FormatException"> A value could not be converted to <typeparamref name="T"/>. </exception>
         /// <exception cref="OverflowException"> A value does not fit in <typeparamref name="T"/>. </exception>
-        /// <exception cref="InvalidReaderStateException"> If NbtReader cannot recover from a previous parsing error. </exception>
+        /// <exception cref="InvalidReaderStateException"> If <see cref="NbtReader"/> cannot recover from a previous parsing error. </exception>
         /// <exception cref="NbtFormatException"> If an error occurred while parsing data in NBT format. </exception>
         public T[] ReadListAsArray<T>() {
             NbtTagType elementType;
@@ -959,12 +975,7 @@ namespace fNbt {
                 case ParseState.AtListBeginning:
                     // Validate before changing any state
                     elementType = ListType;
-                    if (!IsListValueType(elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
-                    }
-                    if (!IsConvertibleTarget(typeof(T), elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
-                    }
+                    EnsureTypesAreConvertible(elementType, typeof(T));
                     if (TagLength == 0) {
                         // Nothing to enter, so the cursor stays on the list and the next step
                         // treats it like any other list tag
@@ -982,12 +993,7 @@ namespace fNbt {
                     // element type comes from the node that entered it
                     NullableSupport.Assert(nodes != null);
                     elementType = nodes[nodeCount - 1].ListType;
-                    if (!IsListValueType(elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
-                    }
-                    if (!IsConvertibleTarget(typeof(T), elementType)) {
-                        throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + typeof(T) + ".");
-                    }
+                    EnsureTypesAreConvertible(elementType, typeof(T));
                     if (ListIndex >= ParentTagLength) {
                         // An earlier bulk read consumed everything
                         unpublished = 0;
@@ -1005,8 +1011,8 @@ namespace fNbt {
 
             try {
                 // Check if declared length is plausible (fits into remaining stream) before allocating huge buffers.
-                // The allocation estimate uses the managed element size, since T may be wider than the wire type.
-                reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>(elementType));
+                // Conversion can change the size of each element, so use the result type for the allocation limit.
+                reader.EnsureAllocation((long)elementsToRead * ManagedElementSize<T>());
                 reader.EnsureCanRead((long)elementsToRead * MinElementSize(elementType, reader.UsesVarInt));
 
                 // Exact-type matches skip boxing and conversion dispatch, and ints and longs
@@ -1072,31 +1078,43 @@ namespace fNbt {
         }
 
 
-        // The types list values can be converted to: primitives, string and decimal through
-        // Convert.ChangeType, and enums from integral values or names. Anything else would fail
-        // only after elements were consumed. GetTypeCode reports an enum as its underlying type,
-        // so enums are checked first.
-        static bool IsConvertibleTarget(Type type, NbtTagType elementType) {
-            if (type.IsEnum) {
+        // Reject unsupported types before consuming any elements. Check enums first because
+        // GetTypeCode reports their underlying type, but they need different conversion rules.
+        static void EnsureTypesAreConvertible(NbtTagType elementType, Type targetType) {
+            if (targetType.IsEnum) {
                 switch (elementType) {
                     case NbtTagType.Byte:
                     case NbtTagType.Short:
                     case NbtTagType.Int:
                     case NbtTagType.Long:
                     case NbtTagType.String:
-                        return true;
+                        return;
                     default:
-                        return false;
+                        throw new InvalidOperationException("ReadListAsArray may only be used on lists of integral types or strings when reading into an enum type.");
                 }
             }
-            switch (Type.GetTypeCode(type)) {
+
+            switch (elementType) {
+                case NbtTagType.Byte:
+                case NbtTagType.Short:
+                case NbtTagType.Int:
+                case NbtTagType.Long:
+                case NbtTagType.Float:
+                case NbtTagType.Double:
+                case NbtTagType.String:
+                    break;
+                default:
+                    throw new InvalidOperationException("ReadListAsArray may only be used on lists of value types.");
+            }
+
+            switch (Type.GetTypeCode(targetType)) {
                 case TypeCode.Object:
                 case TypeCode.DateTime:
                 case TypeCode.DBNull:
                 case TypeCode.Empty:
-                    return false;
+                    throw new InvalidOperationException("ReadListAsArray cannot convert list values to " + targetType + ".");
                 default:
-                    return true;
+                    return;
             }
         }
 
@@ -1127,26 +1145,11 @@ namespace fNbt {
                 return result;
             }
 #endif
+            TypeCode underlyingCode = Type.GetTypeCode(typeof(T));
             for (int i = 0; i < count; i++) {
-                result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T));
+                result[i] = (T)ConvertToEnum(ReadBoxedValue(elementType), typeof(T), underlyingCode);
             }
             return result;
-        }
-
-
-        static bool IsListValueType(NbtTagType type) {
-            switch (type) {
-                case NbtTagType.Byte:
-                case NbtTagType.Short:
-                case NbtTagType.Int:
-                case NbtTagType.Long:
-                case NbtTagType.Float:
-                case NbtTagType.Double:
-                case NbtTagType.String:
-                    return true;
-                default:
-                    return false;
-            }
         }
 
 
@@ -1171,26 +1174,38 @@ namespace fNbt {
         }
 
 
-        // Size of one element of the array that ReadListAsArray is about to allocate. The wire
-        // size is the fallback for exotic conversion targets.
-        static int ManagedElementSize<T>(NbtTagType wireType) {
+        static int ManagedElementSize<T>() {
             Type target = typeof(T);
-            if (target == typeof(byte) || target == typeof(sbyte)) return 1;
+            if (target == typeof(byte) || target == typeof(sbyte) || target == typeof(bool)) return 1;
             if (target == typeof(short) || target == typeof(ushort) || target == typeof(char)) return 2;
             if (target == typeof(int) || target == typeof(uint) || target == typeof(float)) return 4;
             if (target == typeof(long) || target == typeof(ulong) || target == typeof(double)) return 8;
+            if (target == typeof(decimal)) return sizeof(decimal);
             // Array slots for reference types like string hold pointers
             if (!target.IsValueType) return IntPtr.Size;
-            return MinElementSize(wireType, false);
+            // Only enums remain; TypeCode gives their underlying type.
+            switch (Type.GetTypeCode(target)) {
+                case TypeCode.SByte:
+                case TypeCode.Byte:
+                    return 1;
+                case TypeCode.Int16:
+                case TypeCode.UInt16:
+                    return 2;
+                case TypeCode.Int32:
+                case TypeCode.UInt32:
+                    return 4;
+                default:
+                    return 8;
+            }
         }
 
 
-        /// <summary> Parsing option: Whether NbtReader should skip End tags in ReadToFollowing() automatically while parsing.
+        /// <summary> Parsing option: Whether <see cref="NbtReader"/> should skip End tags in <see cref="ReadToFollowing()"/> automatically while parsing.
         /// Default is <c>true</c>. </summary>
         public bool SkipEndTags { get; set; }
 
-        /// <summary> Parsing option: Whether NbtReader should save a copy of the most recently read tag's value.
-        /// Unless CacheTagValues is <c>true</c>, tag values can only be read once. Default is <c>false</c>. </summary>
+        /// <summary> Parsing option: Whether <see cref="NbtReader"/> should save a copy of the most recently read tag's value.
+        /// Unless <see cref="CacheTagValues"/> is <c>true</c>, tag values can only be read once. Default is <c>false</c>. </summary>
         public bool CacheTagValues {
             get { return cacheTagValues; }
             set {
@@ -1204,25 +1219,25 @@ namespace fNbt {
         bool cacheTagValues;
 
 
-        /// <summary> Returns a String that represents the tag currently being read by this NbtReader instance.
+        /// <summary> Returns a String that represents the tag currently being read by this <see cref="NbtReader"/> instance.
         /// Prints current tag's depth, ordinal number, type, name, and size (for arrays and lists). Does not print value.
-        /// Indents the tag according default indentation (NbtTag.DefaultIndentString). </summary>
+        /// Indents the tag according default indentation (<see cref="NbtTag.DefaultIndentString"/>). </summary>
         public override string ToString() {
             return ToString(false, NbtTag.DefaultIndentString);
         }
 
 
-        /// <summary> Returns a String that represents the tag currently being read by this NbtReader instance.
+        /// <summary> Returns a String that represents the tag currently being read by this <see cref="NbtReader"/> instance.
         /// Prints current tag's depth, ordinal number, type, name, size (for arrays and lists), and optionally value.
-        /// Indents the tag according default indentation (NbtTag.DefaultIndentString). </summary>
+        /// Indents the tag according default indentation (<see cref="NbtTag.DefaultIndentString"/>). </summary>
         /// <param name="includeValue"> If set to <c>true</c>, also reads and prints the current tag's value. 
-        /// Note that unless CacheTagValues is set to <c>true</c>, you can only read every tag's value ONCE. </param>
+        /// Note that unless <see cref="CacheTagValues"/> is set to <c>true</c>, you can only read every tag's value ONCE. </param>
         public string ToString(bool includeValue) {
             return ToString(includeValue, NbtTag.DefaultIndentString);
         }
 
 
-        /// <summary> Returns a String that represents the current NbtReader object.
+        /// <summary> Returns a String that represents the current <see cref="NbtReader"/> object.
         /// Prints current tag's depth, ordinal number, type, name, size (for arrays and lists), and optionally value. </summary>
         /// <param name="indentString"> String to be used for indentation. May be empty string, but may not be <c>null</c>. </param>
         /// <param name="includeValue"> If set to <c>true</c>, also reads and prints the current tag's value. </param>

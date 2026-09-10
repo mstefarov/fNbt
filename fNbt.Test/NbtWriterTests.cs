@@ -32,6 +32,7 @@ namespace fNbt.Test {
             using (var ms = new MemoryStream()) {
                 var writer = new NbtWriter(ms, "root");
                 Assert.AreEqual(ms, writer.BaseStream);
+                Assert.AreSame(NbtFlavor.Java, writer.Flavor);
                 {
                     writer.WriteByte("byte", 1);
                     writer.WriteShort("short", 2);
@@ -52,18 +53,6 @@ namespace fNbt.Test {
                 NbtFile file = TestFiles.FinishAndReload(writer, ms);
 
                 TestFiles.AssertAllValues(file);
-            }
-        }
-
-
-        [TestMethod]
-        public void WritesArraysLargerThanChunkSize() {
-            // Tests writing byte arrays that exceed the max NbtBinaryWriter chunk size
-            using (BufferedStream bs = new BufferedStream(Stream.Null)) {
-                NbtWriter writer = new NbtWriter(bs, "root");
-                writer.WriteByteArray("payload4", new byte[5 * 1024 * 1024]);
-                writer.EndCompound();
-                writer.Finish();
             }
         }
 

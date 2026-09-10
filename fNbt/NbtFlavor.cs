@@ -61,7 +61,7 @@ namespace fNbt {
         /// <summary> Short display name of this flavor, e.g. "Java" or "BedrockNetwork". </summary>
         public string Name { get; }
 
-        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and ClassiCube,
+        /// <summary> Whether multi-byte values are big-endian. True for the Java flavors and <see cref="ClassiCube"/>,
         /// false for the Bedrock flavors. </summary>
         public bool BigEndian { get; }
 
@@ -71,7 +71,7 @@ namespace fNbt {
 
         /// <summary> Whether strings are written as Java's modified UTF-8 (CESU-8 pairs for
         /// astral characters, the overlong <c>C0 80</c> form for NUL, lone surrogates preserved).
-        /// True for the Java flavors and ClassiCube; the Bedrock flavors write standard UTF-8.
+        /// True for the Java flavors and <see cref="ClassiCube"/>; the Bedrock flavors write standard UTF-8.
         /// Reads accept both encodings on every flavor. </summary>
         public bool UsesModifiedUtf8 { get; }
 
@@ -140,11 +140,8 @@ namespace fNbt {
                     int listChildBudget = NbtTag.ConsumeDepthBudget(depthBudget);
                     NbtList list = (NbtList)tag;
                     // The element type is written even for empty lists, so it needs its own check
-                    if (list.ListType == NbtTagType.Unknown) {
-                        throw NbtFormatException.UnknownListType();
-                    }
-                    if (list.ListType > MaxTagType) {
-                        throw NbtFormatException.NotPermitted(this, list.ListType);
+                    if (list.WireListType > MaxTagType) {
+                        throw NbtFormatException.NotPermitted(this, list.WireListType);
                     }
                     foreach (NbtTag child in list.tags) {
                         ValidateTree(child, listChildBudget);
@@ -164,9 +161,7 @@ namespace fNbt {
             }
             long byteCount = NbtStringCodec.GetByteCount(value, UsesModifiedUtf8);
             if (byteCount > MaxStringBytes) {
-                throw new NbtFormatException(
-                    "String is " + byteCount + " bytes, but the " + Name +
-                    " flavor allows at most " + MaxStringBytes + ".");
+                throw NbtFormatException.StringTooLong(this, byteCount);
             }
         }
 
